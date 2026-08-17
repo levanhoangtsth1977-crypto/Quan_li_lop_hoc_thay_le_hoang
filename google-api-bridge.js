@@ -1,4 +1,4 @@
-/* QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG - GOOGLE API BRIDGE 2.5.0 */
+/* QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG - GOOGLE API BRIDGE 2.6.0 */
 "use strict";
 
 const GOOGLE_API_CONFIG = Object.freeze({
@@ -24,8 +24,43 @@ function googleApiRequest(action, params = {}) {
     }).finally(() => clearTimeout(timer));
 }
 
+function googleApiJsonp(action, params = {}) {
+    return new Promise((resolve, reject) => {
+        const callback = `__googleApi_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const script = document.createElement("script");
+        const query = new URLSearchParams({ action, callback, ...params });
+        let finished = false;
+
+        const cleanup = () => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            delete window[callback];
+            script.remove();
+        };
+
+        const timer = setTimeout(() => {
+            cleanup();
+            reject(new Error("API JSONP timeout."));
+        }, GOOGLE_API_CONFIG.timeout);
+
+        window[callback] = result => {
+            cleanup();
+            if (result && result.ok === true) resolve(result);
+            else reject(new Error(result?.error || result?.message || "API không trả dữ liệu hợp lệ."));
+        };
+
+        script.onerror = () => {
+            cleanup();
+            reject(new Error("Không tải được phản hồi JSONP từ Apps Script."));
+        };
+        script.async = true;
+        script.src = `${GOOGLE_API_CONFIG.url}?${query.toString()}`;
+        document.head.appendChild(script);
+    });
+}
+
 function googleApiPost(action, payload = {}) {
-    const body = JSON.stringify({ action, ...payload });
     return fetch(GOOGLE_API_CONFIG.url, {
         method: "POST",
         mode: "no-cors",
@@ -33,7 +68,7 @@ function googleApiPost(action, payload = {}) {
         redirect: "follow",
         keepalive: true,
         headers: { "Content-Type": "text/plain;charset=UTF-8" },
-        body
+        body: JSON.stringify({ action, ...payload })
     }).then(() => ({ ok: true, action, dispatched: true }));
 }
 
@@ -48,14 +83,11 @@ async function verifyAttendanceRecord(record, attempt = 0) {
     if (!studentId || !date) throw new Error("Thiếu studentId hoặc date để xác minh.");
 
     try {
-        const result = await googleApiRequest("getAttendance", {
+        const result = await googleApiJsonp("getAttendance", {
             studentId,
             from: date,
             to: date
         });
-        if (!result || result.ok !== true) {
-            throw new Error(result?.error || result?.message || "Không đọc được dữ liệu điểm danh.");
-        }
         const rows = Array.isArray(result.records) ? result.records : [];
         const found = rows.some(row =>
             String(row.studentId || "").trim() === studentId &&
@@ -73,16 +105,99 @@ async function verifyAttendanceRecord(record, attempt = 0) {
     }
 }
 
-async function syncAttendanceRecords(records) {
-    const valid = records.filter(record => record && record.studentId && record.date);
-    if (!valid.length) throw new Error("Không có bản ghi điểm danh hợp lệ để đồng bộ.");
+function normalizeAttendanceRecord(studentId, date, status, note) {
+    return {
+        studentId: String(studentId || "").trim(),
+        date: String(date || "").trim(),
+        status: String(status || "").trim(),
+        note: String(note || "")
+    };
+}
 
-    const results = [];
-    for (const record of valid) {
-        await googleApiPost("saveAttendance", { record });
-        results.push(await verifyAttendanceRecord(record));
+async function syncOneAttendance(record) {
+    if (!record.studentId || !record.date || !record.status) {
+        throw new Error("Bản ghi điểm danh thiếu studentId, date hoặc status.");
     }
-    return { ok: true, count: results.length, verified: true, results };
+    await googleApiPost("saveAttendance", { record });
+    return verifyAttendanceRecord(record);
+}
+
+function installAttendanceWriteBridge() {
+    if (window.__GOOGLE_ATTENDANCE_WRITE_BRIDGE_260__) return;
+    const original = window.saveAttendanceRecord;
+    if (typeof original !== "function") {
+        console.warn("[GOOGLE WRITE] Không tìm thấy saveAttendanceRecord().");
+        return;
+    }
+
+    window.saveAttendanceRecord = function (studentId, date, status, note) {
+        const record = normalizeAttendanceRecord(studentId, date, status, note);
+        const localResult = original.apply(this, arguments);
+
+        if (!record.studentId || !record.date || !record.status) {
+            return localResult;
+        }
+
+        syncOneAttendance(record).then(result => {
+            window.__GOOGLE_LAST_WRITE__ = {
+                ok: true,
+                action: "saveAttendance",
+                verified: true,
+                count: 1,
+                record: result,
+                at: new Date().toISOString()
+            };
+            if (typeof window.showToast === "function") {
+                window.showToast("Đã đồng bộ điểm danh lên Google Sheets.", "success");
+            }
+        }).catch(error => {
+            console.error("[GOOGLE WRITE] saveAttendance:", error);
+            window.__GOOGLE_LAST_WRITE__ = {
+                ok: false,
+                action: "saveAttendance",
+                verified: false,
+                error: error.message,
+                at: new Date().toISOString()
+            };
+            if (typeof window.showToast === "function") {
+                window.showToast("Đã lưu cục bộ nhưng chưa đồng bộ Google Sheets.", "warning");
+            }
+        });
+
+        return localResult;
+    };
+
+    window.__GOOGLE_ATTENDANCE_WRITE_BRIDGE_260__ = true;
+}
+
+function installWriteBridge() {
+    if (window.__GOOGLE_WRITE_BRIDGE_260__) return;
+    const saveMap = [
+        ["addViolation", "saveViolation", "violation"],
+        ["addReward", "saveReward", "reward"],
+        ["addLearningRecord", "saveLearning", "learning"],
+        ["addProgressRecord", "saveProgress", "progress"],
+        ["addComment", "saveComment", "comment"]
+    ];
+
+    saveMap.forEach(([functionName, apiAction, type]) => {
+        const original = window[functionName];
+        if (typeof original !== "function") return;
+        window[functionName] = function (...args) {
+            const localResult = original.apply(this, args);
+            const base = localResult?.record && typeof localResult.record === "object" ? { ...localResult.record } : {};
+            const record = args[0] && typeof args[0] === "object" ? { ...base, ...args[0] } : base;
+            googleApiPost(apiAction, { record }).then(() => {
+                window.__GOOGLE_LAST_WRITE__ = { ok: true, action: apiAction, at: new Date().toISOString() };
+            }).catch(error => {
+                console.error(`[GOOGLE WRITE] ${apiAction}:`, error);
+                window.__GOOGLE_LAST_WRITE__ = { ok: false, action: apiAction, error: error.message, at: new Date().toISOString() };
+            });
+            return localResult;
+        };
+    });
+
+    window.__GOOGLE_WRITE_BRIDGE_260__ = true;
 }
 
 function syncStudentsFromGoogle() {
@@ -104,100 +219,8 @@ function syncStudentsFromGoogle() {
     });
 }
 
-function buildRecord(type, args, localResult) {
-    const base = localResult?.record && typeof localResult.record === "object" ? { ...localResult.record } : {};
-    if (type === "attendance") {
-        return {
-            ...base,
-            studentId: args[0],
-            date: args[1],
-            status: args[2],
-            note: args[3] || ""
-        };
-    }
-    if (args[0] && typeof args[0] === "object") return { ...base, ...args[0] };
-    return base;
-}
-
-function installWriteBridge() {
-    if (window.__GOOGLE_WRITE_BRIDGE_250__) return;
-    const saveMap = [
-        ["addViolation", "saveViolation", "violation"],
-        ["addReward", "saveReward", "reward"],
-        ["addLearningRecord", "saveLearning", "learning"],
-        ["addProgressRecord", "saveProgress", "progress"],
-        ["addComment", "saveComment", "comment"]
-    ];
-
-    saveMap.forEach(([functionName, apiAction, type]) => {
-        const original = window[functionName];
-        if (typeof original !== "function") return;
-        window[functionName] = function (...args) {
-            const localResult = original.apply(this, args);
-            const record = buildRecord(type, args, localResult);
-            googleApiPost(apiAction, { record }).then(() => {
-                window.__GOOGLE_LAST_WRITE__ = {
-                    ok: true,
-                    action: apiAction,
-                    at: new Date().toISOString()
-                };
-            }).catch(error => {
-                console.error(`[GOOGLE WRITE] ${apiAction}:`, error);
-                window.__GOOGLE_LAST_WRITE__ = {
-                    ok: false,
-                    action: apiAction,
-                    error: error.message,
-                    at: new Date().toISOString()
-                };
-            });
-            return localResult;
-        };
-    });
-    window.__GOOGLE_WRITE_BRIDGE_250__ = true;
-}
-
-function installAttendanceButtonBridge() {
-    if (window.__GOOGLE_ATTENDANCE_BUTTON_BRIDGE_250__) return;
-    const button = document.getElementById("saveAttendance");
-    if (!button) return;
-
-    button.addEventListener("click", () => {
-        setTimeout(async () => {
-            try {
-                const records = Array.isArray(window.attendanceRecords) ? window.attendanceRecords : [];
-                const date = document.getElementById("attendanceDate")?.value || "";
-                const selected = records.filter(r => !date || String(r.date || "") === date);
-                const result = await syncAttendanceRecords(selected);
-                window.__GOOGLE_LAST_WRITE__ = {
-                    ok: true,
-                    action: "saveAttendance",
-                    count: result.count,
-                    verified: true,
-                    at: new Date().toISOString()
-                };
-                if (typeof window.showToast === "function") {
-                    window.showToast(`Đã đồng bộ và xác minh ${result.count} bản ghi trên Google Sheets.`, "success");
-                }
-            } catch (error) {
-                console.error("[GOOGLE WRITE] saveAttendance:", error);
-                window.__GOOGLE_LAST_WRITE__ = {
-                    ok: false,
-                    action: "saveAttendance",
-                    error: error.message,
-                    verified: false,
-                    at: new Date().toISOString()
-                };
-                if (typeof window.showToast === "function") {
-                    window.showToast("Lưu cục bộ thành công nhưng chưa đồng bộ Google Sheets.", "warning");
-                }
-            }
-        }, 300);
-    }, false);
-    window.__GOOGLE_ATTENDANCE_BUTTON_BRIDGE_250__ = true;
-}
-
 function refreshAfterGoogleSync() {
-    ["renderDashboard","renderStudents","renderAttendance","renderViolations","renderRewards","renderLearningSafe","renderCommentsSafe","renderStatistics","renderStudentLinks"].forEach(name => {
+    ["renderDashboard", "renderStudents", "renderAttendance", "renderViolations", "renderRewards", "renderLearningSafe", "renderCommentsSafe", "renderStatistics", "renderStudentLinks"].forEach(name => {
         if (typeof window[name] === "function") {
             try { window[name](); } catch (_) {}
         }
@@ -208,16 +231,16 @@ function initializeGoogleApiBridge() {
     const wait = () => {
         if (typeof window.replaceStudents !== "function") return setTimeout(wait, 50);
         syncStudentsFromGoogle().then(result => {
+            installAttendanceWriteBridge();
             installWriteBridge();
-            installAttendanceButtonBridge();
             refreshAfterGoogleSync();
             if (typeof window.showToast === "function") {
                 window.showToast(`Đã đồng bộ ${result.count} học sinh từ Google Sheets.`, "success");
             }
         }).catch(error => {
             console.warn("[GOOGLE API] Sync failed:", error);
+            installAttendanceWriteBridge();
             installWriteBridge();
-            installAttendanceButtonBridge();
         });
     };
     wait();
