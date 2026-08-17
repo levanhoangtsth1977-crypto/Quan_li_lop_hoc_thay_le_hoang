@@ -1,0 +1,231 @@
+name: Fix student links
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Patch student links renderer
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path("script.js")
+          text = path.read_text(encoding="utf-8")
+
+          replacement = r'''function renderStudentLinks() {
+
+    const container =
+        byId("studentLinksList") ||
+        byId("studentLinkList");
+
+    if (!container) {
+        return;
+    }
+
+    let students = [];
+
+    try {
+        students = getStudentsSafe();
+    } catch (error) {
+        console.error("renderStudentLinks/getStudentsSafe:", error);
+    }
+
+    if (!Array.isArray(students) || !students.length) {
+        if (Array.isArray(window.students)) {
+            students = window.students;
+        } else if (Array.isArray(window.classData?.students)) {
+            students = window.classData.students;
+        } else if (Array.isArray(window.appData?.students)) {
+            students = window.appData.students;
+        } else {
+            students = [];
+        }
+    }
+
+    students = students
+        .filter(student =>
+            student &&
+            typeof student === "object" &&
+            normalizeText(student.name)
+        )
+        .slice()
+        .sort((a, b) =>
+            normalizeText(a.name).localeCompare(
+                normalizeText(b.name),
+                "vi",
+                { sensitivity: "base" }
+            )
+        );
+
+    const total = students.length;
+
+    if (!total) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <strong>Chưa có học sinh</strong>
+                <p>Hãy kiểm tra lại danh sách học sinh trong Data Engine.</p>
+            </div>
+        `;
+        return;
+    }
+
+    const rows = students.map((student, index) => {
+
+        const studentId = normalizeText(student.id);
+
+        let link = "";
+
+        if (studentId) {
+            link = safeCall("getStudentLink", studentId) || "";
+        }
+
+        if (!link && studentId && typeof window !== "undefined") {
+            link =
+                window.location.origin +
+                window.location.pathname +
+                "?student=" +
+                encodeURIComponent(studentId);
+        }
+
+        return `
+            <div class="student-link-item">
+                <div>
+                    <strong>${index + 1}. ${escapeHTML(student.name)}</strong>
+                </div>
+
+                <input
+                    type="text"
+                    readonly
+                    value="${escapeHTML(link)}"
+                    aria-label="Link học sinh ${escapeHTML(student.name)}"
+                >
+
+                <button
+                    type="button"
+                    class="button secondary"
+                    data-open-student-link="${escapeHTML(link)}"
+                    ${link ? "" : "disabled"}
+                >
+                    <i class="fa-solid fa-up-right-from-square"></i>
+                    Mở
+                </button>
+
+                <button
+                    type="button"
+                    class="button secondary"
+                    data-copy-student-link="${escapeHTML(link)}"
+                    ${link ? "" : "disabled"}
+                >
+                    <i class="fa-solid fa-copy"></i>
+                    Sao chép
+                </button>
+            </div>
+        `;
+    }).join("");
+
+    container.innerHTML = `
+        <div class="student-links-summary">
+            <strong>Danh sách link học sinh</strong>
+            <span>Tổng số: ${total} học sinh</span>
+        </div>
+        ${rows}
+    `;
+}
+
+
+async function copyStudentLink('''
+
+          pattern = r"function renderStudentLinks\(\)\s*\{.*?\n\}\s*\n\s*\n\s*async function copyStudentLink\("
+          patched, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
+
+          if count != 1:
+              raise SystemExit("Không tìm thấy đúng function renderStudentLinks() để patch an toàn.")
+
+          path.write_text(patched, encoding="utf-8")
+          print("Patched renderStudentLinks()")
+
+      - name: Add open-link event handling
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path("script.js")
+          text = path.read_text(encoding="utf-8")
+
+          marker = 'function handlePageLink(\n'
+          block = r'''function handleOpenStudentLink(event) {
+
+    const button =
+        event.target.closest("[data-open-student-link]");
+
+    if (!button) {
+        return false;
+    }
+
+    event.preventDefault();
+
+    const link =
+        button.dataset.openStudentLink || "";
+
+    if (!link) {
+        showToast("Link học sinh chưa có.", "warning");
+        return true;
+    }
+
+    window.open(link, "_blank", "noopener,noreferrer");
+
+    return true;
+}
+
+
+'''
+
+          if "function handleOpenStudentLink(event)" not in text:
+              if marker not in text:
+                  raise SystemExit("Không tìm thấy vị trí chèn event handler.")
+              text = text.replace(marker, block + marker, 1)
+
+          marker2 = 'function handlePageLink(\n'
+          if 'handleOpenStudentLink(event)' not in text[text.find(marker2):]:
+              pass
+
+          # Bind through the existing document click router without duplicating listeners.
+          anchor = '    if (handlePageLink(event)) {\n'
+          if anchor in text and 'handleOpenStudentLink(event)' not in text:
+              text = text.replace(anchor, '    if (handleOpenStudentLink(event)) {\n        return;\n    }\n\n' + anchor, 1)
+          elif 'handleOpenStudentLink(event)' not in text:
+              # Fallback: add one delegated listener near the global event binding section.
+              fallback = '''\ndocument.addEventListener("click", handleOpenStudentLink);\n'''
+              text += fallback
+
+          path.write_text(text, encoding="utf-8")
+          print("Added open-link handling")
+
+      - name: Commit patch and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/fix-student-links.yml
+          git add script.js .github/workflows/fix-student-links.yml
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "Fix complete student links list"
+          git push
