@@ -1,4 +1,4 @@
-/* QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG - GOOGLE API BRIDGE 2.2.0 */
+/* QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG - GOOGLE API BRIDGE 2.3.0 */
 "use strict";
 
 const GOOGLE_API_CONFIG = Object.freeze({
@@ -36,6 +36,38 @@ function googleApiPost(action, payload = {}) {
     }).finally(() => clearTimeout(timer));
 }
 
+function googleApiJsonp(action, payload = {}) {
+    return new Promise((resolve, reject) => {
+        const callback = `__googleApiCb_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const script = document.createElement("script");
+        const query = new URLSearchParams({ action, callback });
+        Object.keys(payload || {}).forEach(key => {
+            const value = payload[key];
+            query.set(key, typeof value === "object" ? JSON.stringify(value) : String(value ?? ""));
+        });
+        const timer = setTimeout(() => {
+            cleanup();
+            reject(new Error("API JSONP timeout"));
+        }, GOOGLE_API_CONFIG.timeout);
+        function cleanup() {
+            clearTimeout(timer);
+            delete window[callback];
+            script.remove();
+        }
+        window[callback] = result => {
+            cleanup();
+            if (result && result.ok === true) resolve(result);
+            else reject(new Error(result?.error || result?.message || "API không xác nhận ghi dữ liệu."));
+        };
+        script.onerror = () => {
+            cleanup();
+            reject(new Error("Không tải được API JSONP."));
+        };
+        script.src = `${GOOGLE_API_CONFIG.url}?${query.toString()}`;
+        document.head.appendChild(script);
+    });
+}
+
 function syncStudentsFromGoogle() {
     return googleApiRequest("getStudents").then(result => {
         if (!result || result.ok !== true) throw new Error(result?.message || result?.error || "API không hợp lệ.");
@@ -57,7 +89,7 @@ function buildRecord(type, args, localResult) {
 }
 
 function installWriteBridge() {
-    if (window.__GOOGLE_WRITE_BRIDGE_220__) return;
+    if (window.__GOOGLE_WRITE_BRIDGE_230__) return;
     const saveMap = [
         ["saveAttendanceRecord", "saveAttendance", "attendance"],
         ["addViolation", "saveViolation", "violation"],
@@ -72,9 +104,8 @@ function installWriteBridge() {
         window[functionName] = function (...args) {
             const localResult = original.apply(this, args);
             const record = buildRecord(type, args, localResult);
-            googleApiPost(apiAction, { record }).then(result => {
-                if (result?.ok !== true) throw new Error(result?.error || "API không xác nhận ghi dữ liệu.");
-                window.__GOOGLE_LAST_WRITE__ = { ok: true, action: apiAction, at: new Date().toISOString() };
+            googleApiJsonp(apiAction, { record }).then(result => {
+                window.__GOOGLE_LAST_WRITE__ = { ok: true, action: apiAction, at: new Date().toISOString(), result };
             }).catch(error => {
                 console.error(`[GOOGLE WRITE] ${apiAction}:`, error);
                 window.__GOOGLE_LAST_WRITE__ = { ok: false, action: apiAction, error: error.message, at: new Date().toISOString() };
@@ -82,11 +113,11 @@ function installWriteBridge() {
             return localResult;
         };
     });
-    window.__GOOGLE_WRITE_BRIDGE_220__ = true;
+    window.__GOOGLE_WRITE_BRIDGE_230__ = true;
 }
 
 function installAttendanceButtonBridge() {
-    if (window.__GOOGLE_ATTENDANCE_BUTTON_BRIDGE_220__) return;
+    if (window.__GOOGLE_ATTENDANCE_BUTTON_BRIDGE_230__) return;
     const button = document.getElementById("saveAttendance");
     if (!button) return;
     button.addEventListener("click", () => {
@@ -98,11 +129,9 @@ function installAttendanceButtonBridge() {
                 console.warn("[GOOGLE WRITE] Không có bản ghi điểm danh để đồng bộ.");
                 return;
             }
-            Promise.all(selected.map(record => googleApiPost("saveAttendance", { record })))
+            Promise.all(selected.map(record => googleApiJsonp("saveAttendance", { record })))
                 .then(results => {
-                    const failed = results.find(r => r?.ok !== true);
-                    if (failed) throw new Error(failed.error || "API không xác nhận điểm danh.");
-                    window.__GOOGLE_LAST_WRITE__ = { ok: true, action: "saveAttendance", count: selected.length, at: new Date().toISOString() };
+                    window.__GOOGLE_LAST_WRITE__ = { ok: true, action: "saveAttendance", count: selected.length, at: new Date().toISOString(), results };
                     if (typeof window.showToast === "function") window.showToast(`Đã đồng bộ ${selected.length} bản ghi điểm danh lên Google Sheets.`, "success");
                 })
                 .catch(error => {
@@ -112,7 +141,7 @@ function installAttendanceButtonBridge() {
                 });
         }, 300);
     }, false);
-    window.__GOOGLE_ATTENDANCE_BUTTON_BRIDGE_220__ = true;
+    window.__GOOGLE_ATTENDANCE_BUTTON_BRIDGE_230__ = true;
 }
 
 function refreshAfterGoogleSync() {
