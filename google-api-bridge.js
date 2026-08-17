@@ -1,4 +1,4 @@
-/* QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG - GOOGLE API BRIDGE 2.3.0 */
+/* QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG - GOOGLE API BRIDGE 2.4.0 */
 "use strict";
 
 const GOOGLE_API_CONFIG = Object.freeze({
@@ -24,48 +24,38 @@ function googleApiPost(action, payload = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), GOOGLE_API_CONFIG.timeout);
     return fetch(GOOGLE_API_CONFIG.url, {
-        method: "POST", cache: "no-store", redirect: "follow", signal: controller.signal,
+        method: "POST", cache: "no-store", redirect: "follow",
         headers: { "Content-Type": "text/plain;charset=UTF-8" },
         body: JSON.stringify({ action, ...payload })
     }).then(async response => {
         if (!response.ok) throw new Error(`API HTTP ${response.status}`);
         const text = await response.text();
-        if (!text) return { ok: true, action };
+        if (!text) return { ok: true, action, responseEmpty: true };
         try { return JSON.parse(text); }
         catch (_) { return { ok: true, action, raw: text }; }
     }).finally(() => clearTimeout(timer));
 }
 
-function googleApiJsonp(action, payload = {}) {
-    return new Promise((resolve, reject) => {
-        const callback = `__googleApiCb_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-        const script = document.createElement("script");
-        const query = new URLSearchParams({ action, callback });
-        Object.keys(payload || {}).forEach(key => {
-            const value = payload[key];
-            query.set(key, typeof value === "object" ? JSON.stringify(value) : String(value ?? ""));
-        });
-        const timer = setTimeout(() => {
-            cleanup();
-            reject(new Error("API JSONP timeout"));
-        }, GOOGLE_API_CONFIG.timeout);
-        function cleanup() {
-            clearTimeout(timer);
-            delete window[callback];
-            script.remove();
-        }
-        window[callback] = result => {
-            cleanup();
-            if (result && result.ok === true) resolve(result);
-            else reject(new Error(result?.error || result?.message || "API không xác nhận ghi dữ liệu."));
-        };
-        script.onerror = () => {
-            cleanup();
-            reject(new Error("Không tải được API JSONP."));
-        };
-        script.src = `${GOOGLE_API_CONFIG.url}?${query.toString()}`;
-        document.head.appendChild(script);
+function verifyAttendanceRecord(record) {
+    const studentId = String(record?.studentId || "").trim();
+    const date = String(record?.date || "").trim();
+    if (!studentId || !date) return Promise.reject(new Error("Thiếu studentId hoặc date để xác minh."));
+    return googleApiRequest("getAttendance", { studentId, from: date, to: date }).then(result => {
+        if (!result || result.ok !== true) throw new Error(result?.error || result?.message || "Không đọc được dữ liệu điểm danh sau khi ghi.");
+        const rows = Array.isArray(result.records) ? result.records : [];
+        const found = rows.some(row => String(row.studentId || "").trim() === studentId && String(row.date || "").trim() === date && String(row.status || "").trim() === String(record.status || "").trim());
+        if (!found) throw new Error("Google Sheets chưa xuất hiện bản ghi điểm danh vừa ghi.");
+        return { ok: true, verified: true, studentId, date };
     });
+}
+
+function syncAttendanceRecords(records) {
+    const valid = records.filter(record => record && record.studentId && record.date);
+    if (!valid.length) return Promise.reject(new Error("Không có bản ghi điểm danh hợp lệ để đồng bộ."));
+    return Promise.all(valid.map(record =>
+        googleApiPost("saveAttendance", { record })
+            .then(() => verifyAttendanceRecord(record))
+    )).then(results => ({ ok: true, count: results.length, verified: true, results }));
 }
 
 function syncStudentsFromGoogle() {
@@ -89,7 +79,7 @@ function buildRecord(type, args, localResult) {
 }
 
 function installWriteBridge() {
-    if (window.__GOOGLE_WRITE_BRIDGE_230__) return;
+    if (window.__GOOGLE_WRITE_BRIDGE_240__) return;
     const saveMap = [
         ["saveAttendanceRecord", "saveAttendance", "attendance"],
         ["addViolation", "saveViolation", "violation"],
@@ -104,20 +94,22 @@ function installWriteBridge() {
         window[functionName] = function (...args) {
             const localResult = original.apply(this, args);
             const record = buildRecord(type, args, localResult);
-            googleApiJsonp(apiAction, { record }).then(result => {
-                window.__GOOGLE_LAST_WRITE__ = { ok: true, action: apiAction, at: new Date().toISOString(), result };
-            }).catch(error => {
-                console.error(`[GOOGLE WRITE] ${apiAction}:`, error);
-                window.__GOOGLE_LAST_WRITE__ = { ok: false, action: apiAction, error: error.message, at: new Date().toISOString() };
-            });
+            googleApiPost(apiAction, { record })
+                .then(() => {
+                    window.__GOOGLE_LAST_WRITE__ = { ok: true, action: apiAction, at: new Date().toISOString() };
+                })
+                .catch(error => {
+                    console.error(`[GOOGLE WRITE] ${apiAction}:`, error);
+                    window.__GOOGLE_LAST_WRITE__ = { ok: false, action: apiAction, error: error.message, at: new Date().toISOString() };
+                });
             return localResult;
         };
     });
-    window.__GOOGLE_WRITE_BRIDGE_230__ = true;
+    window.__GOOGLE_WRITE_BRIDGE_240__ = true;
 }
 
 function installAttendanceButtonBridge() {
-    if (window.__GOOGLE_ATTENDANCE_BUTTON_BRIDGE_230__) return;
+    if (window.__GOOGLE_ATTENDANCE_BUTTON_BRIDGE_240__) return;
     const button = document.getElementById("saveAttendance");
     if (!button) return;
     button.addEventListener("click", () => {
@@ -125,23 +117,19 @@ function installAttendanceButtonBridge() {
             const records = Array.isArray(window.attendanceRecords) ? window.attendanceRecords : [];
             const date = document.getElementById("attendanceDate")?.value || "";
             const selected = records.filter(r => !date || String(r.date || "") === date);
-            if (!selected.length) {
-                console.warn("[GOOGLE WRITE] Không có bản ghi điểm danh để đồng bộ.");
-                return;
-            }
-            Promise.all(selected.map(record => googleApiJsonp("saveAttendance", { record })))
-                .then(results => {
-                    window.__GOOGLE_LAST_WRITE__ = { ok: true, action: "saveAttendance", count: selected.length, at: new Date().toISOString(), results };
-                    if (typeof window.showToast === "function") window.showToast(`Đã đồng bộ ${selected.length} bản ghi điểm danh lên Google Sheets.`, "success");
+            syncAttendanceRecords(selected)
+                .then(result => {
+                    window.__GOOGLE_LAST_WRITE__ = { ok: true, action: "saveAttendance", count: result.count, verified: true, at: new Date().toISOString() };
+                    if (typeof window.showToast === "function") window.showToast(`Đã ghi và xác minh ${result.count} bản ghi trên Google Sheets.`, "success");
                 })
                 .catch(error => {
                     console.error("[GOOGLE WRITE] saveAttendance:", error);
-                    window.__GOOGLE_LAST_WRITE__ = { ok: false, action: "saveAttendance", error: error.message, at: new Date().toISOString() };
-                    if (typeof window.showToast === "function") window.showToast("Điểm danh đã lưu cục bộ nhưng chưa đồng bộ Google Sheets.", "warning");
+                    window.__GOOGLE_LAST_WRITE__ = { ok: false, action: "saveAttendance", error: error.message, verified: false, at: new Date().toISOString() };
+                    if (typeof window.showToast === "function") window.showToast("Chưa xác minh được dữ liệu trên Google Sheets.", "warning");
                 });
         }, 300);
     }, false);
-    window.__GOOGLE_ATTENDANCE_BUTTON_BRIDGE_230__ = true;
+    window.__GOOGLE_ATTENDANCE_BUTTON_BRIDGE_240__ = true;
 }
 
 function refreshAfterGoogleSync() {
