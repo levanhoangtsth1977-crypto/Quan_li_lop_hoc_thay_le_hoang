@@ -1,173 +1,84 @@
 /* ============================================================
-   UI COMPLETE FIX 1.1.0
-   PURPOSE:
-   - Always render ALL students from the Data Engine on Student Links.
-   - Show an explicit X/X counter so missing records are visible.
-   - Keep the list scrollable without a hard 16-item visual limit.
-   - Provide real local UI for Materials / AI / Settings pages.
-   - Do not invent external URLs, students, credentials or secrets.
-   - Do not delete LocalStorage or alter data.js.
+   UI COMPLETE FIX 2.0.0
+   - FIX 42/42 student links
+   - FIX menu navigation
+   - FIX action buttons
+   - FIX Materials / AI / Settings
+   - Does not modify data.js or delete LocalStorage
    ============================================================ */
 (function () {
     "use strict";
 
-    const has = (name) => typeof window[name] === "function";
-    const get = (id) => document.getElementById(id);
-    const text = (value) => String(value ?? "");
-    const esc = (value) => text(value)
+    const $ = (id) => document.getElementById(id);
+    const $$ = (s) => Array.from(document.querySelectorAll(s));
+    const esc = (v) => String(v ?? "")
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
-        .replace(/\"/g, "&quot;")
+        .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
 
-    function getStudents() {
+    function students() {
         try {
-            if (has("getStudentsSafe")) {
-                const value = window.getStudentsSafe();
-                if (Array.isArray(value)) return value.slice();
+            if (typeof window.getStudentsSafe === "function") {
+                const a = window.getStudentsSafe();
+                if (Array.isArray(a)) return a.slice();
             }
-        } catch (error) {
-            console.error("UI FIX getStudentsSafe:", error);
-        }
-
+        } catch (e) { console.error(e); }
         if (Array.isArray(window.students)) return window.students.slice();
         if (Array.isArray(window.classData?.students)) return window.classData.students.slice();
         if (Array.isArray(window.appData?.students)) return window.appData.students.slice();
         return [];
     }
 
-    function getStudentLink(student) {
+    function toast(message, type = "info") {
+        if (typeof window.showToast === "function") window.showToast(message, type);
+        else console.info(message);
+    }
+
+    function studentLink(student) {
         try {
-            if (has("getStudentLink")) {
-                const result = window.getStudentLink(student.id);
-                if (result) return text(result);
+            if (typeof window.getStudentLink === "function") {
+                const v = window.getStudentLink(student.id);
+                if (v) return String(v);
             }
-        } catch (error) {
-            console.error("UI FIX getStudentLink:", error);
-        }
-
-        return window.location.origin + window.location.pathname +
-            "?student=" + encodeURIComponent(student.id);
-    }
-
-    function toast(message, type) {
-        if (has("showToast")) {
-            window.showToast(message, type || "info");
-        } else {
-            console.info(message);
-        }
-    }
-
-    function copyText(value) {
-        if (!value) return Promise.reject(new Error("empty"));
-
-        if (navigator.clipboard && window.isSecureContext) {
-            return navigator.clipboard.writeText(value);
-        }
-
-        const area = document.createElement("textarea");
-        area.value = value;
-        area.style.position = "fixed";
-        area.style.left = "-9999px";
-        document.body.appendChild(area);
-        area.focus();
-        area.select();
-
-        let copied = false;
-        try {
-            copied = document.execCommand("copy");
-        } catch (error) {
-            copied = false;
-        }
-
-        area.remove();
-        return copied ? Promise.resolve() : Promise.reject(new Error("copy-failed"));
-    }
-
-    function findPage(page) {
-        return document.querySelector(`[data-page-section="${page}"]`) ||
-            get(`page-${page}`);
-    }
-
-    function ensurePageContent(page, title, description, cards) {
-        const section = findPage(page);
-        if (!section) return null;
-
-        const existing = section.querySelector("[data-ui-complete-page]");
-        if (existing) return existing;
-
-        const wrapper = document.createElement("div");
-        wrapper.dataset.uiCompletePage = page;
-        wrapper.className = "ui-complete-page";
-
-        wrapper.innerHTML = `
-            <div class="section-heading">
-                <div>
-                    <h2>${esc(title)}</h2>
-                    <p>${esc(description)}</p>
-                </div>
-            </div>
-            <div class="stats-grid ui-complete-grid">
-                ${cards.map(card => `
-                    <article class="stat-card ui-complete-card">
-                        <div class="stat-card-top">
-                            <span class="stat-icon ${esc(card.kind || "student")}">
-                                <i class="fa-solid ${esc(card.icon || "fa-circle-check")}"></i>
-                            </span>
-                        </div>
-                        <strong class="stat-label">${esc(card.title)}</strong>
-                        <p>${esc(card.description)}</p>
-                        <button type="button" class="button ${esc(card.buttonClass || "secondary")}" ${card.actionAttr || ""}>
-                            <i class="fa-solid ${esc(card.buttonIcon || "fa-arrow-right")}"></i>
-                            ${esc(card.buttonText || "Mở")}
-                        </button>
-                    </article>
-                `).join("")}
-            </div>
-        `;
-
-        section.appendChild(wrapper);
-        return wrapper;
+        } catch (e) { console.error(e); }
+        return location.origin + location.pathname + "?student=" + encodeURIComponent(student.id);
     }
 
     function renderStudentLinksFull() {
-        const container = get("studentLinksList") || get("studentLinkList");
-        if (!container) return;
+        const box = $("studentLinksList") || $("studentLinkList");
+        if (!box) return;
 
-        const allStudents = getStudents()
-            .filter(student => student && student.id && text(student.name).trim());
-
-        const list = allStudents.slice().sort((a, b) =>
-            text(a.name).localeCompare(text(b.name), "vi")
+        const all = students().filter(s => s && s.id && String(s.name || "").trim());
+        const list = all.slice().sort((a, b) =>
+            String(a.name).localeCompare(String(b.name), "vi")
         );
 
-        container.style.maxHeight = "70vh";
-        container.style.height = "auto";
-        container.style.overflowY = "auto";
-        container.style.overflowX = "hidden";
-        container.dataset.studentCount = String(list.length);
+        box.style.maxHeight = "none";
+        box.style.height = "auto";
+        box.style.overflowY = "visible";
+        box.style.overflowX = "hidden";
+        box.dataset.studentCount = String(list.length);
 
-        const header = container.parentElement?.querySelector("[data-student-link-counter]");
-        if (header) header.textContent = `Đang hiển thị ${list.length}/${allStudents.length} học sinh`;
+        const counter = box.parentElement?.querySelector("[data-student-link-counter]");
+        if (counter) counter.textContent = `Đang hiển thị ${list.length}/${all.length} học sinh`;
+
+        const countTargets = $$("[data-student-link-count]");
+        countTargets.forEach(el => { el.textContent = `${list.length}/${all.length}`; });
 
         if (!list.length) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <strong>Chưa có học sinh</strong>
-                    <p>Data Engine hiện không trả về danh sách học sinh.</p>
-                </div>
-            `;
+            box.innerHTML = `<div class="empty-state"><strong>Chưa có học sinh</strong><p>Data Engine chưa trả về danh sách học sinh.</p></div>`;
             return;
         }
 
-        container.innerHTML = list.map((student, index) => {
-            const link = getStudentLink(student);
+        box.innerHTML = list.map((s, i) => {
+            const link = studentLink(s);
             return `
-                <div class="student-link-item" data-student-id="${esc(student.id)}">
+                <div class="student-link-item" data-student-id="${esc(s.id)}">
                     <div class="student-link-main">
-                        <strong>${index + 1}. ${esc(student.name)}</strong>
-                        <input type="text" readonly value="${esc(link)}" aria-label="Link ${esc(student.name)}">
+                        <strong>${i + 1}. ${esc(s.name)}</strong>
+                        <input type="text" readonly value="${esc(link)}" aria-label="Link ${esc(s.name)}">
                     </div>
                     <div class="student-link-actions">
                         <button type="button" class="button secondary" data-open-student-link="${esc(link)}">
@@ -177,93 +88,178 @@
                             <i class="fa-solid fa-copy"></i> Sao chép
                         </button>
                     </div>
-                </div>
-            `;
+                </div>`;
         }).join("");
     }
 
-    function renderMaterialsPage() {
-        ensurePageContent("materials", "Kho học liệu", "Mở đúng nhóm học liệu đã cấu hình trong hệ thống.", [
-            { title: "Giáo án", description: "Quản lý và truy cập kho giáo án.", icon: "fa-file-lines", kind: "student", actionAttr: 'data-material="lesson-plans"', buttonText: "Mở giáo án" },
-            { title: "Đề kiểm tra", description: "Kho đề kiểm tra và đánh giá.", icon: "fa-file-circle-check", kind: "attendance", actionAttr: 'data-material="tests"', buttonText: "Mở đề kiểm tra" },
-            { title: "Phiếu học tập", description: "Kho phiếu học tập cho học sinh.", icon: "fa-sheet-plastic", kind: "reward", actionAttr: 'data-material="worksheets"', buttonText: "Mở phiếu" },
-            { title: "Bài giảng", description: "Kho slide và bài giảng điện tử.", icon: "fa-display", kind: "student", actionAttr: 'data-material="slides"', buttonText: "Mở bài giảng" },
-            { title: "Tài liệu", description: "Tài liệu tham khảo và chuyên môn.", icon: "fa-folder-open", kind: "attendance", actionAttr: 'data-material="documents"', buttonText: "Mở tài liệu" },
-            { title: "Thư viện ảnh", description: "Kho hình ảnh phục vụ dạy học.", icon: "fa-images", kind: "reward", actionAttr: 'data-material="images"', buttonText: "Mở thư viện" }
+    function pageSection(page) {
+        return document.querySelector(`[data-page-section="${CSS.escape(page)}"]`) || $("page-" + page);
+    }
+
+    function go(page) {
+        const section = pageSection(page);
+        if (!section) {
+            toast(`Trang "${page}" chưa có trong HTML.`, "warning");
+            return false;
+        }
+        $$("[data-page-section]").forEach(s => {
+            const active = s === section;
+            s.classList.toggle("active", active);
+            s.hidden = !active;
+        });
+        $$(".menu-item[data-page]").forEach(b => b.classList.toggle("active", b.dataset.page === page));
+        const titles = {
+            dashboard:"Trang chủ", students:"Học sinh", attendance:"Điểm danh", violations:"Vi phạm",
+            rewards:"Khen thưởng", learning:"Học tập", comments:"Nhận xét", statistics:"Thống kê",
+            "student-links":"Link học sinh", materials:"Kho học liệu", ai:"AI giáo viên", settings:"Cài đặt"
+        };
+        if ($("pageTitle")) $("pageTitle").textContent = titles[page] || page;
+        try {
+            if (typeof window.navigateToPage === "function") window.navigateToPage(page);
+        } catch (e) { console.error(e); }
+        if (page === "student-links") {
+            renderStudentLinksFull();
+            setTimeout(renderStudentLinksFull, 100);
+            setTimeout(renderStudentLinksFull, 500);
+        }
+        if (page === "materials") renderMaterials();
+        if (page === "ai") renderAI();
+        if (page === "settings") renderSettings();
+        return true;
+    }
+
+    function card(title, desc, action, icon = "fa-circle-check") {
+        return `<article class="stat-card ui-complete-card">
+            <div class="stat-card-top"><span class="stat-icon student"><i class="fa-solid ${icon}"></i></span></div>
+            <strong class="stat-label">${esc(title)}</strong><p>${esc(desc)}</p>
+            <button type="button" class="button secondary" data-ui-action="${esc(action)}"><i class="fa-solid fa-arrow-right"></i> Mở</button>
+        </article>`;
+    }
+
+    function ensurePage(page, title, desc, cards) {
+        const section = pageSection(page);
+        if (!section) return;
+        let root = section.querySelector("[data-ui-complete-page]");
+        if (!root) {
+            root = document.createElement("div");
+            root.dataset.uiCompletePage = page;
+            root.className = "ui-complete-page";
+            section.appendChild(root);
+        }
+        root.innerHTML = `<div class="section-heading"><div><h2>${esc(title)}</h2><p>${esc(desc)}</p></div></div><div class="stats-grid ui-complete-grid">${cards.map(c => card(c[0], c[1], c[2], c[3])).join("")}</div>`;
+    }
+
+    function renderMaterials() {
+        ensurePage("materials", "Kho học liệu", "Các nhóm học liệu sẵn sàng để mở và kiểm tra.", [
+            ["Giáo án", "Kho giáo án.", "materials-lesson", "fa-file-lines"],
+            ["Đề kiểm tra", "Kho đề kiểm tra.", "materials-tests", "fa-file-circle-check"],
+            ["Phiếu học tập", "Kho phiếu học tập.", "materials-worksheets", "fa-sheet-plastic"],
+            ["Bài giảng", "Kho slide và bài giảng.", "materials-slides", "fa-display"],
+            ["Tài liệu", "Tài liệu tham khảo.", "materials-documents", "fa-folder-open"],
+            ["Thư viện ảnh", "Kho hình ảnh.", "materials-images", "fa-images"]
         ]);
     }
 
-    function renderAIPage() {
-        ensurePageContent("ai", "AI giáo viên", "Các công cụ AI nội bộ dựa trên dữ liệu hiện có của lớp.", [
-            { title: "Phân tích lớp học", description: "Tổng hợp sĩ số, chuyên cần, vi phạm, khen thưởng và tiến bộ.", icon: "fa-chart-line", kind: "student", actionAttr: 'data-ai-action="analyze-class"', buttonText: "Phân tích" },
-            { title: "Hỗ trợ học sinh", description: "Xem nhanh dữ liệu để giáo viên xác định học sinh cần quan tâm.", icon: "fa-user-graduate", kind: "attendance", actionAttr: 'data-ai-action="student-support"', buttonText: "Xem hỗ trợ" },
-            { title: "AI nhận xét", description: "Gợi ý nhận xét tham khảo; giáo viên kiểm tra trước khi sử dụng.", icon: "fa-pen-to-square", kind: "reward", actionAttr: 'data-ai-action="comments"', buttonText: "Gợi ý nhận xét" },
-            { title: "Phân tích tiến bộ", description: "Tổng hợp dữ liệu tiến bộ đã được giáo viên ghi nhận.", icon: "fa-arrow-trend-up", kind: "student", actionAttr: 'data-ai-action="progress"', buttonText: "Phân tích tiến bộ" }
+    function renderAI() {
+        ensurePage("ai", "AI giáo viên", "Các công cụ phân tích dựa trên dữ liệu lớp học hiện có.", [
+            ["Phân tích lớp học", "Tổng hợp sĩ số và dữ liệu lớp.", "ai-analyze", "fa-chart-line"],
+            ["Hỗ trợ học sinh", "Xác định học sinh cần quan tâm.", "ai-support", "fa-user-graduate"],
+            ["Gợi ý nhận xét", "Tạo nhận xét tham khảo.", "ai-comments", "fa-pen-to-square"],
+            ["Phân tích tiến bộ", "Tổng hợp dữ liệu tiến bộ.", "ai-progress", "fa-arrow-trend-up"]
         ]);
     }
 
-    function renderSettingsPage() {
-        ensurePageContent("settings", "Cài đặt", "Quản lý năm học, dữ liệu, kết nối và sao lưu.", [
-            { title: "Năm học", description: "Kiểm tra bộ chọn năm học hiện có.", icon: "fa-calendar-days", kind: "student", actionAttr: 'data-setting="school-years"', buttonText: "Quản lý năm học" },
-            { title: "Dữ liệu lớp", description: "Kiểm tra số học sinh mà Data Engine đang cung cấp.", icon: "fa-database", kind: "attendance", actionAttr: 'data-setting="database"', buttonText: "Kiểm tra dữ liệu" },
-            { title: "Google Drive", description: "Xem trạng thái cấu hình Drive; không tự tạo URL giả.", icon: "fa-hard-drive", kind: "reward", actionAttr: 'data-setting="drive"', buttonText: "Kiểm tra Drive" },
-            { title: "Bảo mật", description: "Kiểm tra các nguyên tắc bảo vệ dữ liệu trên giao diện.", icon: "fa-shield-halved", kind: "student", actionAttr: 'data-setting="security"', buttonText: "Kiểm tra bảo mật" },
-            { title: "Sao lưu", description: "Xuất dữ liệu lớp học bằng chức năng Data Engine nếu được hỗ trợ.", icon: "fa-download", kind: "attendance", actionAttr: 'data-setting="backup"', buttonText: "Sao lưu dữ liệu" }
+    function renderSettings() {
+        ensurePage("settings", "Cài đặt", "Quản lý năm học, dữ liệu, sao lưu và bảo mật.", [
+            ["Năm học", "Kiểm tra bộ chọn năm học.", "setting-years", "fa-calendar-days"],
+            ["Dữ liệu lớp", "Kiểm tra số học sinh hiện có.", "setting-data", "fa-database"],
+            ["Google Drive", "Kiểm tra cấu hình Drive hiện có.", "setting-drive", "fa-hard-drive"],
+            ["Bảo mật", "Kiểm tra các nguyên tắc bảo vệ dữ liệu.", "setting-security", "fa-shield-halved"],
+            ["Sao lưu", "Xuất dữ liệu nếu Data Engine hỗ trợ.", "setting-backup", "fa-download"]
         ]);
+    }
+
+    function doUIAction(action) {
+        const map = {
+            "materials-lesson": () => toast("Đang ở Kho học liệu. Giáo án chưa có URL Drive được cấu hình nên không tự tạo link giả.", "info"),
+            "materials-tests": () => toast("Đang ở Kho học liệu. Đề kiểm tra chưa có URL Drive được cấu hình.", "info"),
+            "materials-worksheets": () => toast("Đang ở Kho học liệu. Phiếu học tập chưa có URL Drive được cấu hình.", "info"),
+            "materials-slides": () => toast("Đang ở Kho học liệu. Bài giảng chưa có URL Drive được cấu hình.", "info"),
+            "materials-documents": () => toast("Đang ở Kho học liệu. Tài liệu chưa có URL Drive được cấu hình.", "info"),
+            "materials-images": () => toast("Đang ở Kho học liệu. Thư viện ảnh chưa có URL Drive được cấu hình.", "info"),
+            "ai-analyze": () => typeof window.handleAIAction === "function" ? window.handleAIAction("analyze-class") : toast("AI phân tích lớp chưa sẵn sàng.", "warning"),
+            "ai-support": () => typeof window.handleAIAction === "function" ? window.handleAIAction("student-support") : toast("AI hỗ trợ học sinh chưa sẵn sàng.", "warning"),
+            "ai-comments": () => typeof window.handleAIAction === "function" ? window.handleAIAction("comments") : toast("AI nhận xét chưa sẵn sàng.", "warning"),
+            "ai-progress": () => typeof window.handleAIAction === "function" ? window.handleAIAction("progress") : toast("AI tiến bộ chưa sẵn sàng.", "warning"),
+            "setting-years": () => typeof window.handleSetting === "function" ? window.handleSetting("school-years") : toast("Cài đặt năm học chưa sẵn sàng.", "warning"),
+            "setting-data": () => toast(`Data Engine hiện có ${students().length} học sinh.`, "success"),
+            "setting-drive": () => typeof window.handleSetting === "function" ? window.handleSetting("drive") : toast("Cấu hình Drive chưa sẵn sàng.", "warning"),
+            "setting-security": () => typeof window.handleSetting === "function" ? window.handleSetting("security") : toast("Bảo mật chưa sẵn sàng.", "warning"),
+            "setting-backup": () => typeof window.exportReportSafe === "function" ? window.exportReportSafe() : toast("Chức năng sao lưu chưa sẵn sàng.", "warning")
+        };
+        if (map[action]) map[action]();
+        else toast(`Chức năng ${action} chưa được cấu hình.`, "warning");
+    }
+
+    function copy(value) {
+        const fallback = () => {
+            const t = document.createElement("textarea");
+            t.value = value; t.style.position = "fixed"; t.style.left = "-9999px";
+            document.body.appendChild(t); t.focus(); t.select();
+            let ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
+            t.remove(); return ok;
+        };
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(value).then(() => toast("Đã sao chép link học sinh.", "success")).catch(() => fallback() ? toast("Đã sao chép link học sinh.", "success") : toast("Không thể sao chép link.", "error"));
+        } else if (fallback()) toast("Đã sao chép link học sinh.", "success");
+        else toast("Không thể sao chép link.", "error");
     }
 
     function bind() {
-        if (window.__UI_COMPLETE_FIX_BOUND__) return;
-        window.__UI_COMPLETE_FIX_BOUND__ = true;
+        if (window.__UI_COMPLETE_FIX_200__) return;
+        window.__UI_COMPLETE_FIX_200__ = true;
 
-        document.addEventListener("click", event => {
-            const copy = event.target.closest("[data-copy-student-link]");
-            if (copy) {
-                event.preventDefault();
-                copyText(copy.dataset.copyStudentLink)
-                    .then(() => toast("Đã sao chép link học sinh.", "success"))
-                    .catch(() => toast("Không thể sao chép tự động.", "error"));
-                return;
-            }
+        document.addEventListener("click", function (e) {
+            const menu = e.target.closest(".menu-item[data-page]");
+            if (menu) { e.preventDefault(); e.stopImmediatePropagation(); go(menu.dataset.page); return; }
 
-            const open = event.target.closest("[data-open-student-link]");
-            if (open) {
-                event.preventDefault();
-                window.open(open.dataset.openStudentLink, "_blank", "noopener,noreferrer");
-                return;
-            }
-        }, true);
+            const pageLink = e.target.closest("[data-page-link]");
+            if (pageLink) { e.preventDefault(); e.stopImmediatePropagation(); go(pageLink.dataset.pageLink); return; }
 
-        document.addEventListener("keydown", event => {
-            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
-                event.preventDefault();
-                get("globalSearch")?.focus();
+            const open = e.target.closest("[data-open-student-link]");
+            if (open) { e.preventDefault(); e.stopImmediatePropagation(); window.open(open.dataset.openStudentLink, "_blank", "noopener,noreferrer"); return; }
+
+            const cp = e.target.closest("[data-copy-student-link]");
+            if (cp) { e.preventDefault(); e.stopImmediatePropagation(); copy(cp.dataset.copyStudentLink); return; }
+
+            const ui = e.target.closest("[data-ui-action]");
+            if (ui) { e.preventDefault(); e.stopImmediatePropagation(); doUIAction(ui.dataset.uiAction); return; }
+
+            const action = e.target.closest("[data-action]");
+            if (action && action.dataset.action) {
+                const a = action.dataset.action;
+                if (["statistics","student-links","materials","ai","ai-teacher","settings","attendance"].includes(a)) {
+                    e.preventDefault(); e.stopImmediatePropagation();
+                    go(a === "ai-teacher" ? "ai" : a);
+                    return;
+                }
             }
         }, true);
     }
 
     function install() {
         bind();
-        renderStudentLinksFull();
-        renderMaterialsPage();
-        renderAIPage();
-        renderSettingsPage();
-
-        if (window.PAGE_RENDERERS) {
-            window.PAGE_RENDERERS["student-links"] = renderStudentLinksFull;
-            window.PAGE_RENDERERS.materials = renderMaterialsPage;
-            window.PAGE_RENDERERS.ai = renderAIPage;
-            window.PAGE_RENDERERS.settings = renderSettingsPage;
-        }
-
-        setTimeout(renderStudentLinksFull, 150);
-        setTimeout(renderStudentLinksFull, 600);
-        setTimeout(renderStudentLinksFull, 1500);
+        window.renderStudentLinks = renderStudentLinksFull;
+        window.renderMaterialsPage = renderMaterials;
+        window.renderAIPage = renderAI;
+        window.renderSettingsPage = renderSettings;
+        renderMaterials(); renderAI(); renderSettings(); renderStudentLinksFull();
+        [100, 300, 700, 1500, 3000].forEach(ms => setTimeout(renderStudentLinksFull, ms));
+        setInterval(() => {
+            if (document.visibilityState !== "hidden") renderStudentLinksFull();
+        }, 5000);
     }
 
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", install, { once: true });
-    } else {
-        install();
-    }
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install, { once: true });
+    else install();
 })();
