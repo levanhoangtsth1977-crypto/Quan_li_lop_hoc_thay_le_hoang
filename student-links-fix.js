@@ -1,6 +1,6 @@
 (function(){
   "use strict";
-  const FIX_VERSION="1.0.0";
+  const FIX_VERSION="1.0.1";
   let timer=null;
   function students(){try{if(typeof window.getStudentsSafe==="function"){const s=window.getStudentsSafe();if(Array.isArray(s))return s;}if(Array.isArray(window.students))return window.students;if(Array.isArray(window.classData?.students))return window.classData.students;}catch(e){console.error("StudentLinksFix",e)}return []}
   function getLink(s){try{if(typeof window.getStudentLink==="function"){const v=window.getStudentLink(s);if(typeof v==="string")return v;if(v&&typeof v.url==="string")return v.url;if(v&&typeof v.href==="string")return v.href;}}catch(e){console.error("getStudentLink",e)}return typeof s.link==="string"?s.link:""}
