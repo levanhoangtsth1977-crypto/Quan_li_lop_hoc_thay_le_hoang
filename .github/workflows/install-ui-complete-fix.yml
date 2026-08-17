@@ -1,0 +1,46 @@
+name: Install UI complete fix
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'ui-complete-fix.js'
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    if: github.event.head_commit.message != 'Install UI complete fix script'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inject UI fix script
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          tag = '<script src="ui-complete-fix.js"></script>'
+          if tag not in s:
+              marker = '</body>'
+              if marker not in s:
+                  raise SystemExit('Không tìm thấy </body> trong index.html')
+              s = s.replace(marker, f'    {tag}\n{marker}', 1)
+              p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          if git diff --cached --quiet; then
+            echo 'No changes'
+          else
+            git commit -m 'Install UI complete fix script'
+            git push
+          fi
