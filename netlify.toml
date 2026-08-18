@@ -1,0 +1,31 @@
+# ============================================================
+# QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG
+# NETLIFY DEPLOY / CACHE POLICY
+# MASTER: DESKTOP + MOBILE DÙNG CÙNG MỘT PHIÊN BẢN
+# ============================================================
+
+[build]
+  publish = "."
+
+# HTML luôn phải kiểm tra phiên bản mới trên Netlify.
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# JavaScript/CSS phải revalidate để điện thoại không giữ bản cũ.
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Dữ liệu/API không được cache phía trình duyệt.
+[[headers]]
+  for = "/google-api-bridge.js"
+  [headers.values]
+    Cache-Control = "no-store, no-cache, must-revalidate, max-age=0"
