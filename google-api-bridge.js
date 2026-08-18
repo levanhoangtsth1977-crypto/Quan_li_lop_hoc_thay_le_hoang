@@ -1,7 +1,8 @@
 /* ============================================================
    QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG
-   GOOGLE API BRIDGE 4.0.0 — VIP PRO MAX
+   GOOGLE API BRIDGE 4.1.0 — VIP PRO MAX
    Google primary + Master Roster fallback + LocalStorage safe sync
+   Compatibility API: replaceStudents()
    ============================================================ */
 "use strict";
 
@@ -10,10 +11,10 @@ const GOOGLE_API_CONFIG = Object.freeze({
   timeout: 15000,
   verifyRetries: 5,
   verifyDelay: 1000,
-  version: "4.0.0",
+  version: "4.1.0",
   schemaVersion: "students-13-columns-v1",
   storageKey: "QL_LOP_HOC_LE_HOANG_2026_2027",
-  masterRosterUrl: "./DANH_SACH_HOC_SINH_5C_2026_2027.json?v=20260818-5",
+  masterRosterUrl: "./DANH_SACH_HOC_SINH_5C_2026_2027.json?v=20260818-7",
   masterRosterCount: 42
 });
 
@@ -53,39 +54,19 @@ function validRoster(list){
 
 function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
 
-async function api(action,params={}){
-  const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),GOOGLE_API_CONFIG.timeout);
-  try{
-    const query=new URLSearchParams({action,...params});
-    const response=await fetch(`${GOOGLE_API_CONFIG.url}?${query.toString()}`,{
-      cache:"no-store",
-      signal:controller.signal,
-      redirect:"follow"
-    });
-    if(!response.ok)throw new Error(`API HTTP ${response.status}`);
-    return await response.json();
-  }finally{clearTimeout(timer);}
-}
-
-async function loadMasterRoster(){
-  const response=await fetch(GOOGLE_API_CONFIG.masterRosterUrl,{cache:"no-store"});
-  if(!response.ok)throw new Error(`Master Roster HTTP ${response.status}`);
-  const payload=await response.json();
-  const list=(payload&&Array.isArray(payload.students)?payload.students:[]).map(normalizeStudentForBridge);
-  if(!validRoster(list))throw new Error(`Master Roster không hợp lệ: ${list.length}/42.`);
-  return list;
+function emptyLocalPayload(){
+  return {version:"3.1.1",config:{},students:[],attendance:[],violations:[],rewards:[],learning:[],progress:[],comments:[]};
 }
 
 function readLocalPayload(){
   try{
     const raw=localStorage.getItem(GOOGLE_API_CONFIG.storageKey);
-    if(!raw)return {version:"3.1.1",config:{},students:[],attendance:[],violations:[],rewards:[],learning:[],progress:[],comments:[]};
+    if(!raw)return emptyLocalPayload();
     const data=JSON.parse(raw);
-    return data&&typeof data==="object"&&!Array.isArray(data)?data:{};
+    return data&&typeof data==="object"&&!Array.isArray(data)?data:emptyLocalPayload();
   }catch(error){
     console.warn("[GOOGLE BRIDGE] Không đọc được LocalStorage:",error);
-    return {version:"3.1.1",config:{},students:[],attendance:[],violations:[],rewards:[],learning:[],progress:[],comments:[]};
+    return emptyLocalPayload();
   }
 }
 
@@ -106,22 +87,28 @@ function writeStudentsToLocal(list,source){
     comments:Array.isArray(current.comments)?current.comments:[]
   };
   localStorage.setItem(GOOGLE_API_CONFIG.storageKey,JSON.stringify(payload));
+  if(typeof window.loadClassData!=="function")throw new Error("Data Engine chưa nạp hàm loadClassData.");
+  if(window.loadClassData()!==true)throw new Error("Data Engine từ chối nạp danh sách vào bộ nhớ.");
+  return {success:true,ok:true,count:42,source};
+}
 
-  if(typeof window.loadClassData==="function"){
-    const loaded=window.loadClassData();
-    if(loaded!==true)throw new Error("Data Engine từ chối nạp danh sách vào bộ nhớ.");
-  }else{
-    throw new Error("Data Engine chưa nạp hàm loadClassData.");
-  }
-
-  const count=Array.isArray(window.APP_DATA?.students)?window.APP_DATA.students.length:null;
-  window.__GOOGLE_CLASS_SYNC__={
-    ok:true,
-    count:42,
-    source,
-    at:new Date().toISOString()
+function installReplaceStudentsApi(){
+  if(typeof window.replaceStudents==="function")return true;
+  window.replaceStudents=function(incoming,options={}){
+    const list=Array.isArray(incoming)?incoming.map(normalizeStudentForBridge):[];
+    if(!validRoster(list)){
+      return {success:false,ok:false,count:list.length,expected:42,reason:"roster-must-contain-42-valid-students"};
+    }
+    try{
+      const result=writeStudentsToLocal(list,options.source||"runtime");
+      if(typeof window.refreshAll==="function")try{window.refreshAll();}catch(_){ }
+      return result;
+    }catch(error){
+      console.error("[GOOGLE BRIDGE] replaceStudents:",error);
+      return {success:false,ok:false,count:0,error:error.message};
+    }
   };
-  return {success:true,count:42,source};
+  return true;
 }
 
 async function waitDataEngine(attempt=0){
@@ -129,6 +116,26 @@ async function waitDataEngine(attempt=0){
   if(attempt>=100)return false;
   await sleep(100);
   return waitDataEngine(attempt+1);
+}
+
+async function api(action,params={}){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),GOOGLE_API_CONFIG.timeout);
+  try{
+    const query=new URLSearchParams({action,...params});
+    const response=await fetch(`${GOOGLE_API_CONFIG.url}?${query.toString()}`,{cache:"no-store",signal:controller.signal,redirect:"follow"});
+    if(!response.ok)throw new Error(`API HTTP ${response.status}`);
+    return await response.json();
+  }finally{clearTimeout(timer);}
+}
+
+async function loadMasterRoster(){
+  const response=await fetch(GOOGLE_API_CONFIG.masterRosterUrl,{cache:"no-store",credentials:"same-origin"});
+  if(!response.ok)throw new Error(`Master Roster HTTP ${response.status}`);
+  const payload=await response.json();
+  const list=(payload&&Array.isArray(payload.students)?payload.students:[]).map(normalizeStudentForBridge);
+  if(!validRoster(list))throw new Error(`Master Roster không hợp lệ: ${list.length}/42.`);
+  return list;
 }
 
 async function fetchRemoteRoster(){
@@ -145,21 +152,9 @@ async function fetchRemoteRoster(){
 
 async function postImport(list){
   if(!validRoster(list))throw new Error("Recovery payload không đủ 42 học sinh.");
-  const payload={
-    action:"importStudents",
-    schemaVersion:GOOGLE_API_CONFIG.schemaVersion,
-    headers:STUDENT_SCHEMA,
-    students:list.map(normalizeStudentForBridge)
-  };
+  const payload={action:"importStudents",schemaVersion:GOOGLE_API_CONFIG.schemaVersion,headers:STUDENT_SCHEMA,students:list.map(normalizeStudentForBridge)};
   try{
-    await fetch(GOOGLE_API_CONFIG.url,{
-      method:"POST",
-      mode:"no-cors",
-      cache:"no-store",
-      redirect:"follow",
-      headers:{"Content-Type":"text/plain;charset=UTF-8"},
-      body:JSON.stringify(payload)
-    });
+    await fetch(GOOGLE_API_CONFIG.url,{method:"POST",mode:"no-cors",cache:"no-store",redirect:"follow",headers:{"Content-Type":"text/plain;charset=UTF-8"},body:JSON.stringify(payload)});
     return true;
   }catch(error){
     console.warn("[GOOGLE BRIDGE] Recovery POST thất bại:",error);
@@ -178,13 +173,14 @@ async function verifyRemote(){
 
 async function syncStudentsVip(){
   if(!(await waitDataEngine()))throw new Error("Data Engine chưa sẵn sàng.");
+  installReplaceStudentsApi();
 
-  /* 1. MASTER trước để giao diện không bao giờ rỗng nếu Google lỗi. */
+  /* MASTER được nạp trước để giao diện không bao giờ rơi về 0 học sinh. */
   const master=await loadMasterRoster();
   writeStudentsToLocal(master,"master-roster-safe-baseline");
   refreshAllAfterSync();
 
-  /* 2. Google là nguồn đồng bộ chính khi trả về đủ 42. */
+  /* Google là nguồn đồng bộ chính khi trả về đủ 42. */
   const remote=await fetchRemoteRoster();
   if(remote.ok){
     writeStudentsToLocal(remote.list,"google-sheets-42");
@@ -193,11 +189,11 @@ async function syncStudentsVip(){
     return window.__GOOGLE_CLASS_SYNC__;
   }
 
-  /* 3. Google thiếu/lỗi: giữ Master 42, không ghi đè bằng dữ liệu rỗng. */
+  /* Google thiếu/lỗi: giữ Master 42, tuyệt đối không ghi đè bằng rỗng/thiếu. */
   window.__GOOGLE_CLASS_SYNC__={ok:true,count:42,source:"master-roster-fallback",fallbackUsed:true,googleCount:remote.total||0,at:new Date().toISOString()};
   refreshAllAfterSync();
 
-  /* 4. Tự phục hồi Google ở nền, nhưng không chặn giao diện. */
+  /* Tự phục hồi Google ở nền; giao diện không bị khóa chờ API. */
   postImport(master)
     .then(()=>verifyRemote())
     .then(verified=>{
@@ -213,29 +209,19 @@ async function syncStudentsVip(){
 }
 
 function refreshAllAfterSync(){
-  const functions=[
-    "renderDashboard","renderStudents","renderAttendance","renderViolations",
-    "renderRewards","renderLearningSafe","renderCommentsSafe","renderStatistics",
-    "renderStudentLinks","updateStudentSelects"
-  ];
-  functions.forEach(name=>{
-    if(typeof window[name]==="function"){
-      try{window[name]();}catch(error){console.warn(`[GOOGLE BRIDGE] ${name}:`,error);}
-    }
+  ["renderDashboard","renderStudents","renderAttendance","renderViolations","renderRewards","renderLearningSafe","renderCommentsSafe","renderStatistics","renderStudentLinks","updateStudentSelects"].forEach(name=>{
+    if(typeof window[name]==="function")try{window[name]();}catch(error){console.warn(`[GOOGLE BRIDGE] ${name}:`,error);}
   });
 }
 
 function initializeGoogleApiBridge(){
-  if(window.__GOOGLE_CLASS_BRIDGE_400__)return;
-  window.__GOOGLE_CLASS_BRIDGE_400__=true;
+  if(window.__GOOGLE_CLASS_BRIDGE_410__)return;
+  window.__GOOGLE_CLASS_BRIDGE_410__=true;
   syncStudentsVip()
     .then(result=>{
       refreshAllAfterSync();
       if(typeof window.showToast==="function"){
-        const msg=result.fallbackUsed
-          ? "Đang dùng bản an toàn 42 học sinh; Google sẽ tự đồng bộ lại."
-          : "Đã đồng bộ 42/42 học sinh từ Google Sheets.";
-        window.showToast(msg,result.fallbackUsed?"warning":"success");
+        window.showToast(result.fallbackUsed?"Đang dùng bản an toàn 42 học sinh; Google sẽ tự đồng bộ lại.":"Đã đồng bộ 42/42 học sinh từ Google Sheets.",result.fallbackUsed?"warning":"success");
       }
     })
     .catch(error=>{
