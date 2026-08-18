@@ -1,4 +1,4 @@
-/* QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG - GOOGLE API BRIDGE 2.7.0 */
+/* QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG - GOOGLE API BRIDGE 2.7.1 */
 "use strict";
 
 const GOOGLE_API_CONFIG = Object.freeze({
@@ -6,7 +6,7 @@ const GOOGLE_API_CONFIG = Object.freeze({
     timeout: 15000,
     verifyRetries: 6,
     verifyDelay: 1000,
-    version: "2.0.0"
+    version: "2.0.1"
 });
 
 function googleApiRequest(action, params = {}) {
@@ -99,7 +99,7 @@ async function syncOneAttendance(record) {
 }
 
 function installAttendanceWriteBridge() {
-    if (window.__GOOGLE_ATTENDANCE_WRITE_BRIDGE_270__) return true;
+    if (window.__GOOGLE_ATTENDANCE_WRITE_BRIDGE_271__) return true;
     const original = window.saveAttendanceRecord;
     if (typeof original !== "function") return false;
     window.saveAttendanceRecord = function (studentId, date, status, note) {
@@ -116,7 +116,7 @@ function installAttendanceWriteBridge() {
         });
         return localResult;
     };
-    window.__GOOGLE_ATTENDANCE_WRITE_BRIDGE_270__ = true;
+    window.__GOOGLE_ATTENDANCE_WRITE_BRIDGE_271__ = true;
     return true;
 }
 
@@ -130,7 +130,7 @@ function waitAndInstallAttendanceBridge(attempt = 0) {
 }
 
 function installWriteBridge() {
-    if (window.__GOOGLE_WRITE_BRIDGE_270__) return;
+    if (window.__GOOGLE_WRITE_BRIDGE_271__) return;
     const saveMap = [
         ["addViolation", "saveViolation"], ["addReward", "saveReward"], ["addLearningRecord", "saveLearning"],
         ["addProgressRecord", "saveProgress"], ["addComment", "saveComment"]
@@ -151,18 +151,27 @@ function installWriteBridge() {
             return localResult;
         };
     });
-    window.__GOOGLE_WRITE_BRIDGE_270__ = true;
+    window.__GOOGLE_WRITE_BRIDGE_271__ = true;
+}
+
+async function getStudentsFromGoogle() {
+    try {
+        return await googleApiRequest("getStudents");
+    } catch (fetchError) {
+        console.warn("[GOOGLE READ] fetch getStudents thất bại, chuyển sang JSONP:", fetchError);
+        return googleApiJsonp("getStudents");
+    }
 }
 
 function syncStudentsFromGoogle() {
-    return googleApiRequest("getStudents").then(result => {
+    return getStudentsFromGoogle().then(result => {
         if (!result || result.ok !== true) throw new Error(result?.message || result?.error || "API không hợp lệ.");
         const students = Array.isArray(result.students) ? result.students : [];
         if (!students.length) throw new Error("Google Sheets trả về 0 học sinh; giữ dữ liệu hiện tại.");
         if (typeof window.replaceStudents !== "function") throw new Error("Thiếu replaceStudents().");
         const localResult = window.replaceStudents(students, { source: "google-sheets", persist: true, allowEmpty: false });
         if (localResult === false || localResult?.success === false) throw new Error(localResult?.message || "Không cập nhật được Data Engine.");
-        window.__GOOGLE_CLASS_SYNC__ = { ok: true, count: students.length, total: Number(result.total) || students.length, syncedAt: new Date().toISOString(), apiVersion: result.version || "2.0.0" };
+        window.__GOOGLE_CLASS_SYNC__ = { ok: true, count: students.length, total: Number(result.total) || students.length, syncedAt: new Date().toISOString(), apiVersion: result.version || "2.0.0", source: "google-sheets" };
         return window.__GOOGLE_CLASS_SYNC__;
     });
 }
@@ -171,15 +180,21 @@ function refreshAfterGoogleSync() {
     ["renderDashboard", "renderStudents", "renderAttendance", "renderViolations", "renderRewards", "renderLearningSafe", "renderCommentsSafe", "renderStatistics", "renderStudentLinks"].forEach(name => {
         if (typeof window[name] === "function") { try { window[name](); } catch (_) {} }
     });
+    if (typeof window.updateStudentSelects === "function") {
+        try { window.updateStudentSelects(); } catch (_) {}
+    }
 }
 
 function initializeGoogleApiBridge() {
+    if (window.__GOOGLE_CLASS_BRIDGE_271__) return;
+    window.__GOOGLE_CLASS_BRIDGE_271__ = true;
     waitAndInstallAttendanceBridge();
     installWriteBridge();
     syncStudentsFromGoogle().then(result => {
         refreshAfterGoogleSync();
         if (typeof window.showToast === "function") window.showToast(`Đã đồng bộ ${result.count} học sinh từ Google Sheets.`, "success");
     }).catch(error => {
+        window.__GOOGLE_CLASS_SYNC__ = { ok: false, error: error.message, at: new Date().toISOString() };
         console.warn("[GOOGLE API] Sync failed:", error);
     });
 }
