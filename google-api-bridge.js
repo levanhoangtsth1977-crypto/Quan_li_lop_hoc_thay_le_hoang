@@ -1,12 +1,12 @@
-/* QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG - GOOGLE API BRIDGE 2.7.1 */
+/* QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG - GOOGLE API BRIDGE 2.8.0 */
 "use strict";
 
 const GOOGLE_API_CONFIG = Object.freeze({
     url: "https://script.google.com/macros/s/AKfycbynklm7SobnkcEZKfAUGdMIBugA4lQ2kA3yOThHVjNoiJzCK7veuwO2vE1tR1QKI-nkIQ/exec",
     timeout: 15000,
-    verifyRetries: 6,
+    verifyRetries: 8,
     verifyDelay: 1000,
-    version: "2.0.1"
+    version: "2.0.0"
 });
 
 function googleApiRequest(action, params = {}) {
@@ -67,11 +67,7 @@ async function verifyAttendanceRecord(record, attempt = 0) {
     try {
         const result = await googleApiJsonp("getAttendance", { studentId });
         const rows = Array.isArray(result.records) ? result.records : [];
-        const found = rows.some(row =>
-            String(row.studentId || "").trim() === studentId &&
-            String(row.date || "").trim() === date &&
-            String(row.status || "").trim() === status
-        );
+        const found = rows.some(row => String(row.studentId || "").trim() === studentId && String(row.date || "").trim() === date && String(row.status || "").trim() === status);
         if (found) return { ok: true, verified: true, studentId, date };
         throw new Error("Bản ghi chưa xuất hiện trong Google Sheets.");
     } catch (error) {
@@ -84,12 +80,7 @@ async function verifyAttendanceRecord(record, attempt = 0) {
 }
 
 function normalizeAttendanceRecord(studentId, date, status, note) {
-    return {
-        studentId: String(studentId || "").trim(),
-        date: String(date || "").trim(),
-        status: String(status || "").trim(),
-        note: String(note || "")
-    };
+    return { studentId: String(studentId || "").trim(), date: String(date || "").trim(), status: String(status || "").trim(), note: String(note || "") };
 }
 
 async function syncOneAttendance(record) {
@@ -163,17 +154,91 @@ async function getStudentsFromGoogle() {
     }
 }
 
-function syncStudentsFromGoogle() {
-    return getStudentsFromGoogle().then(result => {
-        if (!result || result.ok !== true) throw new Error(result?.message || result?.error || "API không hợp lệ.");
-        const students = Array.isArray(result.students) ? result.students : [];
-        if (!students.length) throw new Error("Google Sheets trả về 0 học sinh; giữ dữ liệu hiện tại.");
+function getLocalStudentsForRecovery() {
+    try {
+        if (typeof window.getStudentsSafe === "function") {
+            const list = window.getStudentsSafe();
+            if (Array.isArray(list)) return list;
+        }
+        if (typeof window.getStudents === "function") {
+            const list = window.getStudents();
+            if (Array.isArray(list)) return list;
+        }
+        if (typeof window.APP_DATA !== "undefined" && Array.isArray(window.APP_DATA.students)) {
+            return window.APP_DATA.students;
+        }
+    } catch (error) {
+        console.warn("[GOOGLE RECOVERY] Không đọc được dữ liệu local:", error);
+    }
+    return [];
+}
+
+async function verifyStudentImport(expectedCount, attempt = 0) {
+    try {
+        const result = await googleApiJsonp("getStudents");
+        const actual = Array.isArray(result.students) ? result.students.length : 0;
+        if (actual >= expectedCount) return { ok: true, verified: true, count: actual, total: Number(result.total) || actual };
+        throw new Error(`Google Sheets mới có ${actual}/${expectedCount} học sinh.`);
+    } catch (error) {
+        if (attempt < GOOGLE_API_CONFIG.verifyRetries) {
+            await sleep(GOOGLE_API_CONFIG.verifyDelay);
+            return verifyStudentImport(expectedCount, attempt + 1);
+        }
+        throw error;
+    }
+}
+
+async function recoverStudentsToGoogle(localStudents) {
+    if (!Array.isArray(localStudents) || !localStudents.length) {
+        throw new Error("Không có danh sách học sinh local để khôi phục.");
+    }
+    if (localStudents.length > 50) {
+        throw new Error("Danh sách local vượt giới hạn 50 học sinh.");
+    }
+    const normalized = localStudents.map((student, index) => ({
+        id: String(student?.id || "").trim(),
+        studentCode: String(student?.studentCode || student?.code || `HS${String(index + 1).padStart(2, "0")}`).trim(),
+        name: String(student?.name || "").trim(),
+        gender: String(student?.gender || "").trim(),
+        birthDate: String(student?.birthDate || "").trim(),
+        status: String(student?.status || "active").trim(),
+        parentName: String(student?.parentName || "").trim(),
+        phone: String(student?.phone || "").trim(),
+        address: String(student?.address || "").trim(),
+        note: String(student?.note || "").trim(),
+        shareEnabled: student?.shareEnabled !== false,
+        createdAt: String(student?.createdAt || "").trim(),
+        updatedAt: String(student?.updatedAt || "").trim()
+    }));
+    if (normalized.some(student => !student.name)) throw new Error("Danh sách local có học sinh thiếu họ tên; không ghi Google Sheets.");
+    await googleApiPost("importStudents", { students: normalized });
+    const verified = await verifyStudentImport(normalized.length);
+    return { ok: true, recovered: true, count: verified.count, total: verified.total, source: "local-to-google" };
+}
+
+async function syncStudentsFromGoogle() {
+    const result = await getStudentsFromGoogle();
+    if (!result || result.ok !== true) throw new Error(result?.message || result?.error || "API không hợp lệ.");
+    const students = Array.isArray(result.students) ? result.students : [];
+
+    if (!students.length) {
+        const localStudents = getLocalStudentsForRecovery();
+        if (!localStudents.length) throw new Error("Google Sheets và dữ liệu local đều không có học sinh.");
+        const recovered = await recoverStudentsToGoogle(localStudents);
+        const verifiedStudents = await getStudentsFromGoogle();
+        const finalStudents = Array.isArray(verifiedStudents.students) ? verifiedStudents.students : [];
+        if (!finalStudents.length) throw new Error("Đã gửi dữ liệu nhưng chưa đọc lại được danh sách Google Sheets.");
         if (typeof window.replaceStudents !== "function") throw new Error("Thiếu replaceStudents().");
-        const localResult = window.replaceStudents(students, { source: "google-sheets", persist: true, allowEmpty: false });
-        if (localResult === false || localResult?.success === false) throw new Error(localResult?.message || "Không cập nhật được Data Engine.");
-        window.__GOOGLE_CLASS_SYNC__ = { ok: true, count: students.length, total: Number(result.total) || students.length, syncedAt: new Date().toISOString(), apiVersion: result.version || "2.0.0", source: "google-sheets" };
+        window.replaceStudents(finalStudents, { source: "google-sheets-recovered", persist: true, allowEmpty: false });
+        window.__GOOGLE_CLASS_SYNC__ = { ok: true, count: finalStudents.length, total: Number(verifiedStudents.total) || finalStudents.length, syncedAt: new Date().toISOString(), apiVersion: verifiedStudents.version || "2.0.0", source: "local-to-google-recovery", recovered: recovered.count };
         return window.__GOOGLE_CLASS_SYNC__;
-    });
+    }
+
+    if (typeof window.replaceStudents !== "function") throw new Error("Thiếu replaceStudents().");
+    const localResult = window.replaceStudents(students, { source: "google-sheets", persist: true, allowEmpty: false });
+    if (localResult === false || localResult?.success === false) throw new Error(localResult?.message || "Không cập nhật được Data Engine.");
+    window.__GOOGLE_CLASS_SYNC__ = { ok: true, count: students.length, total: Number(result.total) || students.length, syncedAt: new Date().toISOString(), apiVersion: result.version || "2.0.0", source: "google-sheets" };
+    return window.__GOOGLE_CLASS_SYNC__;
 }
 
 function refreshAfterGoogleSync() {
@@ -192,7 +257,12 @@ function initializeGoogleApiBridge() {
     installWriteBridge();
     syncStudentsFromGoogle().then(result => {
         refreshAfterGoogleSync();
-        if (typeof window.showToast === "function") window.showToast(`Đã đồng bộ ${result.count} học sinh từ Google Sheets.`, "success");
+        if (typeof window.showToast === "function") {
+            const message = result.recovered
+                ? `Đã khôi phục ${result.count} học sinh từ laptop lên Google Sheets và đồng bộ toàn hệ thống.`
+                : `Đã đồng bộ ${result.count} học sinh từ Google Sheets.`;
+            window.showToast(message, "success");
+        }
     }).catch(error => {
         window.__GOOGLE_CLASS_SYNC__ = { ok: false, error: error.message, at: new Date().toISOString() };
         console.warn("[GOOGLE API] Sync failed:", error);
