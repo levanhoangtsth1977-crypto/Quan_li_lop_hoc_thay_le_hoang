@@ -1,6 +1,6 @@
 /* ============================================================
    QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG
-   STUDENT SYNC DEDUPE + MASTER ROSTER SYNC 1.1.0
+   STUDENT SYNC DEDUPE + MASTER ROSTER SYNC 1.1.1
    ------------------------------------------------------------
    MỤC ĐÍCH:
    - Chặn học sinh bị nhân bản khi Google Sheets trả về record trùng.
@@ -12,12 +12,16 @@
    - Chỉ thay danh sách students; không xóa attendance/violations/
      rewards/learning/progress/comments trong LocalStorage.
    - Không tự ghi ngược Google Sheets.
+   - Không cho phép một phản hồi Google không đầy đủ (ví dụ 1/42 HS)
+     ghi đè Master Roster 42 HS.
    ============================================================ */
 
 (function installStudentSyncDedupe() {
     "use strict";
 
-    if (window.__STUDENT_SYNC_DEDUPE_INSTALLED_110__) return;
+    if (window.__STUDENT_SYNC_DEDUPE_INSTALLED_111__) return;
+
+    const TARGET_COUNT = 42;
 
     function text(value) {
         return String(value ?? "").trim();
@@ -75,8 +79,8 @@
             return false;
         }
 
-        if (originalReplaceStudents.__STUDENT_SYNC_DEDUPE_WRAPPED_110__) {
-            window.__STUDENT_SYNC_DEDUPE_INSTALLED_110__ = true;
+        if (originalReplaceStudents.__STUDENT_SYNC_DEDUPE_WRAPPED_111__) {
+            window.__STUDENT_SYNC_DEDUPE_INSTALLED_111__ = true;
             return true;
         }
 
@@ -85,6 +89,51 @@
         const patchedReplaceStudents = function patchedReplaceStudents(incoming, options = {}) {
             const source = Array.isArray(incoming) ? incoming : [];
             const unique = dedupeStudents(source);
+
+            /*
+             * SAFETY GUARD:
+             * Google API hiện tại có thể trả về danh sách không đầy đủ.
+             * Không cho một payload Google nhỏ hơn Master Roster ghi đè
+             * danh sách 42 học sinh đã được khôi phục.
+             */
+            const sourceName = text(options?.source).toLowerCase();
+            const isGoogleSync =
+                sourceName === "google-sheets" ||
+                sourceName === "google" ||
+                sourceName.includes("google-sheets");
+
+            if (
+                isGoogleSync &&
+                unique.length > 0 &&
+                unique.length < TARGET_COUNT
+            ) {
+                const blockedResult = {
+                    success: true,
+                    ok: true,
+                    blocked: true,
+                    reason: "incomplete-google-roster",
+                    sourceCount: source.length,
+                    uniqueCount: unique.length,
+                    expectedCount: TARGET_COUNT,
+                    dedupeApplied: true
+                };
+
+                window.__STUDENT_SYNC_DEDUPE_LAST__ = {
+                    sourceCount: source.length,
+                    uniqueCount: unique.length,
+                    removed: Math.max(0, source.length - unique.length),
+                    blocked: true,
+                    reason: "incomplete-google-roster",
+                    expectedCount: TARGET_COUNT,
+                    at: new Date().toISOString()
+                };
+
+                console.warn(
+                    `[STUDENT SYNC] Bỏ qua Google roster không đầy đủ: ${unique.length}/${TARGET_COUNT}. Master Roster được giữ nguyên.`
+                );
+
+                return blockedResult;
+            }
 
             const result = originalReplaceStudents.call(
                 this,
@@ -112,15 +161,16 @@
                 sourceCount: source.length,
                 uniqueCount: unique.length,
                 removed,
+                blocked: false,
                 at: new Date().toISOString()
             };
 
             return result;
         };
 
-        patchedReplaceStudents.__STUDENT_SYNC_DEDUPE_WRAPPED_110__ = true;
+        patchedReplaceStudents.__STUDENT_SYNC_DEDUPE_WRAPPED_111__ = true;
         window.replaceStudents = patchedReplaceStudents;
-        window.__STUDENT_SYNC_DEDUPE_INSTALLED_110__ = true;
+        window.__STUDENT_SYNC_DEDUPE_INSTALLED_111__ = true;
         return true;
     }
 
@@ -164,7 +214,7 @@
         "./DANH_SACH_HOC_SINH_5C_2026_2027.json?v=20260818-1";
 
     const SYNC_MARKER =
-        "QL_LOP_HOC_MASTER_ROSTER_SYNC_110";
+        "QL_LOP_HOC_MASTER_ROSTER_SYNC_111";
 
     const TARGET_COUNT = 42;
 
