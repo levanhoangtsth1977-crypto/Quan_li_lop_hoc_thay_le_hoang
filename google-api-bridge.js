@@ -1,24 +1,23 @@
 /* ============================================================
    QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG
-   GOOGLE API BRIDGE 4.1.0 — VIP PRO MAX
-   Google primary + Master Roster fallback + LocalStorage safe sync
-   Compatibility API: replaceStudents()
+   GOOGLE API BRIDGE 4.2.0 — VIP PRO MAX
+   Safe duplicate-load compatible bridge
    ============================================================ */
 "use strict";
 
-const GOOGLE_API_CONFIG = Object.freeze({
+var GOOGLE_API_CONFIG = Object.freeze({
   url: "https://script.google.com/macros/s/AKfycbynklm7SobnkcEZKfAUGdMIBugA4lQ2kA3yOThHVjNoiJzCK7veuwO2vE1tR1QKI-nkIQ/exec",
   timeout: 15000,
   verifyRetries: 5,
   verifyDelay: 1000,
-  version: "4.1.0",
+  version: "4.2.0",
   schemaVersion: "students-13-columns-v1",
   storageKey: "QL_LOP_HOC_LE_HOANG_2026_2027",
-  masterRosterUrl: "./DANH_SACH_HOC_SINH_5C_2026_2027.json?v=20260818-7",
+  masterRosterUrl: "./DANH_SACH_HOC_SINH_5C_2026_2027.json?v=20260818-8",
   masterRosterCount: 42
 });
 
-const STUDENT_SCHEMA = Object.freeze([
+var STUDENT_SCHEMA = Object.freeze([
   "id","studentCode","name","gender","birthDate","status",
   "parentName","phone","address","note","shareEnabled","createdAt","updatedAt"
 ]);
@@ -26,8 +25,8 @@ const STUDENT_SCHEMA = Object.freeze([
 function bridgeText(v){return String(v ?? "").trim();}
 
 function normalizeStudentForBridge(student,index){
-  const s=student&&typeof student==="object"?student:{};
-  const fallback=`HS${String(index+1).padStart(2,"0")}`;
+  var s=student&&typeof student==="object"?student:{};
+  var fallback="HS"+String(index+1).padStart(2,"0");
   return {
     id:bridgeText(s.id||s.studentId)||fallback,
     studentCode:bridgeText(s.studentCode||s.code)||fallback,
@@ -46,13 +45,13 @@ function normalizeStudentForBridge(student,index){
 }
 
 function validRoster(list){
-  return Array.isArray(list)&&list.length===42&&list.every((s,i)=>{
-    const n=normalizeStudentForBridge(s,i);
+  return Array.isArray(list)&&list.length===42&&list.every(function(s,i){
+    var n=normalizeStudentForBridge(s,i);
     return Boolean(n.id&&n.studentCode&&n.name);
   });
 }
 
-function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
+function sleep(ms){return new Promise(function(resolve){setTimeout(resolve,ms);});}
 
 function emptyLocalPayload(){
   return {version:"3.1.1",config:{},students:[],attendance:[],violations:[],rewards:[],learning:[],progress:[],comments:[]};
@@ -60,9 +59,9 @@ function emptyLocalPayload(){
 
 function readLocalPayload(){
   try{
-    const raw=localStorage.getItem(GOOGLE_API_CONFIG.storageKey);
+    var raw=localStorage.getItem(GOOGLE_API_CONFIG.storageKey);
     if(!raw)return emptyLocalPayload();
-    const data=JSON.parse(raw);
+    var data=JSON.parse(raw);
     return data&&typeof data==="object"&&!Array.isArray(data)?data:emptyLocalPayload();
   }catch(error){
     console.warn("[GOOGLE BRIDGE] Không đọc được LocalStorage:",error);
@@ -71,10 +70,10 @@ function readLocalPayload(){
 }
 
 function writeStudentsToLocal(list,source){
-  if(!validRoster(list))throw new Error(`Danh sách local không hợp lệ: ${Array.isArray(list)?list.length:0}/42.`);
-  const normalized=list.map(normalizeStudentForBridge);
-  const current=readLocalPayload();
-  const payload={
+  if(!validRoster(list))throw new Error("Danh sách local không hợp lệ: "+(Array.isArray(list)?list.length:0)+"/42.");
+  var normalized=list.map(normalizeStudentForBridge);
+  var current=readLocalPayload();
+  var payload={
     version:current.version||"3.1.1",
     savedAt:new Date().toISOString(),
     config:current.config||{},
@@ -89,18 +88,17 @@ function writeStudentsToLocal(list,source){
   localStorage.setItem(GOOGLE_API_CONFIG.storageKey,JSON.stringify(payload));
   if(typeof window.loadClassData!=="function")throw new Error("Data Engine chưa nạp hàm loadClassData.");
   if(window.loadClassData()!==true)throw new Error("Data Engine từ chối nạp danh sách vào bộ nhớ.");
-  return {success:true,ok:true,count:42,source};
+  return {success:true,ok:true,count:42,source:source};
 }
 
 function installReplaceStudentsApi(){
   if(typeof window.replaceStudents==="function")return true;
-  window.replaceStudents=function(incoming,options={}){
-    const list=Array.isArray(incoming)?incoming.map(normalizeStudentForBridge):[];
-    if(!validRoster(list)){
-      return {success:false,ok:false,count:list.length,expected:42,reason:"roster-must-contain-42-valid-students"};
-    }
+  window.replaceStudents=function(incoming,options){
+    options=options||{};
+    var list=Array.isArray(incoming)?incoming.map(normalizeStudentForBridge):[];
+    if(!validRoster(list))return {success:false,ok:false,count:list.length,expected:42,reason:"roster-must-contain-42-valid-students"};
     try{
-      const result=writeStudentsToLocal(list,options.source||"runtime");
+      var result=writeStudentsToLocal(list,options.source||"runtime");
       if(typeof window.refreshAll==="function")try{window.refreshAll();}catch(_){ }
       return result;
     }catch(error){
@@ -111,124 +109,107 @@ function installReplaceStudentsApi(){
   return true;
 }
 
-async function waitDataEngine(attempt=0){
-  if(typeof window.loadClassData==="function")return true;
-  if(attempt>=100)return false;
-  await sleep(100);
-  return waitDataEngine(attempt+1);
+function waitDataEngine(attempt){
+  attempt=attempt||0;
+  if(typeof window.loadClassData==="function")return Promise.resolve(true);
+  if(attempt>=100)return Promise.resolve(false);
+  return sleep(100).then(function(){return waitDataEngine(attempt+1);});
 }
 
-async function api(action,params={}){
-  const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),GOOGLE_API_CONFIG.timeout);
-  try{
-    const query=new URLSearchParams({action,...params});
-    const response=await fetch(`${GOOGLE_API_CONFIG.url}?${query.toString()}`,{cache:"no-store",signal:controller.signal,redirect:"follow"});
-    if(!response.ok)throw new Error(`API HTTP ${response.status}`);
-    return await response.json();
-  }finally{clearTimeout(timer);}
+function api(action,params){
+  params=params||{};
+  var controller=new AbortController();
+  var timer=setTimeout(function(){controller.abort();},GOOGLE_API_CONFIG.timeout);
+  var query=new URLSearchParams(Object.assign({action:action},params));
+  return fetch(GOOGLE_API_CONFIG.url+"?"+query.toString(),{cache:"no-store",signal:controller.signal,redirect:"follow"})
+    .then(function(response){if(!response.ok)throw new Error("API HTTP "+response.status);return response.json();})
+    .finally(function(){clearTimeout(timer);});
 }
 
-async function loadMasterRoster(){
-  const response=await fetch(GOOGLE_API_CONFIG.masterRosterUrl,{cache:"no-store",credentials:"same-origin"});
-  if(!response.ok)throw new Error(`Master Roster HTTP ${response.status}`);
-  const payload=await response.json();
-  const list=(payload&&Array.isArray(payload.students)?payload.students:[]).map(normalizeStudentForBridge);
-  if(!validRoster(list))throw new Error(`Master Roster không hợp lệ: ${list.length}/42.`);
-  return list;
+function loadMasterRoster(){
+  return fetch(GOOGLE_API_CONFIG.masterRosterUrl,{cache:"no-store",credentials:"same-origin"})
+    .then(function(response){if(!response.ok)throw new Error("Master Roster HTTP "+response.status);return response.json();})
+    .then(function(payload){
+      var list=(payload&&Array.isArray(payload.students)?payload.students:[]).map(normalizeStudentForBridge);
+      if(!validRoster(list))throw new Error("Master Roster không hợp lệ: "+list.length+"/42.");
+      return list;
+    });
 }
 
-async function fetchRemoteRoster(){
-  try{
-    const result=await api("getStudents");
-    const raw=Array.isArray(result.students)?result.students:[];
-    const list=raw.map(normalizeStudentForBridge);
-    return {ok:validRoster(list),list,total:Number(result.total)||list.length,raw};
-  }catch(error){
+function fetchRemoteRoster(){
+  return api("getStudents").then(function(result){
+    var raw=Array.isArray(result.students)?result.students:[];
+    var list=raw.map(normalizeStudentForBridge);
+    return {ok:validRoster(list),list:list,total:Number(result.total)||list.length,raw:raw};
+  }).catch(function(error){
     console.warn("[GOOGLE BRIDGE] Google API không truy cập được:",error);
     return {ok:false,list:[],total:0,raw:[],error:error.message};
-  }
+  });
 }
 
-async function postImport(list){
-  if(!validRoster(list))throw new Error("Recovery payload không đủ 42 học sinh.");
-  const payload={action:"importStudents",schemaVersion:GOOGLE_API_CONFIG.schemaVersion,headers:STUDENT_SCHEMA,students:list.map(normalizeStudentForBridge)};
-  try{
-    await fetch(GOOGLE_API_CONFIG.url,{method:"POST",mode:"no-cors",cache:"no-store",redirect:"follow",headers:{"Content-Type":"text/plain;charset=UTF-8"},body:JSON.stringify(payload)});
-    return true;
-  }catch(error){
-    console.warn("[GOOGLE BRIDGE] Recovery POST thất bại:",error);
-    return false;
-  }
+function postImport(list){
+  if(!validRoster(list))return Promise.reject(new Error("Recovery payload không đủ 42 học sinh."));
+  var payload={action:"importStudents",schemaVersion:GOOGLE_API_CONFIG.schemaVersion,headers:STUDENT_SCHEMA,students:list.map(normalizeStudentForBridge)};
+  return fetch(GOOGLE_API_CONFIG.url,{method:"POST",mode:"no-cors",cache:"no-store",redirect:"follow",headers:{"Content-Type":"text/plain;charset=UTF-8"},body:JSON.stringify(payload)})
+    .then(function(){return true;})
+    .catch(function(error){console.warn("[GOOGLE BRIDGE] Recovery POST thất bại:",error);return false;});
 }
 
-async function verifyRemote(){
-  for(let attempt=0;attempt<=GOOGLE_API_CONFIG.verifyRetries;attempt++){
-    const remote=await fetchRemoteRoster();
+function verifyRemote(attempt){
+  attempt=attempt||0;
+  return fetchRemoteRoster().then(function(remote){
     if(remote.ok)return remote;
-    if(attempt<GOOGLE_API_CONFIG.verifyRetries)await sleep(GOOGLE_API_CONFIG.verifyDelay);
-  }
-  return {ok:false,list:[],total:0,raw:[]};
-}
-
-async function syncStudentsVip(){
-  if(!(await waitDataEngine()))throw new Error("Data Engine chưa sẵn sàng.");
-  installReplaceStudentsApi();
-
-  /* MASTER được nạp trước để giao diện không bao giờ rơi về 0 học sinh. */
-  const master=await loadMasterRoster();
-  writeStudentsToLocal(master,"master-roster-safe-baseline");
-  refreshAllAfterSync();
-
-  /* Google là nguồn đồng bộ chính khi trả về đủ 42. */
-  const remote=await fetchRemoteRoster();
-  if(remote.ok){
-    writeStudentsToLocal(remote.list,"google-sheets-42");
-    window.__GOOGLE_CLASS_SYNC__={ok:true,count:42,source:"google-sheets-42",fallbackUsed:false,at:new Date().toISOString()};
-    refreshAllAfterSync();
-    return window.__GOOGLE_CLASS_SYNC__;
-  }
-
-  /* Google thiếu/lỗi: giữ Master 42, tuyệt đối không ghi đè bằng rỗng/thiếu. */
-  window.__GOOGLE_CLASS_SYNC__={ok:true,count:42,source:"master-roster-fallback",fallbackUsed:true,googleCount:remote.total||0,at:new Date().toISOString()};
-  refreshAllAfterSync();
-
-  /* Tự phục hồi Google ở nền; giao diện không bị khóa chờ API. */
-  postImport(master)
-    .then(()=>verifyRemote())
-    .then(verified=>{
-      if(verified.ok){
-        writeStudentsToLocal(verified.list,"google-sheets-recovered");
-        refreshAllAfterSync();
-        if(typeof window.showToast==="function")window.showToast("Đã khôi phục và xác minh 42/42 học sinh trên Google.","success");
-      }
-    })
-    .catch(error=>console.warn("[GOOGLE BRIDGE] Background recovery:",error));
-
-  return window.__GOOGLE_CLASS_SYNC__;
+    if(attempt>=GOOGLE_API_CONFIG.verifyRetries)return {ok:false,list:[],total:0,raw:[]};
+    return sleep(GOOGLE_API_CONFIG.verifyDelay).then(function(){return verifyRemote(attempt+1);});
+  });
 }
 
 function refreshAllAfterSync(){
-  ["renderDashboard","renderStudents","renderAttendance","renderViolations","renderRewards","renderLearningSafe","renderCommentsSafe","renderStatistics","renderStudentLinks","updateStudentSelects"].forEach(name=>{
-    if(typeof window[name]==="function")try{window[name]();}catch(error){console.warn(`[GOOGLE BRIDGE] ${name}:`,error);}
+  ["renderDashboard","renderStudents","renderAttendance","renderViolations","renderRewards","renderLearningSafe","renderCommentsSafe","renderStatistics","renderStudentLinks","updateStudentSelects"].forEach(function(name){
+    if(typeof window[name]==="function")try{window[name]();}catch(error){console.warn("[GOOGLE BRIDGE] "+name+":",error);}
+  });
+}
+
+function syncStudentsVip(){
+  return waitDataEngine().then(function(ready){
+    if(!ready)throw new Error("Data Engine chưa sẵn sàng.");
+    installReplaceStudentsApi();
+    return loadMasterRoster();
+  }).then(function(master){
+    writeStudentsToLocal(master,"master-roster-safe-baseline");
+    refreshAllAfterSync();
+    return fetchRemoteRoster().then(function(remote){
+      if(remote.ok){
+        writeStudentsToLocal(remote.list,"google-sheets-42");
+        window.__GOOGLE_CLASS_SYNC__={ok:true,count:42,source:"google-sheets-42",fallbackUsed:false,at:new Date().toISOString()};
+        refreshAllAfterSync();
+        return window.__GOOGLE_CLASS_SYNC__;
+      }
+      window.__GOOGLE_CLASS_SYNC__={ok:true,count:42,source:"master-roster-fallback",fallbackUsed:true,googleCount:remote.total||0,at:new Date().toISOString()};
+      refreshAllAfterSync();
+      postImport(master).then(function(){return verifyRemote();}).then(function(verified){
+        if(verified.ok){
+          writeStudentsToLocal(verified.list,"google-sheets-recovered");
+          refreshAllAfterSync();
+          if(typeof window.showToast==="function")window.showToast("Đã khôi phục và xác minh 42/42 học sinh trên Google.","success");
+        }
+      }).catch(function(error){console.warn("[GOOGLE BRIDGE] Background recovery:",error);});
+      return window.__GOOGLE_CLASS_SYNC__;
+    });
   });
 }
 
 function initializeGoogleApiBridge(){
-  if(window.__GOOGLE_CLASS_BRIDGE_410__)return;
-  window.__GOOGLE_CLASS_BRIDGE_410__=true;
-  syncStudentsVip()
-    .then(result=>{
-      refreshAllAfterSync();
-      if(typeof window.showToast==="function"){
-        window.showToast(result.fallbackUsed?"Đang dùng bản an toàn 42 học sinh; Google sẽ tự đồng bộ lại.":"Đã đồng bộ 42/42 học sinh từ Google Sheets.",result.fallbackUsed?"warning":"success");
-      }
-    })
-    .catch(error=>{
-      window.__GOOGLE_CLASS_SYNC__={ok:false,error:error.message,at:new Date().toISOString()};
-      console.error("[GOOGLE BRIDGE] FATAL:",error);
-      if(typeof window.showToast==="function")window.showToast("Không thể nạp danh sách học sinh.","error");
-    });
+  if(window.__GOOGLE_CLASS_BRIDGE_420__)return;
+  window.__GOOGLE_CLASS_BRIDGE_420__=true;
+  syncStudentsVip().then(function(result){
+    refreshAllAfterSync();
+    if(typeof window.showToast==="function")window.showToast(result.fallbackUsed?"Đang dùng bản an toàn 42 học sinh; Google sẽ tự đồng bộ lại.":"Đã đồng bộ 42/42 học sinh từ Google Sheets.",result.fallbackUsed?"warning":"success");
+  }).catch(function(error){
+    window.__GOOGLE_CLASS_SYNC__={ok:false,error:error.message,at:new Date().toISOString()};
+    console.error("[GOOGLE BRIDGE] FATAL:",error);
+    if(typeof window.showToast==="function")window.showToast("Không thể nạp danh sách học sinh.","error");
+  });
 }
 
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",initializeGoogleApiBridge,{once:true});
