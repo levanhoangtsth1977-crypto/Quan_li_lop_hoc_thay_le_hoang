@@ -1,6 +1,6 @@
 /* ============================================================
    QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG
-   STUDENT SYNC DEDUPE PATCH 1.0.0
+   STUDENT SYNC DEDUPE PATCH 1.0.1
    ------------------------------------------------------------
    MỤC ĐÍCH:
    - Chặn học sinh bị nhân bản khi Google Sheets trả về record trùng.
@@ -15,8 +15,7 @@
 (function installStudentSyncDedupe() {
     "use strict";
 
-    if (window.__STUDENT_SYNC_DEDUPE_100__) return;
-    window.__STUDENT_SYNC_DEDUPE_100__ = true;
+    if (window.__STUDENT_SYNC_DEDUPE_INSTALLED_101__) return;
 
     function text(value) {
         return String(value ?? "").trim();
@@ -44,7 +43,7 @@
         const byIdentity = new Map();
         const noIdentity = [];
 
-        input.forEach((student, index) => {
+        input.forEach(student => {
             if (!student || typeof student !== "object") return;
 
             const key = identityOf(student);
@@ -61,18 +60,27 @@
             }
         });
 
-        const unique = Array.from(byIdentity.values());
-        unique.push(...noIdentity);
-
-        return unique;
+        return [
+            ...byIdentity.values(),
+            ...noIdentity
+        ];
     }
 
-    window.dedupeStudentsForSync = dedupeStudents;
+    function installWhenReady() {
+        const originalReplaceStudents = window.replaceStudents;
 
-    const originalReplaceStudents = window.replaceStudents;
+        if (typeof originalReplaceStudents !== "function") {
+            return false;
+        }
 
-    if (typeof originalReplaceStudents === "function") {
-        window.replaceStudents = function patchedReplaceStudents(incoming, options = {}) {
+        if (originalReplaceStudents.__STUDENT_SYNC_DEDUPE_WRAPPED_101__) {
+            window.__STUDENT_SYNC_DEDUPE_INSTALLED_101__ = true;
+            return true;
+        }
+
+        window.dedupeStudentsForSync = dedupeStudents;
+
+        const patchedReplaceStudents = function patchedReplaceStudents(incoming, options = {}) {
             const source = Array.isArray(incoming) ? incoming : [];
             const unique = dedupeStudents(source);
 
@@ -87,38 +95,41 @@
                 }
             );
 
+            const removed = Math.max(0, source.length - unique.length);
+
             if (result && typeof result === "object") {
                 result.dedupe = {
                     applied: true,
                     sourceCount: source.length,
                     uniqueCount: unique.length,
-                    removed: Math.max(0, source.length - unique.length)
+                    removed
                 };
             }
 
             window.__STUDENT_SYNC_DEDUPE_LAST__ = {
                 sourceCount: source.length,
                 uniqueCount: unique.length,
-                removed: Math.max(0, source.length - unique.length),
+                removed,
                 at: new Date().toISOString()
             };
 
             return result;
         };
-    } else {
-        // data.js có thể chưa tải khi patch được thực thi.
-        // Chờ một lần ngắn để bọc API trước khi Google Bridge đồng bộ.
-        let attempts = 0;
-        const timer = setInterval(() => {
-            attempts += 1;
 
-            if (typeof window.replaceStudents === "function") {
-                clearInterval(timer);
-                installStudentSyncDedupe();
-                return;
-            }
-
-            if (attempts >= 100) clearInterval(timer);
-        }, 50);
+        patchedReplaceStudents.__STUDENT_SYNC_DEDUPE_WRAPPED_101__ = true;
+        window.replaceStudents = patchedReplaceStudents;
+        window.__STUDENT_SYNC_DEDUPE_INSTALLED_101__ = true;
+        return true;
     }
+
+    if (installWhenReady()) return;
+
+    let attempts = 0;
+    const timer = setInterval(() => {
+        attempts += 1;
+
+        if (installWhenReady() || attempts >= 200) {
+            clearInterval(timer);
+        }
+    }, 50);
 })();
