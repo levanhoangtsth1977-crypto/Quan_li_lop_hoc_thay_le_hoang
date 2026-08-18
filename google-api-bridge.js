@@ -1,4 +1,4 @@
-/* QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG - GOOGLE API BRIDGE 2.9.0 */
+/* QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG - GOOGLE API BRIDGE 2.9.1 */
 "use strict";
 
 const GOOGLE_API_CONFIG = Object.freeze({
@@ -13,13 +13,9 @@ function googleApiRequest(action, params = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), GOOGLE_API_CONFIG.timeout);
     const query = new URLSearchParams({ action, ...params });
-    return fetch(`${GOOGLE_API_CONFIG.url}?${query.toString()}`, {
-        method: "GET", cache: "no-store", signal: controller.signal,
-        headers: { Accept: "application/json" }
-    }).then(response => {
-        if (!response.ok) throw new Error(`API HTTP ${response.status}`);
-        return response.json();
-    }).finally(() => clearTimeout(timer));
+    return fetch(`${GOOGLE_API_CONFIG.url}?${query.toString()}`, { method: "GET", cache: "no-store", signal: controller.signal, headers: { Accept: "application/json" } })
+        .then(response => { if (!response.ok) throw new Error(`API HTTP ${response.status}`); return response.json(); })
+        .finally(() => clearTimeout(timer));
 }
 
 function googleApiJsonp(action, params = {}) {
@@ -29,19 +25,9 @@ function googleApiJsonp(action, params = {}) {
         const query = new URLSearchParams({ action, callback, ...params });
         let finished = false;
         let timer;
-        const cleanup = () => {
-            if (finished) return;
-            finished = true;
-            clearTimeout(timer);
-            delete window[callback];
-            script.remove();
-        };
+        const cleanup = () => { if (finished) return; finished = true; clearTimeout(timer); delete window[callback]; script.remove(); };
         timer = setTimeout(() => { cleanup(); reject(new Error("API JSONP timeout.")); }, GOOGLE_API_CONFIG.timeout);
-        window[callback] = result => {
-            cleanup();
-            if (result && result.ok === true) resolve(result);
-            else reject(new Error(result?.error || result?.message || "API không trả dữ liệu hợp lệ."));
-        };
+        window[callback] = result => { cleanup(); if (result && result.ok === true) resolve(result); else reject(new Error(result?.error || result?.message || "API không trả dữ liệu hợp lệ.")); };
         script.onerror = () => { cleanup(); reject(new Error("Không tải được phản hồi JSONP từ Apps Script.")); };
         script.async = true;
         script.src = `${GOOGLE_API_CONFIG.url}?${query.toString()}`;
@@ -50,11 +36,8 @@ function googleApiJsonp(action, params = {}) {
 }
 
 function googleApiPost(action, payload = {}) {
-    return fetch(GOOGLE_API_CONFIG.url, {
-        method: "POST", mode: "no-cors", cache: "no-store", redirect: "follow", keepalive: true,
-        headers: { "Content-Type": "text/plain;charset=UTF-8" },
-        body: JSON.stringify({ action, ...payload })
-    }).then(() => ({ ok: true, action, dispatched: true }));
+    return fetch(GOOGLE_API_CONFIG.url, { method: "POST", mode: "no-cors", cache: "no-store", redirect: "follow", keepalive: true, headers: { "Content-Type": "text/plain;charset=UTF-8" }, body: JSON.stringify({ action, ...payload }) })
+        .then(() => ({ ok: true, action, dispatched: true }));
 }
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
@@ -79,11 +62,6 @@ function normalizeStudentForBridge(student, index) {
     };
 }
 
-/*
- * Data Engine adapter.
- * data.js dùng let students = []; nên phải thay nội dung mảng,
- * tuyệt đối không gán lại reference của students.
- */
 function installReplaceStudentsBridge() {
     if (typeof window.replaceStudents === "function") return true;
     try {
@@ -92,34 +70,24 @@ function installReplaceStudentsBridge() {
             if (!Array.isArray(incoming)) throw new Error("Danh sách học sinh không hợp lệ.");
             if (!incoming.length && options.allowEmpty !== true) throw new Error("Từ chối thay danh sách bằng 0 học sinh.");
             if (incoming.length > 50) throw new Error("Danh sách vượt giới hạn 50 học sinh.");
-
-            const normalized = incoming
-                .map(normalizeStudentForBridge)
-                .filter(student => student.name);
-
-            if (!normalized.length && options.allowEmpty !== true) {
-                throw new Error("Không có học sinh hợp lệ để cập nhật Data Engine.");
-            }
-
+            const normalized = incoming.map(normalizeStudentForBridge).filter(student => student.name);
+            if (!normalized.length && options.allowEmpty !== true) throw new Error("Không có học sinh hợp lệ để cập nhật Data Engine.");
             students.splice(0, students.length, ...normalized);
-
-            try {
-                if (typeof saveClassData === "function" && options.persist !== false) saveClassData();
-            } catch (error) {
-                console.warn("[DATA ENGINE] Không lưu được LocalStorage:", error);
-            }
-
-            try {
-                if (typeof refreshAll === "function") refreshAll();
-            } catch (_) {}
-
+            try { if (typeof saveClassData === "function" && options.persist !== false) saveClassData(); } catch (error) { console.warn("[DATA ENGINE] LocalStorage:", error); }
+            try { if (typeof refreshAll === "function") refreshAll(); } catch (_) {}
             return { success: true, ok: true, count: normalized.length, source: options.source || "google" };
         };
         return true;
     } catch (error) {
-        console.error("[DATA ENGINE] Không cài được replaceStudents:", error);
+        console.error("[DATA ENGINE] replaceStudents:", error);
         return false;
     }
+}
+
+function waitForDataEngine(attempt = 0) {
+    if (installReplaceStudentsBridge()) return Promise.resolve(true);
+    if (attempt >= 100) return Promise.resolve(false);
+    return new Promise(resolve => setTimeout(() => resolve(waitForDataEngine(attempt + 1)), 100));
 }
 
 async function verifyAttendanceRecord(record, attempt = 0) {
@@ -134,17 +102,12 @@ async function verifyAttendanceRecord(record, attempt = 0) {
         if (found) return { ok: true, verified: true, studentId, date };
         throw new Error("Bản ghi chưa xuất hiện trong Google Sheets.");
     } catch (error) {
-        if (attempt < GOOGLE_API_CONFIG.verifyRetries) {
-            await sleep(GOOGLE_API_CONFIG.verifyDelay);
-            return verifyAttendanceRecord(record, attempt + 1);
-        }
+        if (attempt < GOOGLE_API_CONFIG.verifyRetries) { await sleep(GOOGLE_API_CONFIG.verifyDelay); return verifyAttendanceRecord(record, attempt + 1); }
         throw error;
     }
 }
 
-function normalizeAttendanceRecord(studentId, date, status, note) {
-    return { studentId: String(studentId || "").trim(), date: String(date || "").trim(), status: String(status || "").trim(), note: String(note || "") };
-}
+function normalizeAttendanceRecord(studentId, date, status, note) { return { studentId: String(studentId || "").trim(), date: String(date || "").trim(), status: String(status || "").trim(), note: String(note || "") }; }
 
 async function syncOneAttendance(record) {
     if (!record.studentId || !record.date || !record.status) throw new Error("Bản ghi điểm danh thiếu studentId, date hoặc status.");
@@ -153,7 +116,7 @@ async function syncOneAttendance(record) {
 }
 
 function installAttendanceWriteBridge() {
-    if (window.__GOOGLE_ATTENDANCE_WRITE_BRIDGE_290__) return true;
+    if (window.__GOOGLE_ATTENDANCE_WRITE_BRIDGE_291__) return true;
     const original = window.saveAttendanceRecord;
     if (typeof original !== "function") return false;
     window.saveAttendanceRecord = function (studentId, date, status, note) {
@@ -170,25 +133,19 @@ function installAttendanceWriteBridge() {
         });
         return localResult;
     };
-    window.__GOOGLE_ATTENDANCE_WRITE_BRIDGE_290__ = true;
+    window.__GOOGLE_ATTENDANCE_WRITE_BRIDGE_291__ = true;
     return true;
 }
 
 function waitAndInstallAttendanceBridge(attempt = 0) {
     if (installAttendanceWriteBridge()) return;
-    if (attempt >= 200) {
-        console.error("[GOOGLE WRITE] Không tìm thấy saveAttendanceRecord() sau 20 giây.");
-        return;
-    }
+    if (attempt >= 200) { console.error("[GOOGLE WRITE] Không tìm thấy saveAttendanceRecord() sau 20 giây."); return; }
     setTimeout(() => waitAndInstallAttendanceBridge(attempt + 1), 100);
 }
 
 function installWriteBridge() {
-    if (window.__GOOGLE_WRITE_BRIDGE_290__) return;
-    const saveMap = [
-        ["addViolation", "saveViolation"], ["addReward", "saveReward"], ["addLearningRecord", "saveLearning"],
-        ["addProgressRecord", "saveProgress"], ["addComment", "saveComment"]
-    ];
+    if (window.__GOOGLE_WRITE_BRIDGE_291__) return;
+    const saveMap = [["addViolation", "saveViolation"], ["addReward", "saveReward"], ["addLearningRecord", "saveLearning"], ["addProgressRecord", "saveProgress"], ["addComment", "saveComment"]];
     saveMap.forEach(([functionName, apiAction]) => {
         const original = window[functionName];
         if (typeof original !== "function") return;
@@ -196,41 +153,24 @@ function installWriteBridge() {
             const localResult = original.apply(this, args);
             const base = localResult?.record && typeof localResult.record === "object" ? { ...localResult.record } : {};
             const record = args[0] && typeof args[0] === "object" ? { ...base, ...args[0] } : base;
-            googleApiPost(apiAction, { record }).then(() => {
-                window.__GOOGLE_LAST_WRITE__ = { ok: true, action: apiAction, at: new Date().toISOString() };
-            }).catch(error => {
-                console.error(`[GOOGLE WRITE] ${apiAction}:`, error);
-                window.__GOOGLE_LAST_WRITE__ = { ok: false, action: apiAction, error: error.message, at: new Date().toISOString() };
-            });
+            googleApiPost(apiAction, { record }).then(() => { window.__GOOGLE_LAST_WRITE__ = { ok: true, action: apiAction, at: new Date().toISOString() }; }).catch(error => { console.error(`[GOOGLE WRITE] ${apiAction}:`, error); window.__GOOGLE_LAST_WRITE__ = { ok: false, action: apiAction, error: error.message, at: new Date().toISOString() }; });
             return localResult;
         };
     });
-    window.__GOOGLE_WRITE_BRIDGE_290__ = true;
+    window.__GOOGLE_WRITE_BRIDGE_291__ = true;
 }
 
 async function getStudentsFromGoogle() {
-    try {
-        return await googleApiRequest("getStudents");
-    } catch (fetchError) {
-        console.warn("[GOOGLE READ] fetch getStudents thất bại, chuyển sang JSONP:", fetchError);
-        return googleApiJsonp("getStudents");
-    }
+    try { return await googleApiRequest("getStudents"); }
+    catch (fetchError) { console.warn("[GOOGLE READ] fetch getStudents thất bại, chuyển JSONP:", fetchError); return googleApiJsonp("getStudents"); }
 }
 
 function getLocalStudentsForRecovery() {
     try {
-        if (typeof window.getStudentsSafe === "function") {
-            const list = window.getStudentsSafe();
-            if (Array.isArray(list)) return list;
-        }
-        if (typeof window.getStudents === "function") {
-            const list = window.getStudents();
-            if (Array.isArray(list)) return list;
-        }
+        if (typeof window.getStudentsSafe === "function") { const list = window.getStudentsSafe(); if (Array.isArray(list)) return list; }
+        if (typeof window.getStudents === "function") { const list = window.getStudents(); if (Array.isArray(list)) return list; }
         if (typeof window.APP_DATA !== "undefined" && Array.isArray(window.APP_DATA.students)) return window.APP_DATA.students;
-    } catch (error) {
-        console.warn("[GOOGLE RECOVERY] Không đọc được dữ liệu local:", error);
-    }
+    } catch (error) { console.warn("[GOOGLE RECOVERY] local:", error); }
     return [];
 }
 
@@ -241,10 +181,7 @@ async function verifyStudentImport(expectedCount, attempt = 0) {
         if (actual >= expectedCount) return { ok: true, verified: true, count: actual, total: Number(result.total) || actual };
         throw new Error(`Google Sheets mới có ${actual}/${expectedCount} học sinh.`);
     } catch (error) {
-        if (attempt < GOOGLE_API_CONFIG.verifyRetries) {
-            await sleep(GOOGLE_API_CONFIG.verifyDelay);
-            return verifyStudentImport(expectedCount, attempt + 1);
-        }
+        if (attempt < GOOGLE_API_CONFIG.verifyRetries) { await sleep(GOOGLE_API_CONFIG.verifyDelay); return verifyStudentImport(expectedCount, attempt + 1); }
         throw error;
     }
 }
@@ -259,7 +196,8 @@ async function recoverStudentsToGoogle(localStudents) {
 }
 
 async function syncStudentsFromGoogle() {
-    if (!installReplaceStudentsBridge()) throw new Error("Data Engine chưa sẵn sàng: không cài được replaceStudents().");
+    const dataReady = await waitForDataEngine();
+    if (!dataReady) throw new Error("Data Engine chưa sẵn sàng sau 10 giây.");
     const result = await getStudentsFromGoogle();
     if (!result || result.ok !== true) throw new Error(result?.message || result?.error || "API không hợp lệ.");
     const remoteStudents = Array.isArray(result.students) ? result.students : [];
@@ -276,34 +214,23 @@ async function syncStudentsFromGoogle() {
         return window.__GOOGLE_CLASS_SYNC__;
     }
 
-    const resultLocal = window.replaceStudents(remoteStudents, { source: "google-sheets", persist: true, allowEmpty: false });
-    if (!resultLocal || resultLocal.success !== true) throw new Error("Không cập nhật được Data Engine.");
+    const localResult = window.replaceStudents(remoteStudents, { source: "google-sheets", persist: true, allowEmpty: false });
+    if (!localResult || localResult.success !== true) throw new Error("Không cập nhật được Data Engine.");
     window.__GOOGLE_CLASS_SYNC__ = { ok: true, count: remoteStudents.length, total: Number(result.total) || remoteStudents.length, syncedAt: new Date().toISOString(), apiVersion: result.version || "2.0.0", source: "google-sheets" };
     return window.__GOOGLE_CLASS_SYNC__;
 }
 
 function refreshAfterGoogleSync() {
-    ["renderDashboard", "renderStudents", "renderAttendance", "renderViolations", "renderRewards", "renderLearningSafe", "renderCommentsSafe", "renderStatistics", "renderStudentLinks"].forEach(name => {
-        if (typeof window[name] === "function") { try { window[name](); } catch (_) {} }
-    });
-    if (typeof window.updateStudentSelects === "function") {
-        try { window.updateStudentSelects(); } catch (_) {}
-    }
+    ["renderDashboard", "renderStudents", "renderAttendance", "renderViolations", "renderRewards", "renderLearningSafe", "renderCommentsSafe", "renderStatistics", "renderStudentLinks"].forEach(name => { if (typeof window[name] === "function") { try { window[name](); } catch (_) {} } });
+    if (typeof window.updateStudentSelects === "function") { try { window.updateStudentSelects(); } catch (_) {} }
 }
 
 function initializeGoogleApiBridge() {
-    if (window.__GOOGLE_CLASS_BRIDGE_290__) return;
-    window.__GOOGLE_CLASS_BRIDGE_290__ = true;
+    if (window.__GOOGLE_CLASS_BRIDGE_291__) return;
+    window.__GOOGLE_CLASS_BRIDGE_291__ = true;
     waitAndInstallAttendanceBridge();
     installWriteBridge();
-    installReplaceStudentsBridge();
-    syncStudentsFromGoogle().then(result => {
-        refreshAfterGoogleSync();
-        if (typeof window.showToast === "function") window.showToast(`Đã đồng bộ ${result.count} học sinh từ Google Sheets.`, "success");
-    }).catch(error => {
-        window.__GOOGLE_CLASS_SYNC__ = { ok: false, error: error.message, at: new Date().toISOString() };
-        console.warn("[GOOGLE API] Sync failed:", error);
-    });
+    syncStudentsFromGoogle().then(result => { refreshAfterGoogleSync(); if (typeof window.showToast === "function") window.showToast(`Đã đồng bộ ${result.count} học sinh từ Google Sheets.`, "success"); }).catch(error => { window.__GOOGLE_CLASS_SYNC__ = { ok: false, error: error.message, at: new Date().toISOString() }; console.warn("[GOOGLE API] Sync failed:", error); });
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initializeGoogleApiBridge, { once: true });
