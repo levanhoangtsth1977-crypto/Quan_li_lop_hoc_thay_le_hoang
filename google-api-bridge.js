@@ -1,4 +1,4 @@
-/* QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG - GOOGLE API BRIDGE 2.8.0 */
+/* QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG - GOOGLE API BRIDGE 2.9.0 */
 "use strict";
 
 const GOOGLE_API_CONFIG = Object.freeze({
@@ -59,6 +59,69 @@ function googleApiPost(action, payload = {}) {
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
+function normalizeStudentForBridge(student, index) {
+    const source = student && typeof student === "object" ? student : {};
+    const fallbackId = `HS${String(index + 1).padStart(2, "0")}`;
+    return {
+        id: String(source.id || source.studentId || fallbackId).trim(),
+        studentCode: String(source.studentCode || source.code || fallbackId).trim(),
+        name: String(source.name || source.studentName || "").trim(),
+        gender: String(source.gender || "").trim(),
+        birthDate: String(source.birthDate || source.dateOfBirth || "").trim(),
+        status: String(source.status || "active").trim(),
+        parentName: String(source.parentName || "").trim(),
+        phone: String(source.phone || "").trim(),
+        address: String(source.address || "").trim(),
+        note: String(source.note || "").trim(),
+        shareEnabled: source.shareEnabled !== false,
+        createdAt: String(source.createdAt || "").trim(),
+        updatedAt: String(source.updatedAt || "").trim()
+    };
+}
+
+/*
+ * Data Engine adapter.
+ * data.js dùng let students = []; nên phải thay nội dung mảng,
+ * tuyệt đối không gán lại reference của students.
+ */
+function installReplaceStudentsBridge() {
+    if (typeof window.replaceStudents === "function") return true;
+    try {
+        if (typeof students === "undefined" || !Array.isArray(students)) return false;
+        window.replaceStudents = function (incoming, options = {}) {
+            if (!Array.isArray(incoming)) throw new Error("Danh sách học sinh không hợp lệ.");
+            if (!incoming.length && options.allowEmpty !== true) throw new Error("Từ chối thay danh sách bằng 0 học sinh.");
+            if (incoming.length > 50) throw new Error("Danh sách vượt giới hạn 50 học sinh.");
+
+            const normalized = incoming
+                .map(normalizeStudentForBridge)
+                .filter(student => student.name);
+
+            if (!normalized.length && options.allowEmpty !== true) {
+                throw new Error("Không có học sinh hợp lệ để cập nhật Data Engine.");
+            }
+
+            students.splice(0, students.length, ...normalized);
+
+            try {
+                if (typeof saveClassData === "function" && options.persist !== false) saveClassData();
+            } catch (error) {
+                console.warn("[DATA ENGINE] Không lưu được LocalStorage:", error);
+            }
+
+            try {
+                if (typeof refreshAll === "function") refreshAll();
+            } catch (_) {}
+
+            return { success: true, ok: true, count: normalized.length, source: options.source || "google" };
+        };
+        return true;
+    } catch (error) {
+        console.error("[DATA ENGINE] Không cài được replaceStudents:", error);
+        return false;
+    }
+}
+
 async function verifyAttendanceRecord(record, attempt = 0) {
     const studentId = String(record?.studentId || "").trim();
     const date = String(record?.date || "").trim();
@@ -90,7 +153,7 @@ async function syncOneAttendance(record) {
 }
 
 function installAttendanceWriteBridge() {
-    if (window.__GOOGLE_ATTENDANCE_WRITE_BRIDGE_271__) return true;
+    if (window.__GOOGLE_ATTENDANCE_WRITE_BRIDGE_290__) return true;
     const original = window.saveAttendanceRecord;
     if (typeof original !== "function") return false;
     window.saveAttendanceRecord = function (studentId, date, status, note) {
@@ -107,7 +170,7 @@ function installAttendanceWriteBridge() {
         });
         return localResult;
     };
-    window.__GOOGLE_ATTENDANCE_WRITE_BRIDGE_271__ = true;
+    window.__GOOGLE_ATTENDANCE_WRITE_BRIDGE_290__ = true;
     return true;
 }
 
@@ -121,7 +184,7 @@ function waitAndInstallAttendanceBridge(attempt = 0) {
 }
 
 function installWriteBridge() {
-    if (window.__GOOGLE_WRITE_BRIDGE_271__) return;
+    if (window.__GOOGLE_WRITE_BRIDGE_290__) return;
     const saveMap = [
         ["addViolation", "saveViolation"], ["addReward", "saveReward"], ["addLearningRecord", "saveLearning"],
         ["addProgressRecord", "saveProgress"], ["addComment", "saveComment"]
@@ -142,7 +205,7 @@ function installWriteBridge() {
             return localResult;
         };
     });
-    window.__GOOGLE_WRITE_BRIDGE_271__ = true;
+    window.__GOOGLE_WRITE_BRIDGE_290__ = true;
 }
 
 async function getStudentsFromGoogle() {
@@ -164,9 +227,7 @@ function getLocalStudentsForRecovery() {
             const list = window.getStudents();
             if (Array.isArray(list)) return list;
         }
-        if (typeof window.APP_DATA !== "undefined" && Array.isArray(window.APP_DATA.students)) {
-            return window.APP_DATA.students;
-        }
+        if (typeof window.APP_DATA !== "undefined" && Array.isArray(window.APP_DATA.students)) return window.APP_DATA.students;
     } catch (error) {
         console.warn("[GOOGLE RECOVERY] Không đọc được dữ liệu local:", error);
     }
@@ -189,55 +250,35 @@ async function verifyStudentImport(expectedCount, attempt = 0) {
 }
 
 async function recoverStudentsToGoogle(localStudents) {
-    if (!Array.isArray(localStudents) || !localStudents.length) {
-        throw new Error("Không có danh sách học sinh local để khôi phục.");
-    }
-    if (localStudents.length > 50) {
-        throw new Error("Danh sách local vượt giới hạn 50 học sinh.");
-    }
-    const normalized = localStudents.map((student, index) => ({
-        id: String(student?.id || "").trim(),
-        studentCode: String(student?.studentCode || student?.code || `HS${String(index + 1).padStart(2, "0")}`).trim(),
-        name: String(student?.name || "").trim(),
-        gender: String(student?.gender || "").trim(),
-        birthDate: String(student?.birthDate || "").trim(),
-        status: String(student?.status || "active").trim(),
-        parentName: String(student?.parentName || "").trim(),
-        phone: String(student?.phone || "").trim(),
-        address: String(student?.address || "").trim(),
-        note: String(student?.note || "").trim(),
-        shareEnabled: student?.shareEnabled !== false,
-        createdAt: String(student?.createdAt || "").trim(),
-        updatedAt: String(student?.updatedAt || "").trim()
-    }));
+    if (!Array.isArray(localStudents) || !localStudents.length) throw new Error("Không có danh sách học sinh local để khôi phục.");
+    if (localStudents.length > 50) throw new Error("Danh sách local vượt giới hạn 50 học sinh.");
+    const normalized = localStudents.map(normalizeStudentForBridge);
     if (normalized.some(student => !student.name)) throw new Error("Danh sách local có học sinh thiếu họ tên; không ghi Google Sheets.");
     await googleApiPost("importStudents", { students: normalized });
-    const verified = await verifyStudentImport(normalized.length);
-    return { ok: true, recovered: true, count: verified.count, total: verified.total, source: "local-to-google" };
+    return verifyStudentImport(normalized.length);
 }
 
 async function syncStudentsFromGoogle() {
+    if (!installReplaceStudentsBridge()) throw new Error("Data Engine chưa sẵn sàng: không cài được replaceStudents().");
     const result = await getStudentsFromGoogle();
     if (!result || result.ok !== true) throw new Error(result?.message || result?.error || "API không hợp lệ.");
-    const students = Array.isArray(result.students) ? result.students : [];
+    const remoteStudents = Array.isArray(result.students) ? result.students : [];
 
-    if (!students.length) {
+    if (!remoteStudents.length) {
         const localStudents = getLocalStudentsForRecovery();
         if (!localStudents.length) throw new Error("Google Sheets và dữ liệu local đều không có học sinh.");
-        const recovered = await recoverStudentsToGoogle(localStudents);
+        await recoverStudentsToGoogle(localStudents);
         const verifiedStudents = await getStudentsFromGoogle();
         const finalStudents = Array.isArray(verifiedStudents.students) ? verifiedStudents.students : [];
         if (!finalStudents.length) throw new Error("Đã gửi dữ liệu nhưng chưa đọc lại được danh sách Google Sheets.");
-        if (typeof window.replaceStudents !== "function") throw new Error("Thiếu replaceStudents().");
-        window.replaceStudents(finalStudents, { source: "google-sheets-recovered", persist: true, allowEmpty: false });
-        window.__GOOGLE_CLASS_SYNC__ = { ok: true, count: finalStudents.length, total: Number(verifiedStudents.total) || finalStudents.length, syncedAt: new Date().toISOString(), apiVersion: verifiedStudents.version || "2.0.0", source: "local-to-google-recovery", recovered: recovered.count };
+        window.replaceStudents(finalStudents, { source: "local-to-google-recovery", persist: true, allowEmpty: false });
+        window.__GOOGLE_CLASS_SYNC__ = { ok: true, count: finalStudents.length, total: Number(verifiedStudents.total) || finalStudents.length, syncedAt: new Date().toISOString(), apiVersion: verifiedStudents.version || "2.0.0", source: "local-to-google-recovery" };
         return window.__GOOGLE_CLASS_SYNC__;
     }
 
-    if (typeof window.replaceStudents !== "function") throw new Error("Thiếu replaceStudents().");
-    const localResult = window.replaceStudents(students, { source: "google-sheets", persist: true, allowEmpty: false });
-    if (localResult === false || localResult?.success === false) throw new Error(localResult?.message || "Không cập nhật được Data Engine.");
-    window.__GOOGLE_CLASS_SYNC__ = { ok: true, count: students.length, total: Number(result.total) || students.length, syncedAt: new Date().toISOString(), apiVersion: result.version || "2.0.0", source: "google-sheets" };
+    const resultLocal = window.replaceStudents(remoteStudents, { source: "google-sheets", persist: true, allowEmpty: false });
+    if (!resultLocal || resultLocal.success !== true) throw new Error("Không cập nhật được Data Engine.");
+    window.__GOOGLE_CLASS_SYNC__ = { ok: true, count: remoteStudents.length, total: Number(result.total) || remoteStudents.length, syncedAt: new Date().toISOString(), apiVersion: result.version || "2.0.0", source: "google-sheets" };
     return window.__GOOGLE_CLASS_SYNC__;
 }
 
@@ -251,18 +292,14 @@ function refreshAfterGoogleSync() {
 }
 
 function initializeGoogleApiBridge() {
-    if (window.__GOOGLE_CLASS_BRIDGE_271__) return;
-    window.__GOOGLE_CLASS_BRIDGE_271__ = true;
+    if (window.__GOOGLE_CLASS_BRIDGE_290__) return;
+    window.__GOOGLE_CLASS_BRIDGE_290__ = true;
     waitAndInstallAttendanceBridge();
     installWriteBridge();
+    installReplaceStudentsBridge();
     syncStudentsFromGoogle().then(result => {
         refreshAfterGoogleSync();
-        if (typeof window.showToast === "function") {
-            const message = result.recovered
-                ? `Đã khôi phục ${result.count} học sinh từ laptop lên Google Sheets và đồng bộ toàn hệ thống.`
-                : `Đã đồng bộ ${result.count} học sinh từ Google Sheets.`;
-            window.showToast(message, "success");
-        }
+        if (typeof window.showToast === "function") window.showToast(`Đã đồng bộ ${result.count} học sinh từ Google Sheets.`, "success");
     }).catch(error => {
         window.__GOOGLE_CLASS_SYNC__ = { ok: false, error: error.message, at: new Date().toISOString() };
         console.warn("[GOOGLE API] Sync failed:", error);
