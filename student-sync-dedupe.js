@@ -1,21 +1,23 @@
 /* ============================================================
    QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG
-   STUDENT SYNC DEDUPE PATCH 1.0.1
+   STUDENT SYNC DEDUPE + MASTER ROSTER SYNC 1.1.0
    ------------------------------------------------------------
    MỤC ĐÍCH:
    - Chặn học sinh bị nhân bản khi Google Sheets trả về record trùng.
    - Khóa định danh ưu tiên: studentCode -> id.
    - KHÔNG dedupe theo tên.
    - Giữ bản ghi có updatedAt mới nhất khi cùng khóa.
-   - Không xóa dữ liệu LocalStorage.
-   - Không tự tạo học sinh mới.
-   - Không ghi ngược Google Sheets.
+   - Đồng bộ Master Roster 5C 2026–2027 từ GitHub Pages.
+   - Laptop và điện thoại dùng cùng một nguồn danh sách 42 học sinh.
+   - Chỉ thay danh sách students; không xóa attendance/violations/
+     rewards/learning/progress/comments trong LocalStorage.
+   - Không tự ghi ngược Google Sheets.
    ============================================================ */
 
 (function installStudentSyncDedupe() {
     "use strict";
 
-    if (window.__STUDENT_SYNC_DEDUPE_INSTALLED_101__) return;
+    if (window.__STUDENT_SYNC_DEDUPE_INSTALLED_110__) return;
 
     function text(value) {
         return String(value ?? "").trim();
@@ -73,8 +75,8 @@
             return false;
         }
 
-        if (originalReplaceStudents.__STUDENT_SYNC_DEDUPE_WRAPPED_101__) {
-            window.__STUDENT_SYNC_DEDUPE_INSTALLED_101__ = true;
+        if (originalReplaceStudents.__STUDENT_SYNC_DEDUPE_WRAPPED_110__) {
+            window.__STUDENT_SYNC_DEDUPE_INSTALLED_110__ = true;
             return true;
         }
 
@@ -116,13 +118,13 @@
             return result;
         };
 
-        patchedReplaceStudents.__STUDENT_SYNC_DEDUPE_WRAPPED_101__ = true;
+        patchedReplaceStudents.__STUDENT_SYNC_DEDUPE_WRAPPED_110__ = true;
         window.replaceStudents = patchedReplaceStudents;
-        window.__STUDENT_SYNC_DEDUPE_INSTALLED_101__ = true;
+        window.__STUDENT_SYNC_DEDUPE_INSTALLED_110__ = true;
         return true;
     }
 
-    if (installWhenReady()) return;
+    installWhenReady();
 
     let attempts = 0;
     const timer = setInterval(() => {
@@ -132,4 +134,215 @@
             clearInterval(timer);
         }
     }, 50);
+})();
+
+
+/* ============================================================
+   MASTER ROSTER SYNC
+   ------------------------------------------------------------
+   Nguồn chuẩn:
+   DANH_SACH_HOC_SINH_5C_2026_2027.json
+
+   Cơ chế:
+   1. Đọc Master Roster cùng domain GitHub Pages.
+   2. Chuẩn hóa ID/mã HS ổn định theo STT.
+   3. So sánh với danh sách hiện có.
+   4. Chỉ khi khác mới gọi replaceStudents().
+   5. replaceStudents() lưu LocalStorage qua Data Engine.
+   6. Reload một lần để toàn bộ UI đọc danh sách mới.
+   ------------------------------------------------------------
+   Quan trọng:
+   - Không xóa các mảng điểm danh, vi phạm, khen thưởng...
+   - Không tự tạo học sinh ngoài Master Roster.
+   - Không ghi dữ liệu ngược lên Google Sheets.
+   ============================================================ */
+
+(function installMasterRosterSync() {
+    "use strict";
+
+    const MASTER_URL =
+        "./DANH_SACH_HOC_SINH_5C_2026_2027.json?v=20260818-1";
+
+    const SYNC_MARKER =
+        "QL_LOP_HOC_MASTER_ROSTER_SYNC_110";
+
+    const TARGET_COUNT = 42;
+
+    function waitForReplaceStudents(maxAttempts = 240) {
+        return new Promise(resolve => {
+            let attempts = 0;
+
+            const timer = setInterval(() => {
+                attempts += 1;
+
+                if (typeof window.replaceStudents === "function") {
+                    clearInterval(timer);
+                    resolve(true);
+                    return;
+                }
+
+                if (attempts >= maxAttempts) {
+                    clearInterval(timer);
+                    resolve(false);
+                }
+            }, 50);
+        });
+    }
+
+    function normalizeMasterStudent(source, index) {
+        const stt = Number(source?.stt) || index + 1;
+        const code = text(source?.studentCode) ||
+            `5C-2026-${String(stt).padStart(3, "0")}`;
+        const id = `STU_5C_2026_${String(stt).padStart(3, "0")}`;
+
+        return {
+            id,
+            studentCode: code,
+            name: text(source?.name),
+            gender: text(source?.gender),
+            birthDate: text(source?.birthDate),
+            parentName: text(source?.parentName),
+            phone: text(source?.phone),
+            address: text(source?.address),
+            status: "active",
+            note: "",
+            createdAt: "2026-08-18T00:00:00.000Z",
+            updatedAt: "2026-08-18T00:00:00.000Z",
+            shareEnabled: true
+        };
+    }
+
+    function rosterSignature(list) {
+        return list.map(student => [
+            text(student?.studentCode || student?.code),
+            text(student?.name),
+            text(student?.gender),
+            text(student?.birthDate),
+            text(student?.parentName),
+            text(student?.phone),
+            text(student?.address)
+        ].join("\u001F")).join("\u001E");
+    }
+
+    function currentStudents() {
+        try {
+            if (typeof window.getStudentsSafe === "function") {
+                const result = window.getStudentsSafe();
+                if (Array.isArray(result)) return result;
+            }
+        } catch (error) {
+            console.warn("[MASTER ROSTER] Không đọc được students:", error);
+        }
+
+        return [];
+    }
+
+    async function fetchMasterRoster() {
+        const response = await fetch(MASTER_URL, {
+            method: "GET",
+            cache: "no-store",
+            credentials: "same-origin"
+        });
+
+        if (!response.ok) {
+            throw new Error(`Master Roster HTTP ${response.status}`);
+        }
+
+        const payload = await response.json();
+        const source = Array.isArray(payload?.students)
+            ? payload.students
+            : [];
+
+        return source.map(normalizeMasterStudent);
+    }
+
+    async function syncMasterRoster() {
+        try {
+            const master = await fetchMasterRoster();
+
+            if (master.length !== TARGET_COUNT) {
+                throw new Error(
+                    `Master Roster không hợp lệ: ${master.length}/${TARGET_COUNT} học sinh.`
+                );
+            }
+
+            const ready = await waitForReplaceStudents();
+            if (!ready) {
+                throw new Error("Data Engine chưa sẵn sàng.");
+            }
+
+            const current = currentStudents();
+            const same =
+                current.length === master.length &&
+                rosterSignature(current) === rosterSignature(master);
+
+            if (same) {
+                window.__MASTER_ROSTER_SYNC_STATUS__ = {
+                    status: "already-synced",
+                    count: master.length,
+                    at: new Date().toISOString()
+                };
+                return;
+            }
+
+            const result = window.replaceStudents(
+                master,
+                {
+                    source: "MASTER_ROSTER_GITHUB",
+                    replaceMode: "authoritative",
+                    preserveRelatedRecords: true,
+                    allowEmpty: false,
+                    expectedCount: TARGET_COUNT
+                }
+            );
+
+            if (result === false || result?.success === false) {
+                throw new Error("replaceStudents() không hoàn tất đồng bộ.");
+            }
+
+            window.__MASTER_ROSTER_SYNC_STATUS__ = {
+                status: "synced",
+                count: master.length,
+                previousCount: current.length,
+                at: new Date().toISOString()
+            };
+
+            /*
+             * Chỉ reload một lần cho mỗi tab sau khi danh sách thực sự thay đổi.
+             * Dùng sessionStorage để không tạo vòng lặp reload.
+             */
+            const alreadyReloaded =
+                sessionStorage.getItem(SYNC_MARKER) === "1";
+
+            if (!alreadyReloaded) {
+                sessionStorage.setItem(SYNC_MARKER, "1");
+                setTimeout(() => location.reload(), 150);
+            } else {
+                sessionStorage.removeItem(SYNC_MARKER);
+            }
+
+        } catch (error) {
+            window.__MASTER_ROSTER_SYNC_STATUS__ = {
+                status: "error",
+                message: String(error?.message || error),
+                at: new Date().toISOString()
+            };
+
+            console.error(
+                "[MASTER ROSTER] Đồng bộ thất bại:",
+                error
+            );
+        }
+    }
+
+    function start() {
+        /* Đợi toàn bộ script hiện tại hoàn tất khởi tạo. */
+        setTimeout(syncMasterRoster, 700);
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", start, { once: true });
+    } else {
+        start();
+    }
 })();
