@@ -214,3 +214,27 @@ function initializeGoogleApiBridge(){
 
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",initializeGoogleApiBridge,{once:true});
 else initializeGoogleApiBridge();
+
+/* ============================================================
+   PATCH 4.2.1 — GIỮ LIÊN KẾT STUDENT ID + VIỆT HÓA
+   ============================================================ */
+(function(){
+  if(window.__GOOGLE_CLASS_BRIDGE_421__)return;
+  window.__GOOGLE_CLASS_BRIDGE_421__=true;
+  var TEXT={present:"Có mặt",excused:"Có phép",absent:"Vắng",late:"Đi muộn",active:"Đang học",inactive:"Không còn học",light:"Nhẹ",attention:"Cần chú ý",serious:"Nghiêm trọng",monitoring:"Đang theo dõi",resolved:"Đã xử lý",praise:"Tuyên dương",reward:"Khen thưởng",other:"Khác",general:"Chung",good:"Tốt",achieved:"Đạt",not_achieved:"Chưa đạt"};
+  function students(){try{if(typeof window.getStudentsSafe==="function"){var s=window.getStudentsSafe();if(Array.isArray(s))return s;}}catch(_){}return Array.isArray(window.students)?window.students:[];}
+  function same(s,v){v=String(v??"").trim();return !!s&&(String(s.id??"").trim()===v||String(s.studentCode??"").trim()===v||String(s.code??"").trim()===v);}
+  var oldGet=window.getStudentById;
+  window.getStudentById=function(id){var s=students().find(function(x){return same(x,id);});return s||((typeof oldGet==="function")?oldGet(id):null);};
+  window.filterValidStudentRecords=function(records){var list=Array.isArray(records)?records:[];return list.filter(function(r){return r&&students().some(function(s){return same(s,r.studentId);});});};
+  window.renderAttendance=function(){
+    var tbody=document.getElementById("attendanceTableBody");if(!tbody)return;
+    var date=(typeof window.getValue==="function"?window.getValue("attendanceDate"):"")||(typeof window.todayISO==="function"?window.todayISO():new Date().toISOString().slice(0,10));
+    var dateEl=document.getElementById("attendanceDate");if(dateEl)dateEl.value=date;
+    var list=students(),records=typeof window.getAttendanceRecords==="function"?(window.getAttendanceRecords()||[]):[];
+    var esc=window.escapeHTML||function(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;");};
+    tbody.innerHTML=list.map(function(s,i){var r=Array.isArray(records)?records.find(function(x){return same(s,x.studentId)&&String(x.date)===String(date);}):null;var st=r&&r.status||"present";var id=String(s.id??s.studentCode??"");return '<tr><td>'+String(i+1)+'</td><td><strong>'+esc(s.name)+'</strong></td><td><select class="attendance-status" data-student-id="'+esc(id)+'"><option value="present" '+(st==="present"?"selected":"")+'>Có mặt</option><option value="excused" '+(st==="excused"?"selected":"")+'>Có phép</option><option value="absent" '+(st==="absent"?"selected":"")+'>Vắng</option></select></td><td><input type="text" class="attendance-note" data-student-id="'+esc(id)+'" value="'+esc(r&&r.note||"")+'" placeholder="Ghi chú"></td></tr>';}).join("");
+    if(typeof window.updateAttendanceSummary==="function")window.updateAttendanceSummary();
+  };
+  window.__QL_VI_SYNC_FIX__={version:"4.2.1",translate:function(v){var k=String(v??"").trim().toLocaleLowerCase("vi");return TEXT[k]||String(v??"");}};
+})();
