@@ -1,234 +1,27 @@
 /* ============================================================
-   UI ACTION PATCH 2.0.0 — VIP PRO MAX
-   Mobile menu + attendance Google sync queue
+   UI ACTION PATCH 2.1.0 — VIP PRO MAX
+   Mobile menu + attendance sync + Triệu Phú Học Đường launcher
    ============================================================ */
 (function () {
     "use strict";
-
     var GOOGLE_URL = "https://script.google.com/macros/s/AKfycbynklm7SobnkcEZKfAUGdMIBugA4lQ2kA3yOThHVjNoiJzCK7veuwO2vE1tR1QKI-nkIQ/exec";
     var QUEUE_KEY = "QL_LOP_HOC_ATTENDANCE_SYNC_QUEUE_2026_2027";
     var $ = function (id) { return document.getElementById(id); };
-
-    function openMobileSidebarDirect() {
-        var sidebar = $("sidebar");
-        var overlay = $("sidebarOverlay");
-        if (!sidebar) return false;
-        sidebar.classList.add("open");
-        sidebar.classList.remove("collapsed");
-        if (overlay) {
-            overlay.classList.add("active");
-            overlay.hidden = false;
-            overlay.setAttribute("aria-hidden", "false");
-        }
-        document.body.classList.add("sidebar-open");
-        return true;
-    }
-
-    function closeMobileSidebarDirect() {
-        var sidebar = $("sidebar");
-        var overlay = $("sidebarOverlay");
-        if (sidebar) sidebar.classList.remove("open");
-        if (overlay) {
-            overlay.classList.remove("active");
-            overlay.hidden = true;
-            overlay.setAttribute("aria-hidden", "true");
-        }
-        document.body.classList.remove("sidebar-open");
-        return true;
-    }
-
-    function call(name) {
-        var args = Array.prototype.slice.call(arguments, 1);
-        var fn = window[name];
-        if (typeof fn !== "function") return false;
-        try { fn.apply(window, args); return true; }
-        catch (error) { console.error("[UI ACTION] " + name, error); return false; }
-    }
-
-    function go(page) {
-        if (!page) return false;
-        if (call("navigateToPage", page)) return true;
-        var target = String(page).replace(/[^a-zA-Z0-9_-]/g, "");
-        var section = document.querySelector('[data-page-section="' + target + '"]') || $("page-" + target);
-        if (!section) return false;
-        document.querySelectorAll("[data-page-section]").forEach(function (item) {
-            var active = item === section;
-            item.hidden = !active;
-            item.classList.toggle("active", active);
-        });
-        document.querySelectorAll(".menu-item[data-page]").forEach(function (item) {
-            item.classList.toggle("active", item.dataset.page === page);
-        });
-        var title = $("pageTitle");
-        if (title) title.textContent = page;
-        closeMobileSidebarDirect();
-        return true;
-    }
-
-    function handleMenuClick(event) {
-        var target = event.target instanceof Element ? event.target : null;
-        if (!target) return;
-        var button = target.closest("#sidebarToggle, #sidebarClose, #closeSidebar");
-        if (button) {
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            if (button.id === "sidebarToggle") openMobileSidebarDirect();
-            else closeMobileSidebarDirect();
-            return;
-        }
-        var overlay = target.closest("#sidebarOverlay");
-        if (overlay) {
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            closeMobileSidebarDirect();
-            return;
-        }
-        var menu = target.closest(".menu-item[data-page]");
-        if (menu) {
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            go(menu.dataset.page);
-        }
-    }
-
-    function readQueue() {
-        try {
-            var raw = localStorage.getItem(QUEUE_KEY);
-            var data = raw ? JSON.parse(raw) : [];
-            return Array.isArray(data) ? data : [];
-        } catch (_) { return []; }
-    }
-
-    function writeQueue(queue) {
-        try { localStorage.setItem(QUEUE_KEY, JSON.stringify(queue)); } catch (_) {}
-    }
-
-    function makeQueueId(record) {
-        return [record.studentId, record.date, record.status].join("|");
-    }
-
-    function enqueueAttendance(record) {
-        var queue = readQueue();
-        var key = makeQueueId(record);
-        var found = false;
-        queue = queue.map(function (item) {
-            if (makeQueueId(item) === key) {
-                found = true;
-                return Object.assign({}, item, record, { queuedAt: item.queuedAt || new Date().toISOString() });
-            }
-            return item;
-        });
-        if (!found) queue.push(Object.assign({}, record, { queuedAt: new Date().toISOString() }));
-        writeQueue(queue);
-    }
-
-    function jsonp(action, params) {
-        params = params || {};
-        return new Promise(function (resolve, reject) {
-            var callback = "__LH_ATT_" + Date.now() + "_" + Math.random().toString(36).slice(2);
-            var script = document.createElement("script");
-            var query = new URLSearchParams(Object.assign({ action: action, callback: callback }, params));
-            var done = false;
-            var timer = setTimeout(function () { finish(new Error("JSONP timeout")); }, 10000);
-            function finish(error, value) {
-                if (done) return;
-                done = true;
-                clearTimeout(timer);
-                try { delete window[callback]; } catch (_) {}
-                script.remove();
-                if (error) reject(error); else resolve(value);
-            }
-            window[callback] = function (value) { finish(null, value); };
-            script.onerror = function () { finish(new Error("JSONP error")); };
-            script.src = GOOGLE_URL + "?" + query.toString();
-            document.head.appendChild(script);
-        });
-    }
-
-    function postAttendance(record) {
-        return fetch(GOOGLE_URL, {
-            method: "POST",
-            mode: "no-cors",
-            cache: "no-store",
-            redirect: "follow",
-            headers: { "Content-Type": "text/plain;charset=UTF-8" },
-            body: JSON.stringify({ action: "saveAttendance", record: record })
-        }).then(function () { return true; });
-    }
-
-    function flushAttendanceQueue() {
-        var queue = readQueue();
-        if (!queue.length) return;
-        var remaining = queue.slice();
-        var chain = Promise.resolve();
-        queue.forEach(function (record) {
-            chain = chain.then(function () {
-                return postAttendance(record).then(function () {
-                    return jsonp("getAttendance", { studentId: record.studentId })
-                        .then(function (response) {
-                            var rows = Array.isArray(response && response.records) ? response.records : [];
-                            var found = rows.some(function (row) {
-                                return String(row.studentId) === String(record.studentId) && String(row.date) === String(record.date) && String(row.status) === String(record.status);
-                            });
-                            if (found) {
-                                remaining = remaining.filter(function (item) { return makeQueueId(item) !== makeQueueId(record); });
-                            }
-                        });
-                }).catch(function () {});
-            });
-        });
-        chain.finally(function () {
-            writeQueue(remaining);
-            window.__LH_ATTENDANCE_SYNC__ = {
-                queued: remaining.length,
-                synced: queue.length - remaining.length,
-                at: new Date().toISOString()
-            };
-        });
-    }
-
-    function installAttendanceSync() {
-        if (window.__LH_ATTENDANCE_SYNC_WRAPPER_200__) return true;
-        var original = window.saveAttendanceRecord;
-        if (typeof original !== "function") return false;
-        if (original.__LH_ATTENDANCE_WRAPPED_200__) return true;
-        var wrapped = function (studentId, date, status, note) {
-            var result;
-            try { result = original.apply(this, arguments); }
-            catch (error) { console.error("[ATTENDANCE LOCAL]", error); return false; }
-            enqueueAttendance({
-                id: "ATT_" + String(studentId) + "_" + String(date),
-                studentId: String(studentId),
-                date: String(date),
-                status: String(status || "present"),
-                note: String(note || ""),
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            });
-            setTimeout(flushAttendanceQueue, 100);
-            return result;
-        };
-        wrapped.__LH_ATTENDANCE_WRAPPED_200__ = true;
-        window.saveAttendanceRecord = wrapped;
-        window.__LH_ATTENDANCE_SYNC_WRAPPER_200__ = true;
-        flushAttendanceQueue();
-        return true;
-    }
-
-    function install() {
-        if (window.__UI_ACTION_PATCH_200__) return;
-        window.__UI_ACTION_PATCH_200__ = true;
-        document.addEventListener("click", handleMenuClick, true);
-        window.openMobileSidebar = openMobileSidebarDirect;
-        window.closeMobileSidebar = closeMobileSidebarDirect;
-        var attempts = 0;
-        var timer = setInterval(function () {
-            attempts += 1;
-            if (installAttendanceSync() || attempts >= 200) clearInterval(timer);
-        }, 50);
-        console.info("UI ACTION PATCH 2.0.0: READY");
-    }
-
-    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install, { once: true });
-    else install();
+    function openMobileSidebarDirect(){var s=$("sidebar"),o=$("sidebarOverlay");if(!s)return false;s.classList.add("open");s.classList.remove("collapsed");if(o){o.classList.add("active");o.hidden=false;o.setAttribute("aria-hidden","false");}document.body.classList.add("sidebar-open");return true;}
+    function closeMobileSidebarDirect(){var s=$("sidebar"),o=$("sidebarOverlay");if(s)s.classList.remove("open");if(o){o.classList.remove("active");o.hidden=true;o.setAttribute("aria-hidden","true");}document.body.classList.remove("sidebar-open");return true;}
+    function call(name){var args=[].slice.call(arguments,1),fn=window[name];if(typeof fn!=="function")return false;try{fn.apply(window,args);return true;}catch(e){console.error("[UI ACTION] "+name,e);return false;}}
+    function ensureGameMenu(){var nav=document.querySelector(".main-menu");if(!nav||nav.querySelector('[data-page="game"]'))return;var b=document.createElement("button");b.type="button";b.className="menu-item";b.dataset.page="game";b.innerHTML='<i class="fa-solid fa-gamepad"></i><span>🎮 Triệu Phú Học Đường</span><span class="menu-label">Mới</span>';var divider=nav.querySelector(".menu-divider");if(divider)nav.insertBefore(b,divider);else nav.appendChild(b);}
+    function ensureGameSection(){var main=$("mainContent");if(!main||$("page-game"))return;var s=document.createElement("section");s.className="page-section";s.id="page-game";s.dataset.pageSection="game";s.innerHTML='<div class="page-header"><div><span class="page-eyebrow">🎮 GAME HỌC TẬP</span><h1>Triệu Phú Học Đường</h1><p>Ôn luyện lớp 5 dùng chung dữ liệu học sinh của hệ thống.</p></div><div class="page-actions"><a class="button primary" href="game/index.html">🎮 Mở Game</a></div></div><div class="dashboard-panel"><h3>4 môn học • 4 mức độ • 15 câu/lượt</h3><p>Toán • Tiếng Việt • Khoa học • Lịch sử &amp; Địa lí</p><p>50:50 • Hỏi cả lớp • Đổi câu • Lưu kết quả.</p></div>';main.appendChild(s);}
+    function go(page){if(!page)return false;if(page==="game"){ensureGameSection();}if(call("navigateToPage",page))return true;var t=String(page).replace(/[^a-zA-Z0-9_-]/g,"");var sec=document.querySelector('[data-page-section="'+t+'"]')||$("page-"+t);if(!sec)return false;document.querySelectorAll("[data-page-section]").forEach(function(x){var a=x===sec;x.hidden=!a;x.classList.toggle("active",a);});document.querySelectorAll(".menu-item[data-page]").forEach(function(x){x.classList.toggle("active",x.dataset.page===page);});var title=$("pageTitle");if(title)title.textContent=page==="game"?"Triệu Phú Học Đường":page;closeMobileSidebarDirect();return true;}
+    function handleMenuClick(e){var t=e.target instanceof Element?e.target:null;if(!t)return;var b=t.closest("#sidebarToggle,#sidebarClose,#closeSidebar");if(b){e.preventDefault();e.stopImmediatePropagation();b.id==="sidebarToggle"?openMobileSidebarDirect():closeMobileSidebarDirect();return;}if(t.closest("#sidebarOverlay")){e.preventDefault();e.stopImmediatePropagation();closeMobileSidebarDirect();return;}var m=t.closest(".menu-item[data-page]");if(m){e.preventDefault();e.stopImmediatePropagation();go(m.dataset.page);}}
+    function readQueue(){try{var d=JSON.parse(localStorage.getItem(QUEUE_KEY)||"[]");return Array.isArray(d)?d:[];}catch(_){return[];}}
+    function writeQueue(q){try{localStorage.setItem(QUEUE_KEY,JSON.stringify(q));}catch(_){}}
+    function qid(r){return[r.studentId,r.date,r.status].join("|");}
+    function enqueue(r){var q=readQueue(),k=qid(r),found=false;q=q.map(function(x){if(qid(x)===k){found=true;return Object.assign({},x,r,{queuedAt:x.queuedAt||new Date().toISOString()});}return x;});if(!found)q.push(Object.assign({},r,{queuedAt:new Date().toISOString()}));writeQueue(q);}
+    function jsonp(action,params){params=params||{};return new Promise(function(resolve,reject){var cb="__LH_ATT_"+Date.now()+"_"+Math.random().toString(36).slice(2),sc=document.createElement("script"),query=new URLSearchParams(Object.assign({action:action,callback:cb},params)),done=false,timer=setTimeout(function(){finish(new Error("JSONP timeout"));},10000);function finish(err,val){if(done)return;done=true;clearTimeout(timer);try{delete window[cb];}catch(_){}sc.remove();err?reject(err):resolve(val);}window[cb]=function(v){finish(null,v);};sc.onerror=function(){finish(new Error("JSONP error"));};sc.src=GOOGLE_URL+"?"+query.toString();document.head.appendChild(sc);});}
+    function postAttendance(r){return fetch(GOOGLE_URL,{method:"POST",mode:"no-cors",cache:"no-store",redirect:"follow",headers:{"Content-Type":"text/plain;charset=UTF-8"},body:JSON.stringify({action:"saveAttendance",record:r})}).then(function(){return true;});}
+    function flush(){var q=readQueue();if(!q.length)return;var rem=q.slice(),chain=Promise.resolve();q.forEach(function(r){chain=chain.then(function(){return postAttendance(r).then(function(){return jsonp("getAttendance",{studentId:r.studentId}).then(function(v){var rows=Array.isArray(v&&v.records)?v.records:[];if(rows.some(function(x){return String(x.studentId)===String(r.studentId)&&String(x.date)===String(r.date)&&String(x.status)===String(r.status);}))rem=rem.filter(function(x){return qid(x)!==qid(r);});});}).catch(function(){});});});chain.finally(function(){writeQueue(rem);window.__LH_ATTENDANCE_SYNC__={queued:rem.length,synced:q.length-rem.length,at:new Date().toISOString()};});}
+    function installAttendance(){if(window.__LH_ATTENDANCE_SYNC_WRAPPER_210__)return true;var original=window.saveAttendanceRecord;if(typeof original!=="function")return false;var wrapped=function(studentId,date,status,note){var out=original.apply(this,arguments);enqueue({id:"ATT_"+studentId+"_"+date,studentId:String(studentId),date:String(date),status:String(status||"present"),note:String(note||""),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});setTimeout(flush,100);return out;};wrapped.__LH_ATTENDANCE_WRAPPED_210__=true;window.saveAttendanceRecord=wrapped;window.__LH_ATTENDANCE_SYNC_WRAPPER_210__=true;flush();return true;}
+    function install(){if(window.__UI_ACTION_PATCH_210__)return;window.__UI_ACTION_PATCH_210__=true;ensureGameMenu();ensureGameSection();document.addEventListener("click",handleMenuClick,true);window.openMobileSidebar=openMobileSidebarDirect;window.closeMobileSidebar=closeMobileSidebarDirect;var n=0,t=setInterval(function(){n++;if(installAttendance()||n>=200)clearInterval(t);},50);console.info("UI ACTION PATCH 2.1.0: READY");}
+    if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});else install();
 })();
