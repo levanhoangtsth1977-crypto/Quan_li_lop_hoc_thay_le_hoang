@@ -6,7 +6,7 @@
 "use strict";
 
 var GOOGLE_API_CONFIG = Object.freeze({
-  url: "https://script.google.com/macros/s/AKfycbynklm7SobnkcEZKfAUGdMIBugA4lQ2kA3yOThHVjNoiJzCK7veuwO2vE1tR1QKI-nkIQ/exec",
+  url: "https://script.google.com/macros/s/AKfycbxnqx0824-jI7LzuAaK-Ys5V3_TdYg6uNT9wWkV_O1EfJapW2IrY_HJF-rv_PVsZM71bw/exec",
   timeout: 15000,
   verifyRetries: 5,
   verifyDelay: 1000,
