@@ -1,11 +1,10 @@
-/* GOOGLE SHEETS RECORDS BRIDGE 2.5 — AUTHORITATIVE EVENT SYNC / APP_DATA SAFE */
+/* GOOGLE SHEETS RECORDS BRIDGE 3.0 — AUTHORITATIVE EVENT SYNC / AUTO CHANGE DETECTION */
 (function(){
 'use strict';
-if(window.__LH_GOOGLE_RECORDS_BRIDGE_250__)return;
-window.__LH_GOOGLE_RECORDS_BRIDGE_250__=true;
+if(window.__LH_GOOGLE_RECORDS_BRIDGE_300__)return;
+window.__LH_GOOGLE_RECORDS_BRIDGE_300__=true;
 
 const API='https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
-
 const clean=v=>String(v??'').trim().replace(/\s+/g,' ');
 const present=r=>/^(present|có mặt|co mat)$/i.test(clean(r&&r.status));
 
@@ -23,7 +22,7 @@ function replaceArray(name,appKey,list){
     if(window.APP_DATA&&Array.isArray(window.APP_DATA[appKey])){
       window.APP_DATA[appKey].splice(0,window.APP_DATA[appKey].length,...x);
     }
-    if(Array.isArray(window[name])){
+    if(Array.isArray(window[name])&&window[name]!==window.APP_DATA?.[appKey]){
       window[name].splice(0,window[name].length,...x);
     }
   }catch(_){}
@@ -38,9 +37,17 @@ function eventSnapshot(){
   };
 }
 
+function snapshotKey(s){
+  try{return JSON.stringify(s)}catch(_){return ''}
+}
+
+let lastLocalKey='';
+let syncing=false;
+let bootstrapped=false;
+
 function jsonp(action){
   return new Promise((resolve,reject)=>{
-    const cb='LH250_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    const cb='LH300_'+Date.now()+'_'+Math.random().toString(36).slice(2);
     const s=document.createElement('script');
     let done=false;
     const tm=setTimeout(()=>finish(Error('Google Sheets timeout')),15000);
@@ -61,19 +68,26 @@ function jsonp(action){
 
 function post(payload){
   return new Promise((resolve,reject)=>{
-    const n='LH250_'+Date.now();
+    const n='LH300_'+Date.now()+'_'+Math.random().toString(36).slice(2);
     const f=document.createElement('iframe');
     const form=document.createElement('form');
-    f.name=n;f.style.display='none';
-    form.method='POST';form.target=n;form.action=API;form.style.display='none';
+    f.name=n;
+    f.style.display='none';
+    form.method='POST';
+    form.target=n;
+    form.action=API;
+    form.style.display='none';
     const i=document.createElement('input');
-    i.type='hidden';i.name='payload';i.value=JSON.stringify(payload);
-    form.appendChild(i);document.body.append(f,form);
+    i.type='hidden';
+    i.name='payload';
+    i.value=JSON.stringify(payload);
+    form.appendChild(i);
+    document.body.append(f,form);
     let done=false;
     const finish=ok=>{
       if(done)return;
       done=true;
-      setTimeout(()=>{f.remove();form.remove()},700);
+      setTimeout(()=>{f.remove();form.remove()},1000);
       ok?resolve({ok:true}):reject(Error('Không gửi được dữ liệu Google Sheets'));
     };
     f.onload=()=>finish(true);
@@ -98,71 +112,85 @@ function applyEvents(d){
   try{if(typeof window.renderRewards==='function')window.renderRewards()}catch(_){}
   try{if(typeof window.renderDashboard==='function')window.renderDashboard()}catch(_){}
 
-  window.GOOGLE_SHEET_EVENT_DATA={
-    version:'2.5',
-    mode:'REPLACE',
-    loadedAt:new Date().toISOString(),
-    tabs:d,
-    counts:{attendance:attendance.length,violations:violations.length,rewards:rewards.length}
-  };
+  const cleanSnapshot=eventSnapshot();
+  lastLocalKey=snapshotKey(cleanSnapshot);
+  bootstrapped=true;
+  window.GOOGLE_SHEET_EVENT_DATA={version:'3.0',mode:'REPLACE',loadedAt:new Date().toISOString(),tabs:d,counts:{attendance:attendance.length,violations:violations.length,rewards:rewards.length}};
   window.dispatchEvent(new CustomEvent('google-sheet-events-ready',{detail:window.GOOGLE_SHEET_EVENT_DATA}));
   return true;
 }
 
 async function pull(){
+  if(syncing)return null;
   try{
+    syncing=true;
     const d=await jsonp('get_events');
     applyEvents(d);
     return d;
   }catch(e){
-    console.warn('[GOOGLE EVENTS]',e.message);
+    console.warn('[GOOGLE EVENTS PULL]',e.message);
     return null;
-  }
+  }finally{syncing=false;}
 }
 
-async function push(){
+async function push(force){
+  if(syncing)return{ok:false,busy:true};
   try{
     const snapshot=eventSnapshot();
-    return await post({action:'sync_events',records:snapshot});
+    const k=snapshotKey(snapshot);
+    if(!force&&bootstrapped&&k===lastLocalKey)return{ok:true,changed:false};
+    syncing=true;
+    const result=await post({action:'sync_events',records:snapshot});
+    lastLocalKey=k;
+    bootstrapped=true;
+    window.dispatchEvent(new CustomEvent('google-sheet-events-saved',{detail:{ok:true,counts:{attendance:snapshot.DIEM_DANH.length,violations:snapshot.VI_PHAM.length,rewards:snapshot.KHEN_THUONG.length}}}));
+    return{ok:true,changed:true,result};
   }catch(e){
     console.warn('[GOOGLE EVENTS PUSH]',e.message);
     return{ok:false,error:e.message};
-  }
+  }finally{syncing=false;}
 }
 
 function install(){
   ['saveAttendanceRecord','addViolation','deleteViolation','addReward','deleteReward'].forEach(n=>{
     try{
-      if(typeof window[n]!=='function'||window[n].__lh250)return;
+      if(typeof window[n]!=='function'||window[n].__lh300)return;
       const o=window[n];
       const w=function(){
         const r=o.apply(this,arguments);
-        setTimeout(async()=>{
-          await push();
-          await pull();
-        },250);
+        setTimeout(()=>push(false),300);
         return r;
       };
-      w.__lh250=true;
+      w.__lh300=true;
       w.__lhOriginal=o;
       window[n]=w;
     }catch(_){}
   });
 }
 
-async function boot(){
-  install();
-  await pull();
-  install();
-  if(window.__LH250_TIMER__)clearInterval(window.__LH250_TIMER__);
-  window.__LH250_TIMER__=setInterval(install,1000);
+async function detectChanges(){
+  if(!bootstrapped||syncing)return;
+  try{
+    const k=snapshotKey(eventSnapshot());
+    if(k!==lastLocalKey)await push(false);
+  }catch(e){console.warn('[GOOGLE EVENTS WATCH]',e.message)}
 }
 
-window.syncGoogleSheetEvents=push;
-window.pushGoogleSheetEvents=push;
+async function boot(){
+  await pull();
+  install();
+  if(window.__LH300_INSTALL_TIMER__)clearInterval(window.__LH300_INSTALL_TIMER__);
+  if(window.__LH300_WATCH_TIMER__)clearInterval(window.__LH300_WATCH_TIMER__);
+  window.__LH300_INSTALL_TIMER__=setInterval(install,1000);
+  window.__LH300_WATCH_TIMER__=setInterval(detectChanges,1200);
+}
+
+window.syncGoogleSheetEvents=()=>push(true);
+window.pushGoogleSheetEvents=()=>push(true);
 window.pullGoogleSheetEvents=pull;
 window.getGoogleSheetEventData=()=>window.GOOGLE_SHEET_EVENT_DATA||null;
 window.getGoogleSheetEventSnapshot=eventSnapshot;
+window.forceGoogleSheetEventSync=()=>push(true);
 
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,1200),{once:true});
 else setTimeout(boot,1200);
