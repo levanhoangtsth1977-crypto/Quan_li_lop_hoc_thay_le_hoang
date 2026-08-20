@@ -1,30 +1,169 @@
 /* ============================================================
    QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG
-   GOOGLE API BRIDGE 6.1 — READ + SAFE STUDENT WRITE-BACK
+   GOOGLE API BRIDGE 6.2 — 12-COLUMN STUDENT SCHEMA SAFE SYNC
    ============================================================ */
 'use strict';
-var GOOGLE_API_CONFIG=Object.freeze({url:'https://script.google.com/macros/s/AKfycbynklm7SobnkcEZKfAUGdMIBugA4lQ2kA3yOThHVjNoiJzCK7veuwO2vE1tR1QKI-nkIQ/exec',timeout:15000,version:'6.1.0',storageKey:'QL_LOP_HOC_LE_HOANG_2026_2027'});
-var STUDENT_SCHEMA=Object.freeze(['id','studentCode','name','gender','birthDate','status','parentName','phone','address','note','shareEnabled','createdAt','updatedAt']);
+
+var GOOGLE_API_CONFIG=Object.freeze({
+  url:'https://script.google.com/macros/s/AKfycbynklm7SobnkcEZKfAUGdMIBugA4lQ2kA3yOThHVjNoiJzCK7veuwO2vE1tR1QKI-nkIQ/exec',
+  timeout:15000,
+  version:'6.2.0',
+  storageKey:'QL_LOP_HOC_LE_HOANG_2026_2027'
+});
+
+/* HOC_SINH = EXACTLY 12 COLUMNS. Never add studentCode here. */
+var STUDENT_SCHEMA=Object.freeze([
+  'id','name','gender','birthDate','status','parentName',
+  'phone','address','note','shareEnabled','createdAt','updatedAt'
+]);
+
 function bridgeText(v){return String(v??'').trim().replace(/\s+/g,' ')}
 function bridgeKey(v){return bridgeText(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase().replace(/[^a-z0-9]/g,'')}
-function bridgeDate(v){return bridgeText(v).replace(/\D/g,'')}
+function bridgeDate(v){
+  var s=bridgeText(v);
+  if(!s)return '';
+  var iso=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+  if(iso)return iso[3].padStart(2,'0')+iso[2].padStart(2,'0')+iso[1];
+  var dmy=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/);
+  if(dmy)return dmy[1].padStart(2,'0')+dmy[2].padStart(2,'0')+dmy[3];
+  return s.replace(/\D/g,'');
+}
 function identityKey(s){return bridgeKey(s.name)+'|'+bridgeDate(s.birthDate)+'|'+bridgeKey(s.gender)}
 function canonicalRank(s){return /^STU_5C_2026_\d{3,4}$/i.test(bridgeText(s.id))?0:1}
-function normalizeStudentForBridge(s){s=s&&typeof s==='object'?s:{};return{id:bridgeText(s.id||s.studentId||s.studentCode),studentCode:bridgeText(s.studentCode||s.id||s.studentId),name:bridgeText(s.name||s.studentName),gender:bridgeText(s.gender),birthDate:bridgeText(s.birthDate||s.dateOfBirth),status:bridgeText(s.status)||'active',parentName:bridgeText(s.parentName),phone:bridgeText(s.phone),address:bridgeText(s.address),note:bridgeText(s.note),shareEnabled:s.shareEnabled!==false,createdAt:bridgeText(s.createdAt),updatedAt:bridgeText(s.updatedAt)}}
-function dedupeStudents(list){var by=new Map(),duplicates=[];(Array.isArray(list)?list:[]).map(normalizeStudentForBridge).filter(function(s){return s.id&&s.name}).forEach(function(s){var k=identityKey(s);if(!k||k==='||')return;var old=by.get(k);if(!old){by.set(k,s);return}var keep=canonicalRank(s)<canonicalRank(old)?s:(canonicalRank(s)>canonicalRank(old)?old:(s.id<old.id?s:old));var drop=keep===old?s:old;by.set(k,keep);duplicates.push({keptId:keep.id,droppedId:drop.id,name:keep.name})});return{students:Array.from(by.values()),duplicates:duplicates}}
+function normalizeStudentForBridge(s){
+  s=s&&typeof s==='object'?s:{};
+  return {
+    id:bridgeText(s.id||s.studentId),
+    name:bridgeText(s.name||s.studentName),
+    gender:bridgeText(s.gender),
+    birthDate:bridgeText(s.birthDate||s.dateOfBirth),
+    status:bridgeText(s.status)||'active',
+    parentName:bridgeText(s.parentName),
+    phone:bridgeText(s.phone),
+    address:bridgeText(s.address),
+    note:bridgeText(s.note),
+    shareEnabled:s.shareEnabled!==false,
+    createdAt:bridgeText(s.createdAt),
+    updatedAt:bridgeText(s.updatedAt)
+  };
+}
+function validateStudentSchema(s){
+  return STUDENT_SCHEMA.every(function(k){return Object.prototype.hasOwnProperty.call(s,k)});
+}
+function dedupeStudents(list){
+  var by=new Map(),duplicates=[];
+  (Array.isArray(list)?list:[])
+    .map(normalizeStudentForBridge)
+    .filter(function(s){return s.id&&s.name&&validateStudentSchema(s)})
+    .forEach(function(s){
+      var k=identityKey(s);
+      if(!k||k==='||')return;
+      var old=by.get(k);
+      if(!old){by.set(k,s);return}
+      var keep=canonicalRank(s)<canonicalRank(old)?s:(canonicalRank(s)>canonicalRank(old)?old:(s.id<old.id?s:old));
+      var drop=keep===old?s:old;
+      by.set(k,keep);
+      duplicates.push({keptId:keep.id,droppedId:drop.id,name:keep.name});
+    });
+  return {students:Array.from(by.values()),duplicates:duplicates};
+}
 function emptyLocalPayload(){return{version:'3.1.1',config:{},students:[],attendance:[],violations:[],rewards:[],learning:[],progress:[],comments:[]}}
 function readLocalPayload(){try{var raw=localStorage.getItem(GOOGLE_API_CONFIG.storageKey);if(!raw)return emptyLocalPayload();var d=JSON.parse(raw);return d&&typeof d==='object'&&!Array.isArray(d)?d:emptyLocalPayload()}catch(_){return emptyLocalPayload()}}
-function writeStudentsToLocal(list,source){var d=dedupeStudents(list);if(!d.students.length)throw new Error('Google chưa trả về học sinh hợp lệ.');var cur=readLocalPayload(),payload={version:cur.version||'3.1.1',savedAt:new Date().toISOString(),config:cur.config||{},students:d.students,attendance:Array.isArray(cur.attendance)?cur.attendance:[],violations:Array.isArray(cur.violations)?cur.violations:[],rewards:Array.isArray(cur.rewards)?cur.rewards:[],learning:Array.isArray(cur.learning)?cur.learning:[],progress:Array.isArray(cur.progress)?cur.progress:[],comments:Array.isArray(cur.comments)?cur.comments:[]};localStorage.setItem(GOOGLE_API_CONFIG.storageKey,JSON.stringify(payload));if(typeof window.loadClassData==='function')window.loadClassData();return{ok:true,success:true,count:d.students.length,physicalCount:Array.isArray(list)?list.length:d.students.length,duplicateCount:d.duplicates.length,source:source}}
-function api(action){var controller=new AbortController(),timer=setTimeout(function(){controller.abort()},GOOGLE_API_CONFIG.timeout);return fetch(GOOGLE_API_CONFIG.url+'?action='+encodeURIComponent(action)+'&t='+Date.now(),{cache:'no-store',signal:controller.signal,redirect:'follow'}).then(function(r){if(!r.ok)throw new Error('API HTTP '+r.status);return r.json()}).finally(function(){clearTimeout(timer)})}
+function writeStudentsToLocal(list,source){
+  var d=dedupeStudents(list);
+  if(!d.students.length)throw new Error('Google chưa trả về học sinh hợp lệ.');
+  var cur=readLocalPayload();
+  var payload={version:cur.version||'3.1.1',savedAt:new Date().toISOString(),config:cur.config||{},students:d.students,attendance:Array.isArray(cur.attendance)?cur.attendance:[],violations:Array.isArray(cur.violations)?cur.violations:[],rewards:Array.isArray(cur.rewards)?cur.rewards:[],learning:Array.isArray(cur.learning)?cur.learning:[],progress:Array.isArray(cur.progress)?cur.progress:[],comments:Array.isArray(cur.comments)?cur.comments:[]};
+  localStorage.setItem(GOOGLE_API_CONFIG.storageKey,JSON.stringify(payload));
+  if(typeof window.loadClassData==='function')window.loadClassData();
+  return{ok:true,success:true,count:d.students.length,physicalCount:Array.isArray(list)?list.length:d.students.length,duplicateCount:d.duplicates.length,source:source,schema:STUDENT_SCHEMA.slice()};
+}
+function api(action){
+  var controller=new AbortController(),timer=setTimeout(function(){controller.abort()},GOOGLE_API_CONFIG.timeout);
+  return fetch(GOOGLE_API_CONFIG.url+'?action='+encodeURIComponent(action)+'&t='+Date.now(),{cache:'no-store',signal:controller.signal,redirect:'follow'}).then(function(r){if(!r.ok)throw new Error('API HTTP '+r.status);return r.json()}).finally(function(){clearTimeout(timer)});
+}
 function refreshAllAfterSync(){['renderDashboard','renderStudents','renderAttendance','renderViolations','renderRewards','renderLearningSafe','renderCommentsSafe','renderStatistics','renderStudentLinks','updateStudentSelects'].forEach(function(n){if(typeof window[n]==='function')try{window[n]()}catch(e){console.warn('[GOOGLE BRIDGE] '+n,e)}})}
-function fetchRemoteRoster(){return api('get_students').then(function(r){if(!r||r.ok!==true)throw new Error(r&&r.error||'Google API trả về lỗi.');var list=Array.isArray(r.students)?r.students:[],d=dedupeStudents(list);if(!d.students.length)throw new Error('Không có học sinh hợp lệ.');return{ok:true,list:d.students,physicalCount:Number(r.physicalCount)||list.length,logicalCount:d.students.length,duplicateCount:Number(r.duplicateCount)||d.duplicates.length,duplicates:d.duplicates}})}
-function syncStudentsVip(){return fetchRemoteRoster().then(function(remote){var saved=writeStudentsToLocal(remote.list,'google-sheets-single-source');window.__GOOGLE_CLASS_SYNC__={ok:true,count:saved.count,physicalCount:remote.physicalCount,logicalCount:remote.logicalCount,duplicateCount:remote.duplicateCount,source:'google-sheets-single-source',fallbackUsed:false,autoRestore:false,at:new Date().toISOString()};refreshAllAfterSync();return window.__GOOGLE_CLASS_SYNC__}).catch(function(error){var local=readLocalPayload(),count=Array.isArray(local.students)?local.students.length:0;window.__GOOGLE_CLASS_SYNC__={ok:false,count:count,source:'local-preserved',fallbackUsed:true,autoRestore:false,error:error.message,at:new Date().toISOString()};console.warn('[GOOGLE BRIDGE] Google lỗi; giữ local, không restore:',error);refreshAllAfterSync();return window.__GOOGLE_CLASS_SYNC__})}
-function postStudentWrite(list){var students=Array.isArray(list)?list.map(normalizeStudentForBridge).filter(function(s){return s.id&&s.name}):[];if(!students.length)return Promise.resolve({ok:false,error:'empty-students'});var payload=JSON.stringify({action:'sync_students',students:students});return new Promise(function(resolve){var iframe=document.createElement('iframe'),form=document.createElement('form'),name='LH_SYNC_'+Date.now()+'_'+Math.random().toString(36).slice(2),done=false;iframe.name=name;iframe.style.display='none';form.method='POST';form.action=GOOGLE_API_CONFIG.url;form.target=name;form.style.display='none';var input=document.createElement('input');input.type='hidden';input.name='payload';input.value=payload;form.appendChild(input);document.body.appendChild(iframe);document.body.appendChild(form);function finish(result){if(done)return;done=true;setTimeout(function(){iframe.remove();form.remove()},800);resolve(result)}iframe.addEventListener('load',function(){finish({ok:true,submitted:true,count:students.length})},{once:true});form.submit();setTimeout(function(){finish({ok:true,submitted:true,count:students.length})},12000)})}
-function verifyRemoteStudent(student){return api('get_students').then(function(r){var list=Array.isArray(r.students)?r.students:[];var found=list.some(function(s){return bridgeText(s.id)===bridgeText(student.id)||identityKey(normalizeStudentForBridge(s))===identityKey(normalizeStudentForBridge(student))});if(!found)throw new Error('Google chưa xác nhận học sinh vừa lưu.');return{ok:true,found:true,count:list.length}})}
-function syncStudentWriteBack(student,action){return postStudentWrite([student]).then(function(){return new Promise(function(resolve){setTimeout(function(){verifyRemoteStudent(student).then(function(){window.__GOOGLE_STUDENT_WRITE__={ok:true,action:action,studentId:student.id,verified:true,at:new Date().toISOString()};if(typeof window.showToast==='function')window.showToast('Đã đồng bộ học sinh sang Google Sheets.','success');resolve(window.__GOOGLE_STUDENT_WRITE__)}).catch(function(e){window.__GOOGLE_STUDENT_WRITE__={ok:false,action:action,studentId:student.id,verified:false,error:e.message,at:new Date().toISOString()};if(typeof window.showToast==='function')window.showToast('Đã lưu cục bộ nhưng Google chưa xác nhận đồng bộ: '+student.name,'warning');resolve(window.__GOOGLE_STUDENT_WRITE__)})},900)})})}
-function installStudentWriteHooks(){if(window.__LH_STUDENT_WRITE_HOOKS_610__)return;window.__LH_STUDENT_WRITE_HOOKS_610__=true;var originalAdd=window.addStudent,originalUpdate=window.updateStudent;if(typeof originalAdd==='function'){window.addStudent=function(data){var result=originalAdd.apply(this,arguments);if(result&&result.success&&result.student)syncStudentWriteBack(result.student,'add').catch(function(e){console.warn('[GOOGLE WRITE add]',e)});return result}}if(typeof originalUpdate==='function'){window.updateStudent=function(id,changes){var result=originalUpdate.apply(this,arguments);if(result&&result.success&&result.student)syncStudentWriteBack(result.student,'update').catch(function(e){console.warn('[GOOGLE WRITE update]',e)});return result}}}
-function installReplaceStudentsApi(){if(typeof window.replaceStudents==='function')return;window.replaceStudents=function(incoming,options){try{return writeStudentsToLocal(Array.isArray(incoming)?incoming:[],options&&options.source||'runtime')}catch(e){return{ok:false,success:false,error:e.message}}}}
-function initializeGoogleApiBridge(){if(window.__GOOGLE_CLASS_BRIDGE_610__)return;window.__GOOGLE_CLASS_BRIDGE_610__=true;installReplaceStudentsApi();installStudentWriteHooks();syncStudentsVip().then(function(r){if(typeof window.showToast==='function')window.showToast(r.ok?'Google: '+r.count+' học sinh hợp lệ, không nhân bản.':'Google chưa kết nối; dữ liệu hiện có được giữ nguyên.',r.ok?'success':'warning')})}
-window.getGoogleStudentSyncStatus=function(){return window.__GOOGLE_CLASS_SYNC__||{ok:false,source:'not-started'}};
-window.getGoogleStudentWriteStatus=function(){return window.__GOOGLE_STUDENT_WRITE__||{ok:false,source:'not-started'}};
+function fetchRemoteRoster(){
+  return api('get_students').then(function(r){
+    if(!r||r.ok!==true)throw new Error(r&&r.error||'Google API trả về lỗi.');
+    var list=Array.isArray(r.students)?r.students:[];
+    var d=dedupeStudents(list);
+    if(!d.students.length)throw new Error('Không có học sinh hợp lệ.');
+    return{ok:true,list:d.students,physicalCount:Number(r.physicalCount)||list.length,logicalCount:d.students.length,duplicateCount:Number(r.duplicateCount)||d.duplicates.length,duplicates:d.duplicates,version:r.version||GOOGLE_API_CONFIG.version};
+  });
+}
+function syncStudentsVip(){
+  return fetchRemoteRoster().then(function(remote){
+    var saved=writeStudentsToLocal(remote.list,'google-sheets-single-source');
+    window.__GOOGLE_CLASS_SYNC__={ok:true,count:saved.count,physicalCount:remote.physicalCount,logicalCount:remote.logicalCount,duplicateCount:remote.duplicateCount,source:'google-sheets-single-source',fallbackUsed:false,autoRestore:false,schema:STUDENT_SCHEMA.slice(),at:new Date().toISOString()};
+    refreshAllAfterSync();
+    return window.__GOOGLE_CLASS_SYNC__;
+  }).catch(function(error){
+    var local=readLocalPayload(),count=Array.isArray(local.students)?local.students.length:0;
+    window.__GOOGLE_CLASS_SYNC__={ok:false,count:count,source:'local-preserved',fallbackUsed:true,autoRestore:false,error:error.message,schema:STUDENT_SCHEMA.slice(),at:new Date().toISOString()};
+    console.warn('[GOOGLE BRIDGE] Google lỗi; giữ local, không restore:',error);
+    refreshAllAfterSync();
+    return window.__GOOGLE_CLASS_SYNC__;
+  });
+}
+function postStudentWrite(list){
+  var students=Array.isArray(list)?list.map(normalizeStudentForBridge).filter(function(s){return s.id&&s.name&&validateStudentSchema(s)}):[];
+  if(!students.length)return Promise.resolve({ok:false,error:'empty-students'});
+  var payload=JSON.stringify({action:'sync_students',students:students});
+  return new Promise(function(resolve){
+    var iframe=document.createElement('iframe'),form=document.createElement('form'),name='LH_SYNC_'+Date.now()+'_'+Math.random().toString(36).slice(2),done=false;
+    iframe.name=name;iframe.style.display='none';form.method='POST';form.action=GOOGLE_API_CONFIG.url;form.target=name;form.style.display='none';
+    var input=document.createElement('input');input.type='hidden';input.name='payload';input.value=payload;form.appendChild(input);document.body.appendChild(iframe);document.body.appendChild(form);
+    function finish(result){if(done)return;done=true;setTimeout(function(){iframe.remove();form.remove()},800);resolve(result)}
+    iframe.addEventListener('load',function(){finish({ok:true,submitted:true,count:students.length,schema:STUDENT_SCHEMA.slice()})},{once:true});
+    form.submit();
+    setTimeout(function(){finish({ok:true,submitted:true,count:students.length,schema:STUDENT_SCHEMA.slice()})},12000);
+  });
+}
+function verifyRemoteStudent(student){
+  return api('get_students').then(function(r){
+    var list=Array.isArray(r.students)?r.students:[];
+    var target=normalizeStudentForBridge(student);
+    var found=list.some(function(s){var x=normalizeStudentForBridge(s);return bridgeText(x.id)===bridgeText(target.id)||identityKey(x)===identityKey(target)});
+    if(!found)throw new Error('Google chưa xác nhận học sinh vừa lưu.');
+    return{ok:true,found:true,count:list.length};
+  });
+}
+function syncStudentWriteBack(student,action){
+  return postStudentWrite([student]).then(function(){
+    return new Promise(function(resolve){
+      setTimeout(function(){
+        verifyRemoteStudent(student).then(function(){
+          window.__GOOGLE_STUDENT_WRITE__={ok:true,action:action,studentId:student.id,verified:true,schema:STUDENT_SCHEMA.slice(),at:new Date().toISOString()};
+          if(typeof window.showToast==='function')window.showToast('Đã đồng bộ học sinh sang Google Sheets.','success');
+          resolve(window.__GOOGLE_STUDENT_WRITE__);
+        }).catch(function(e){
+          window.__GOOGLE_STUDENT_WRITE__={ok:false,action:action,studentId:student.id,verified:false,error:e.message,schema:STUDENT_SCHEMA.slice(),at:new Date().toISOString()};
+          if(typeof window.showToast==='function')window.showToast('Đã lưu cục bộ nhưng Google chưa xác nhận đồng bộ: '+student.name,'warning');
+          resolve(window.__GOOGLE_STUDENT_WRITE__);
+        });
+      },900);
+    });
+  });
+}
+function installStudentWriteHooks(){
+  if(window.__LH_STUDENT_WRITE_HOOKS_620__)return;
+  window.__LH_STUDENT_WRITE_HOOKS_620__=true;
+  var originalAdd=window.addStudent,originalUpdate=window.updateStudent;
+  if(typeof originalAdd==='function')window.addStudent=function(data){var result=originalAdd.apply(this,arguments);if(result&&result.success&&result.student)syncStudentWriteBack(result.student,'add').catch(function(e){console.warn('[GOOGLE WRITE add]',e)});return result};
+  if(typeof originalUpdate==='function')window.updateStudent=function(id,changes){var result=originalUpdate.apply(this,arguments);if(result&&result.success&&result.student)syncStudentWriteBack(result.student,'update').catch(function(e){console.warn('[GOOGLE WRITE update]',e)});return result};
+}
+function installReplaceStudentsApi(){
+  if(typeof window.replaceStudents==='function')return;
+  window.replaceStudents=function(incoming,options){try{return writeStudentsToLocal(Array.isArray(incoming)?incoming:[],options&&options.source||'runtime')}catch(e){return{ok:false,success:false,error:e.message}}};
+}
+function initializeGoogleApiBridge(){
+  if(window.__GOOGLE_CLASS_BRIDGE_620__)return;
+  window.__GOOGLE_CLASS_BRIDGE_620__=true;
+  installReplaceStudentsApi();
+  installStudentWriteHooks();
+  syncStudentsVip().then(function(r){if(typeof window.showToast==='function')window.showToast(r.ok?'Google: '+r.count+' học sinh hợp lệ, schema 12 cột, không nhân bản.':'Google chưa kết nối; dữ liệu hiện có được giữ nguyên.',r.ok?'success':'warning')});
+}
+window.getGoogleStudentSyncStatus=function(){return window.__GOOGLE_CLASS_SYNC__||{ok:false,source:'not-started',schema:STUDENT_SCHEMA.slice()}};
+window.getGoogleStudentWriteStatus=function(){return window.__GOOGLE_STUDENT_WRITE__||{ok:false,source:'not-started',schema:STUDENT_SCHEMA.slice()}};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(initializeGoogleApiBridge,300);},{once:true});else setTimeout(initializeGoogleApiBridge,300);
