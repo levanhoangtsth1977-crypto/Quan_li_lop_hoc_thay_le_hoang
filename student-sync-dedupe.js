@@ -97,3 +97,76 @@
   const start=()=>setTimeout(syncMaster,700);
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start,{once:true}); else start();
 })();
+
+/* ============================================================
+   STUDENT LIST UI FIX 1.0 - DYNAMIC / A-Z
+   ------------------------------------------------------------
+   Chỉ sửa tầng HIỂN THỊ.
+   KHÔNG sửa students[].
+   KHÔNG sửa Google Sheets.
+   KHÔNG sửa JSON Master.
+   KHÔNG tạo học sinh mẫu.
+   KHÔNG dùng maxStudents để tạo dòng.
+   ============================================================ */
+(function(){
+  'use strict';
+  if(window.__STUDENT_LIST_UI_FIX_100__) return;
+  window.__STUDENT_LIST_UI_FIX_100__=true;
+
+  const collator=new Intl.Collator('vi',{sensitivity:'base',numeric:true});
+  let running=false;
+
+  function text(v){return String(v??'').replace(/\s+/g,' ').trim();}
+  function getBody(){return document.getElementById('studentTableBody');}
+  function getName(row){
+    const cells=row.querySelectorAll('td');
+    if(cells.length<2) return '';
+    return text(cells[1].textContent);
+  }
+  function isRealStudentRow(row){
+    if(!(row instanceof HTMLTableRowElement)) return false;
+    if(row.querySelector('[data-student-id],[data-student-action]')) return true;
+    const cells=row.querySelectorAll('td');
+    if(cells.length<2) return false;
+    const name=getName(row);
+    if(!name) return false;
+    if(/^(chưa có học sinh|đang chờ|không có dữ liệu)$/i.test(name)) return false;
+    return true;
+  }
+  function normalizeRows(){
+    const body=getBody();
+    if(!body||running) return;
+    const rows=Array.from(body.children).filter(el=>el.tagName==='TR');
+    if(!rows.length) return;
+    const real=rows.filter(isRealStudentRow);
+    if(!real.length) return;
+    running=true;
+    try{
+      real.sort((a,b)=>collator.compare(getName(a),getName(b)));
+      real.forEach((row,index)=>{
+        const first=row.querySelector('td');
+        if(first) first.textContent=String(index+1);
+        body.appendChild(row);
+      });
+      rows.filter(row=>!isRealStudentRow(row)).forEach(row=>row.remove());
+    }finally{running=false;}
+  }
+  function start(){
+    normalizeRows();
+    const body=getBody();
+    if(!body) return;
+    const observer=new MutationObserver(()=>{
+      if(running) return;
+      requestAnimationFrame(normalizeRows);
+    });
+    observer.observe(body,{childList:true,subtree:true});
+    window.__STUDENT_LIST_UI_FIX_OBSERVER__=observer;
+    ['studentSearch','studentStatusFilter'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el) el.addEventListener('input',()=>setTimeout(normalizeRows,0));
+      if(el) el.addEventListener('change',()=>setTimeout(normalizeRows,0));
+    });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start,{once:true});
+  else start();
+})();
