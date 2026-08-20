@@ -1,20 +1,20 @@
-/* GOOGLE SHEETS RECORDS BRIDGE 2.0 — AUTHORITATIVE EVENT REPLACE
+/* GOOGLE SHEETS RECORDS BRIDGE 2.1 — AUTHORITATIVE EVENT REPLACE
    - HOC_SINH remains the full authoritative roster and is untouched.
    - DIEM_DANH on the Web contains ONLY records returned from Google Sheets that are not PRESENT.
    - VI_PHAM on the Web contains ONLY actual violation records returned from Google Sheets.
    - KHEN_THUONG on the Web contains ONLY actual reward records returned from Google Sheets.
    - Google Sheets is authoritative for the three event arrays.
    - Pull REPLACES event arrays; it never merges stale browser records into them.
-   - Existing menus/functions are not modified; only the Google event bridge is patched.
+   - On boot, an empty event snapshot is pushed first so legacy PRESENT rows are purged by Code.gs.
+   - Existing menus/functions are not modified; only this Google event bridge is patched.
 */
 (function(){
   'use strict';
-  if(window.__LH_GOOGLE_RECORDS_BRIDGE_200__)return;
-  window.__LH_GOOGLE_RECORDS_BRIDGE_200__=true;
+  if(window.__LH_GOOGLE_RECORDS_BRIDGE_210__)return;
+  window.__LH_GOOGLE_RECORDS_BRIDGE_210__=true;
 
   const API='https://script.google.com/macros/s/AKfycbynklm7SobnkcEZKfAUGdMIBugA4lQ2kA3yOThHVjNoiJzCK7veuwO2vE1tR1QKI-nkIQ/exec';
   let syncing=false;
-  let installed=false;
   const clean=v=>String(v??'').trim().replace(/\s+/g,' ');
 
   function records(name){
@@ -27,8 +27,7 @@
   }
 
   function replaceArray(name,incoming){
-    const target=records(name);
-    const source=Array.isArray(incoming)?incoming:[];
+    const target=records(name),source=Array.isArray(incoming)?incoming:[];
     target.splice(0,target.length,...source);
     return target;
   }
@@ -64,47 +63,20 @@
 
   function pullIntoApp(data){
     if(!data||data.ok!==true)return false;
-
-    /* GOOGLE SHEETS IS AUTHORITATIVE FOR EVENT ARRAYS.
-       REPLACE — NEVER MERGE — TO PREVENT STALE 42-STUDENT DATA. */
-    replaceArray(
-      'attendanceRecords',
-      (data.DIEM_DANH||[]).filter(r=>!/^present$/i.test(clean(r.status))&&clean(r.studentId))
-    );
-
-    replaceArray(
-      'violationRecords',
-      (data.VI_PHAM||[]).filter(r=>clean(r.studentId))
-    );
-
-    replaceArray(
-      'rewardRecords',
-      (data.KHEN_THUONG||[]).filter(r=>clean(r.studentId))
-    );
-
+    replaceArray('attendanceRecords',(data.DIEM_DANH||[]).filter(r=>!/^present$/i.test(clean(r.status))&&clean(r.studentId)));
+    replaceArray('violationRecords',(data.VI_PHAM||[]).filter(r=>clean(r.studentId)));
+    replaceArray('rewardRecords',(data.KHEN_THUONG||[]).filter(r=>clean(r.studentId)));
     try{if(typeof syncAppDataReferences==='function')syncAppDataReferences()}catch(_){}
     try{if(typeof renderAttendance==='function')renderAttendance()}catch(_){}
     try{if(typeof renderViolations==='function')renderViolations()}catch(_){}
     try{if(typeof renderRewards==='function')renderRewards()}catch(_){}
-
-    window.GOOGLE_SHEET_EVENT_DATA={
-      version:'2.0',
-      mode:'REPLACE',
-      loadedAt:new Date().toISOString(),
-      tabs:data
-    };
+    window.GOOGLE_SHEET_EVENT_DATA={version:'2.1',mode:'REPLACE',loadedAt:new Date().toISOString(),tabs:data};
     return true;
   }
 
   async function pull(){
-    try{
-      const data=await jsonp('get_events');
-      pullIntoApp(data);
-      return data;
-    }catch(e){
-      console.warn('[GOOGLE RECORDS] pull:',e.message);
-      return null;
-    }
+    try{const data=await jsonp('get_events');pullIntoApp(data);return data}
+    catch(e){console.warn('[GOOGLE RECORDS] pull:',e.message);return null}
   }
 
   async function push(){
@@ -118,9 +90,7 @@
       window.GOOGLE_SHEET_EVENT_SYNC={ok:false,at:new Date().toISOString(),error:e.message};
       console.warn('[GOOGLE RECORDS] push:',e.message);
       return{ok:false,error:e.message};
-    }finally{
-      syncing=false;
-    }
+    }finally{syncing=false}
   }
 
   function wrap(name){
@@ -128,10 +98,7 @@
     const original=window[name];
     function wrapped(){
       const result=original.apply(this,arguments);
-      setTimeout(async()=>{
-        await push();
-        await pull();
-      },100);
+      setTimeout(async()=>{await push();await pull()},100);
       return result;
     }
     wrapped.__lhWrapped=true;
@@ -141,11 +108,13 @@
 
   function installWrappers(){
     ['saveAttendanceRecord','addViolation','deleteViolation','addReward','deleteReward'].forEach(wrap);
-    installed=true;
   }
 
   async function boot(){
     installWrappers();
+    /* Clean legacy PRESENT rows already stored in Sheets, then reload the
+       authoritative event sets. HOC_SINH is never touched here. */
+    await push();
     await pull();
     installWrappers();
     if(window.__LH_GOOGLE_RECORDS_TIMER__)clearInterval(window.__LH_GOOGLE_RECORDS_TIMER__);
@@ -156,9 +125,6 @@
   window.pullGoogleSheetEvents=pull;
   window.getGoogleSheetEventData=()=>window.GOOGLE_SHEET_EVENT_DATA||null;
 
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,1200),{once:true});
-  }else{
-    setTimeout(boot,1200);
-  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,1200),{once:true});
+  else setTimeout(boot,1200);
 })();
