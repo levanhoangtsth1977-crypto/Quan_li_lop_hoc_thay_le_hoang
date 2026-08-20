@@ -1,18 +1,17 @@
 /**
  * QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG
- * GOOGLE SHEETS SYNC API — MASTER 2.2 VIP DEDUPE
+ * GOOGLE SHEETS SYNC API — MASTER 3.0 SAFE IDENTITY UPSERT
  *
- * HOC_SINH là nguồn danh sách duy nhất.
- * - Đúng 42 học sinh, A2:L43.
- * - Không append, không tạo STU_ giả, không dòng trống.
- * - HS01-HS42 là ID chuẩn và đi theo đúng học sinh.
- * - Chỉ thay đổi thứ tự hiển thị A-Z; không tự ý sửa trường hồ sơ.
+ * HOC_SINH là nguồn Google duy nhất. Không tự tạo/xóa/đổi ID.
+ * ID hiện có được bảo toàn: STU_5C_2026_xxxx hoặc HSxx.
+ * Nếu ID nguồn không tồn tại, hệ thống MATCH theo Họ tên + Ngày sinh + Giới tính.
+ * Không match được thì BỎ QUA, tuyệt đối không INSERT.
+ * Khi đọc, bản ghi trùng identity được gộp logic; ưu tiên ID STU_5C_2026_xxxx.
  */
 const CONFIG=Object.freeze({
   SPREADSHEET_ID:'174xQ29phs-Or7OOEKOM0IHylFJXg5SsqzOC27x7K3Wg',
   SCHOOL_YEAR:'2026–2027',CLASS_NAME:'5C',EXPECTED_STUDENTS:42,
-  MASTER_ROSTER_URL:'https://raw.githubusercontent.com/levanhoangtsth1977-crypto/Quan_li_lop_hoc_thay_le_hoang/master/DANH_SACH_HOC_SINH_5C_2026_2027.json',
-  VERSION:'MASTER-2.2-VIP-DEDUPE',
+  VERSION:'MASTER-3.0-SAFE-IDENTITY-UPSERT',
   TABS:['HOC_SINH','DIEM_DANH','VI_PHAM','KHEN_THUONG','HOC_TAP','TIEN_BO','NHAN_XET','LINK_HOC_SINH','CAU_HINH','NHAT_KY'],
   HEADERS:{
     HOC_SINH:['id','name','gender','birthDate','status','parentName','phone','address','note','shareEnabled','createdAt','updatedAt'],
@@ -23,191 +22,30 @@ const CONFIG=Object.freeze({
     TIEN_BO:['id','studentId','date','category','level','score','note','createdAt','updatedAt'],
     NHAN_XET:['id','studentId','date','subject','content','level','createdAt','updatedAt'],
     LINK_HOC_SINH:['studentId','studentCode','studentName','studentUrl','enabled','createdAt','updatedAt'],
-    CAU_HINH:['Key','Value','UpdatedAt'],
-    NHAT_KY:['timestamp','action','sheet','recordId','message']
+    CAU_HINH:['Key','Value','UpdatedAt'],NHAT_KY:['timestamp','action','sheet','recordId','message']
   }
 });
-
 function getSpreadsheet_(){return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID)}
 function text_(v){return String(v??'').trim().replace(/\s+/g,' ')}
-function collator_(){return new Intl.Collator('vi',{sensitivity:'base',numeric:false})}
-function expectedIds_(){return Array.from({length:42},(_,i)=>'HS'+String(i+1).padStart(2,'0'))}
-
-function ensureTab_(ss,name){
-  let sh=ss.getSheetByName(name);if(!sh)sh=ss.insertSheet(name);
-  const h=CONFIG.HEADERS[name]||[];
-  if(h.length){
-    if(sh.getMaxColumns()<h.length)sh.insertColumnsAfter(sh.getMaxColumns(),h.length-sh.getMaxColumns());
-    if(!sh.getRange(1,1,1,h.length).getValues()[0].some(v=>text_(v)))sh.getRange(1,1,1,h.length).setValues([h]);
-    sh.setFrozenRows(1);
-  }
-  return sh;
-}
-
-function prepareStudentSheet_(ss){
-  const sh=ss.getSheetByName('HOC_SINH')||ss.insertSheet('HOC_SINH');
-  const h=CONFIG.HEADERS.HOC_SINH;
-  if(sh.getMaxColumns()<h.length)sh.insertColumnsAfter(sh.getMaxColumns(),h.length-sh.getMaxColumns());
-  if(sh.getFilter())sh.getFilter().remove();
-  sh.showRows(1,sh.getMaxRows());
-  sh.getRange(1,1,1,h.length).setValues([h]);
-  sh.setFrozenRows(1);return sh;
-}
-
-function setupSheet(){const ss=getSpreadsheet_();CONFIG.TABS.forEach(n=>ensureTab_(ss,n));prepareStudentSheet_(ss);writeConfig_(ss);return'OK'}
-function writeConfig_(ss){
-  const sh=ensureTab_(ss,'CAU_HINH'),now=new Date();
-  if(sh.getLastRow()>1)sh.getRange(2,1,sh.getLastRow()-1,3).clearContent();
-  sh.getRange(1,1,1,3).setValues([CONFIG.HEADERS.CAU_HINH]);
-  sh.getRange(2,1,6,3).setValues([
-    ['SPREADSHEET_ID',CONFIG.SPREADSHEET_ID,now],['LOP',CONFIG.CLASS_NAME,now],['NAM_HOC',CONFIG.SCHOOL_YEAR,now],
-    ['SYNC_VERSION',CONFIG.VERSION,now],['EXPECTED_STUDENTS',CONFIG.EXPECTED_STUDENTS,now],['MASTER_ROSTER',CONFIG.MASTER_ROSTER_URL,now]
-  ]);
-}
-
-function doGet(e){
-  const action=String((e&&e.parameter&&e.parameter.action)||'ping').toLowerCase();
-  try{
-    if(action==='ping')return json_({ok:true,service:'LE_HOANG_CLASSROOM_SYNC',version:CONFIG.VERSION});
-    if(action==='setup')return json_({ok:true,message:setupSheet()});
-    if(['restore_master_students','repair_students','compact_students'].includes(action))return json_(restoreMasterStudents_());
-    if(['get_students','getstudents'].includes(action))return json_(getStudents_());
-    return json_({ok:false,error:'Unknown action'});
-  }catch(err){log_('ERROR','SYSTEM','',String(err.stack||err));return json_({ok:false,error:String(err.message||err)})}
-}
-
-function doPost(e){
-  const lock=LockService.getScriptLock();
-  try{
-    lock.waitLock(30000);
-    const body=parseBody_(e),action=String(body.action||'').toLowerCase();
-    if(action==='sync_students')return json_(syncStudents_(Array.isArray(body.students)?body.students:[]));
-    if(['restore_master_students','repair_students','compact_students'].includes(action))return json_(restoreMasterStudents_());
-    if(action==='setup')return json_({ok:true,message:setupSheet()});
-    return json_({ok:false,error:'Unknown action'});
-  }catch(err){log_('ERROR','SYSTEM','',String(err.stack||err));return json_({ok:false,error:String(err.message||err)})}
-  finally{try{lock.releaseLock()}catch(_) {}}
-}
-
-function parseBody_(e){
-  if(!e)return{};
-  if(e.postData&&e.postData.contents){try{return JSON.parse(e.postData.contents)}catch(_) {}}
-  const p=e.parameter||{};if(p.payload){try{return JSON.parse(p.payload)}catch(_) {}}
-  return p;
-}
-
-function normalizeStudent_(s,index,now){
-  const stt=Number(s.stt)||index+1;
-  if(stt<1||stt>42)throw new Error('STT ngoài phạm vi 1-42: '+stt);
-  return {
-    id:'HS'+String(stt).padStart(2,'0'),stt,
-    name:text_(s.name||s.hoTen||s.studentName),gender:text_(s.gender||s.gioiTinh),
-    birthDate:s.birthDate||s.ngaySinh||'',status:text_(s.status||'active')||'active',
-    parentName:text_(s.parentName||s.phuHuynh),phone:text_(s.phone||s.dienThoai),
-    address:text_(s.address||s.diaChi),note:text_(s.note||s.ghiChu),
-    shareEnabled:s.shareEnabled===false?false:true,createdAt:s.createdAt||now,updatedAt:now
-  };
-}
-
-function validateMaster_(students){
-  if(!Array.isArray(students)||students.length!==42)throw new Error('Master Roster không hợp lệ: '+(students?students.length:0)+'/42.');
-  const seen=new Set();
-  students.forEach((s,i)=>{
-    const stt=Number(s.stt);
-    if(!Number.isInteger(stt)||stt<1||stt>42||seen.has(stt))throw new Error('STT Master lỗi tại vị trí '+(i+1)+': '+s.stt);
-    if(!text_(s.name))throw new Error('Học sinh rỗng tại STT '+stt);
-    seen.add(stt);
-  });
-  for(let i=1;i<=42;i++)if(!seen.has(i))throw new Error('Master thiếu STT '+i);
-}
-
-function sortStudentsAZ_(students){
-  const c=collator_();
-  return students.slice().sort((a,b)=>{const n=c.compare(text_(a.name),text_(b.name));return n!==0?n:(Number(a.stt)||0)-(Number(b.stt)||0)});
-}
-
-function validateStudentRows_(students){
-  if(!Array.isArray(students)||students.length!==42)return false;
-  const expected=new Set(expectedIds_()),seen=new Set();
-  for(const s of students){const id=text_(s.id);if(!expected.has(id)||seen.has(id)||!text_(s.name))return false;seen.add(id)}
-  return seen.size===42;
-}
-
-/* Xóa vật lý vùng dữ liệu cũ rồi mới ghi. Không append. */
-function hardResetStudentSheet_(sh){
-  if(sh.getFilter())sh.getFilter().remove();
-  sh.showRows(1,sh.getMaxRows());
-  const maxRows=sh.getMaxRows(),maxCols=sh.getMaxColumns();
-  if(maxRows>1)sh.getRange(2,1,maxRows-1,maxCols).clearContent();
-  if(maxRows>43)sh.deleteRows(44,maxRows-43);
-  if(sh.getMaxRows()<43)sh.insertRowsAfter(sh.getMaxRows(),43-sh.getMaxRows());
-  sh.getRange(1,1,1,CONFIG.HEADERS.HOC_SINH.length).setValues([CONFIG.HEADERS.HOC_SINH]);
-  SpreadsheetApp.flush();
-}
-
-function writeLinks_(ss,students){
-  const sh=ensureTab_(ss,'LINK_HOC_SINH'),h=CONFIG.HEADERS.LINK_HOC_SINH;
-  if(sh.getFilter())sh.getFilter().remove();sh.showRows(1,sh.getMaxRows());
-  if(sh.getMaxRows()>43)sh.deleteRows(44,sh.getMaxRows()-43);
-  if(sh.getMaxRows()<43)sh.insertRowsAfter(sh.getMaxRows(),43-sh.getMaxRows());
-  sh.getRange(1,1,1,h.length).setValues([h]);
-  if(sh.getMaxRows()>1)sh.getRange(2,1,42,Math.max(h.length,sh.getMaxColumns())).clearContent();
-  const now=new Date();
-  sh.getRange(2,1,42,h.length).setValues(students.map(s=>[s.id,s.id,s.name,'?student='+encodeURIComponent(s.id),s.shareEnabled,s.createdAt||now,s.updatedAt||now]));
-  sh.setFrozenRows(1);SpreadsheetApp.flush();
-}
-
-function writeStudents_(students,source){
-  if(students.length!==42)throw new Error('Từ chối ghi: phải đúng 42 học sinh.');
-  if(!validateStudentRows_(students))throw new Error('Bộ học sinh phải đúng HS01-HS42, không trùng ID.');
-  const ss=getSpreadsheet_(),sh=prepareStudentSheet_(ss);
-  const rows=students.map(s=>[s.id,s.name,s.gender,s.birthDate,s.status,s.parentName,s.phone,s.address,s.note,s.shareEnabled,s.createdAt,s.updatedAt]);
-  /* REPLACE ATOMICALLY: không dùng appendRow, không chèn dòng giữa dữ liệu. */
-  hardResetStudentSheet_(sh);
-  sh.getRange(2,1,42,CONFIG.HEADERS.HOC_SINH.length).setValues(rows);
-  sh.setFrozenRows(1);SpreadsheetApp.flush();
-  const check=sh.getRange(2,1,42,CONFIG.HEADERS.HOC_SINH.length).getValues().map(r=>({id:r[0],name:r[1]}));
-  if(!validateStudentRows_(check))throw new Error('HOC_SINH sau ghi không đúng 42 HS01-HS42.');
-  writeLinks_(ss,students);
-  log_('REPLACE_STUDENTS','HOC_SINH','',`REPLACE 42 HS; source=${source}; no-append; no-STU; sort=A-Z`);
-  return {ok:true,count:42,links:42,startRow:2,endRow:43,sort:'A-Z',mode:'REPLACE_NOT_APPEND',source,version:CONFIG.VERSION};
-}
-
-function restoreMasterStudents_(){
-  const response=UrlFetchApp.fetch(CONFIG.MASTER_ROSTER_URL,{muteHttpExceptions:true,followRedirects:true});
-  if(response.getResponseCode()!==200)throw new Error('Không tải được Master Roster: HTTP '+response.getResponseCode());
-  const payload=JSON.parse(response.getContentText('UTF-8')),source=Array.isArray(payload.students)?payload.students:[];
-  validateMaster_(source);
-  const now=new Date();
-  const normalized=source.slice().sort((a,b)=>Number(a.stt)-Number(b.stt)).map((s,i)=>normalizeStudent_(s,i,now));
-  return writeStudents_(sortStudentsAZ_(normalized),'MASTER_ROSTER');
-}
-
-function syncStudents_(students){
-  if(!Array.isArray(students)||students.length!==42)throw new Error('Nguồn đồng bộ phải có đúng 42 học sinh; nhận được '+(students?students.length:0)+'.');
-  const now=new Date(),normalized=students.map((s,i)=>normalizeStudent_(s,i,now));
-  if(!validateStudentRows_(normalized))throw new Error('Nguồn đồng bộ phải chứa đúng bộ ID HS01-HS42. Không ghi.');
-  return writeStudents_(sortStudentsAZ_(normalized),'CLIENT_SYNC');
-}
-
-function getStudents_(){
-  const ss=getSpreadsheet_(),sh=prepareStudentSheet_(ss),headers=CONFIG.HEADERS.HOC_SINH;
-  if(sh.getLastRow()!==43)return restoreMasterStudents_();
-  const values=sh.getRange(2,1,42,headers.length).getValues();
-  const students=values.map(r=>{const o={};headers.forEach((h,i)=>o[h]=r[i]);return o});
-  if(!validateStudentRows_(students))return restoreMasterStudents_();
-  const sorted=sortStudentsAZ_(students);
-  if(students.map(s=>s.id).join('|')!==sorted.map(s=>s.id).join('|')){
-    writeStudents_(sorted,'REORDER_EXISTING');
-  }
-  return {ok:true,count:42,students:sorted,startRow:2,endRow:43,sort:'A-Z',source:'HOC_SINH',version:CONFIG.VERSION};
-}
-
-function json_(obj){return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON)}
-function log_(action,sheet,recordId,message){
-  try{
-    const ss=getSpreadsheet_(),sh=ensureTab_(ss,'NHAT_KY');
-    if(sh.getLastRow()<1)sh.getRange(1,1,1,CONFIG.HEADERS.NHAT_KY.length).setValues([CONFIG.HEADERS.NHAT_KY]);
-    sh.appendRow([new Date(),action,sheet,recordId,message]);
-  }catch(_){}
-}
+function key_(v){return text_(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase().replace(/[^a-z0-9]/g,'')}
+function dateKey_(v){return text_(v).replace(/\D/g,'')}
+function identityKey_(s){return key_(s.name)+'|'+dateKey_(s.birthDate)+'|'+key_(s.gender)}
+function isCanonicalId_(id){return /^STU_5C_2026_\d{3,4}$/i.test(text_(id))}
+function preferred_(a,b){if(!a)return b;if(!b)return a;if(isCanonicalId_(b.id)&&!isCanonicalId_(a.id))return b;if(isCanonicalId_(a.id)&&!isCanonicalId_(b.id))return a;return Number(a.row||999999)<=Number(b.row||999999)?a:b}
+function json_(obj,e){const cb=String(e&&e.parameter&&e.parameter.callback||'').trim(),body=JSON.stringify(obj);if(cb&&/^[A-Za-z_$][\w$\.]*$/.test(cb))return ContentService.createTextOutput(cb+'('+body+');').setMimeType(ContentService.MimeType.JAVASCRIPT);return ContentService.createTextOutput(body).setMimeType(ContentService.MimeType.JSON)}
+function log_(action,sheet,recordId,message){try{const ss=getSpreadsheet_(),sh=ss.getSheetByName('NHAT_KY')||ss.insertSheet('NHAT_KY');if(sh.getLastRow()<1)sh.getRange(1,1,1,5).setValues([CONFIG.HEADERS.NHAT_KY]);sh.appendRow([new Date(),action,sheet,recordId,message])}catch(_) {}}
+function ensureTab_(ss,name){let sh=ss.getSheetByName(name);if(!sh)sh=ss.insertSheet(name);const h=CONFIG.HEADERS[name]||[];if(h.length){if(sh.getMaxColumns()<h.length)sh.insertColumnsAfter(sh.getMaxColumns(),h.length-sh.getMaxColumns());const first=sh.getRange(1,1,1,h.length).getValues()[0];if(!first.some(v=>text_(v)))sh.getRange(1,1,1,h.length).setValues([h]);sh.setFrozenRows(1)}return sh}
+function setupSheet(){const ss=getSpreadsheet_();CONFIG.TABS.forEach(n=>ensureTab_(ss,n));const sh=ensureTab_(ss,'CAU_HINH'),now=new Date();if(sh.getLastRow()>1)sh.getRange(2,1,sh.getLastRow()-1,3).clearContent();sh.getRange(1,1,1,3).setValues([CONFIG.HEADERS.CAU_HINH]);sh.getRange(2,1,6,3).setValues([['SPREADSHEET_ID',CONFIG.SPREADSHEET_ID,now],['LOP',CONFIG.CLASS_NAME,now],['NAM_HOC',CONFIG.SCHOOL_YEAR,now],['SYNC_VERSION',CONFIG.VERSION,now],['EXPECTED_STUDENTS',CONFIG.EXPECTED_STUDENTS,now],['IDENTITY_MATCH','name+birthDate+gender',now]]);return'OK'}
+function headerOk_(sh){const h=CONFIG.HEADERS.HOC_SINH;if(sh.getMaxColumns()<h.length)return false;const a=sh.getRange(1,1,1,h.length).getValues()[0].map(text_);return h.every((x,i)=>a[i]===x)}
+function readPhysicalStudents_(){const sh=getSpreadsheet_().getSheetByName('HOC_SINH');if(!sh)throw new Error('Không tìm thấy SHEET HOC_SINH.');if(!headerOk_(sh))throw new Error('Header HOC_SINH không đúng schema. API không tự sửa.');const last=sh.getLastRow();if(last<2)return[];const h=CONFIG.HEADERS.HOC_SINH,w=h.length,values=sh.getRange(2,1,last-1,w).getValues();return values.map((r,i)=>{const s={};h.forEach((k,j)=>s[k]=r[j]);s.id=text_(s.id);s.name=text_(s.name);s.gender=text_(s.gender);s.birthDate=text_(s.birthDate);s.status=text_(s.status)||'active';s.parentName=text_(s.parentName);s.phone=text_(s.phone);s.address=text_(s.address);s.note=text_(s.note);s.shareEnabled=s.shareEnabled===false||String(s.shareEnabled).toUpperCase()==='FALSE'?false:true;s.row=i+2;return s}).filter(s=>s.id&&s.name)}
+function dedupeLogicalStudents_(physical){const byIdentity=new Map(),duplicates=[];physical.forEach(s=>{const k=identityKey_(s);if(!k||k==='||')return;const current=byIdentity.get(k);if(!current){byIdentity.set(k,s);return}const keep=preferred_(current,s),drop=keep===current?s:current;byIdentity.set(k,keep);duplicates.push({identity:k,keptId:keep.id,droppedId:drop.id,keptRow:keep.row,droppedRow:drop.row,name:keep.name})});const logical=Array.from(byIdentity.values()).sort((a,b)=>key_(a.name).localeCompare(key_(b.name),'vi')||Number(a.row)-Number(b.row));return{logical,duplicates}}
+function readStudents_(){const physical=readPhysicalStudents_(),d=dedupeLogicalStudents_(physical);return{ok:true,count:d.logical.length,physicalCount:physical.length,duplicateCount:d.duplicates.length,students:d.logical,duplicates:d.duplicates,source:'HOC_SINH_SAFE_IDENTITY',version:CONFIG.VERSION}}
+function findRowById_(physical,id){const wanted=text_(id);return physical.find(s=>s.id===wanted)||null}
+function findRowByIdentity_(physical,incoming){const k=identityKey_(incoming);if(k==='||')return null;let best=null;physical.forEach(s=>{if(identityKey_(s)===k)best=preferred_(best,s)});return best}
+function normalizeIncoming_(s){return{id:text_(s&&(s.id||s.studentId||s.studentCode)),name:text_(s&&(s.name||s.studentName||s.hoTen)),gender:text_(s&&(s.gender||s.gioiTinh)),birthDate:text_(s&&(s.birthDate||s.dateOfBirth||s.ngaySinh)),status:text_(s&&s.status)||'active',parentName:text_(s&&(s.parentName||s.phuHuynh)),phone:text_(s&&(s.phone||s.dienThoai)),address:text_(s&&(s.address||s.diaChi)),note:text_(s&&(s.note||s.ghiChu)),shareEnabled:s&&s.shareEnabled===false?false:true,createdAt:s&&s.createdAt||new Date(),updatedAt:new Date()}}
+function updateRow_(sh,row,s){const old=sh.getRange(row,1,1,12).getValues()[0],now=new Date(),out=[s.id||old[0],s.name||old[1],s.gender||old[2],s.birthDate||old[3],s.status||old[4]||'active',s.parentName||old[5],s.phone||old[6],s.address||old[7],s.note||old[8],s.shareEnabled,old[10]||s.createdAt||now,now];sh.getRange(row,1,1,12).setValues([out])}
+function syncStudents_(incoming){if(!Array.isArray(incoming)||!incoming.length)throw new Error('Không có dữ liệu học sinh để đồng bộ.');const sh=getSpreadsheet_().getSheetByName('HOC_SINH');if(!sh)throw new Error('Không tìm thấy HOC_SINH.');if(!headerOk_(sh))throw new Error('Header HOC_SINH không đúng schema.');const physical=readPhysicalStudents_(),updated=[],skipped=[],seen=new Set();incoming.map(normalizeIncoming_).forEach(s=>{if(!s.id||!s.name){skipped.push({id:s.id,name:s.name,reason:'missing-id-or-name'});return}const incomingId=s.id,target=findRowById_(physical,incomingId),identityTarget=target||findRowByIdentity_(physical,s);if(!identityTarget){skipped.push({id:incomingId,name:s.name,reason:'NO_MATCH_NO_INSERT'});return}const finalId=identityTarget.id,requestKey=finalId+'|'+identityKey_(s);if(seen.has(requestKey)){skipped.push({id:incomingId,name:s.name,reason:'duplicate-in-request'});return}seen.add(requestKey);s.id=finalId;updateRow_(sh,identityTarget.row,s);updated.push({incomingId,storedId:finalId,row:identityTarget.row,name:s.name,matchedBy:target?'ID':'IDENTITY'})});SpreadsheetApp.flush();const after=readStudents_();log_('SAFE_UPSERT','HOC_SINH','',`updated=${updated.length}; skipped=${skipped.length}; physical=${after.physicalCount}; logical=${after.count}; duplicates=${after.duplicateCount}; no-insert=true`);return{ok:true,created:0,deleted:0,updated:updated.length,updatedRows:updated,skipped,physicalCount:after.physicalCount,logicalCount:after.count,duplicateCount:after.duplicateCount,mode:'SAFE_UPSERT_ID_OR_NAME_BIRTHDATE_GENDER',version:CONFIG.VERSION}}
+function auditDuplicates_(){const r=readStudents_();return{ok:true,physicalCount:r.physicalCount,logicalCount:r.count,duplicateCount:r.duplicateCount,duplicates:r.duplicates,policy:'READ_ONLY_NO_DELETE'}}
+function doGet(e){const action=String((e&&e.parameter&&e.parameter.action)||'ping').toLowerCase();try{if(action==='ping')return json_({ok:true,service:'LE_HOANG_CLASSROOM_SYNC',version:CONFIG.VERSION,policy:'SAFE_IDENTITY_UPSERT'},e);if(action==='setup')return json_({ok:true,message:setupSheet()},e);if(action==='get_students'||action==='getstudents')return json_(readStudents_(),e);if(action==='audit_duplicates')return json_(auditDuplicates_(),e);if(['restore_master_students','repair_students','compact_students'].includes(action))return json_({ok:false,blocked:true,error:'Đã khóa thao tác tự động xóa/dồn/đổi ID để bảo vệ dữ liệu. Dùng audit_duplicates để kiểm tra trước.'},e);return json_({ok:false,error:'Unknown action'},e)}catch(err){log_('ERROR','SYSTEM','',String(err.stack||err));return json_({ok:false,error:String(err.message||err),version:CONFIG.VERSION},e)}}
+function doPost(e){const lock=LockService.getScriptLock();try{lock.waitLock(30000);const body=parseBody_(e),action=String(body.action||'').toLowerCase();if(action==='sync_students')return json_(syncStudents_(Array.isArray(body.students)?body.students:[]),e);if(action==='audit_duplicates')return json_(auditDuplicates_(),e);if(action==='setup')return json_({ok:true,message:setupSheet()},e);if(['restore_master_students','repair_students','compact_students'].includes(action))return json_({ok:false,blocked:true,error:'Đã khóa thao tác phục hồi/xóa/dồn/đổi ID.'},e);return json_({ok:false,error:'Unknown action'},e)}catch(err){log_('ERROR','SYSTEM','',String(err.stack||err));return json_({ok:false,error:String(err.message||err),version:CONFIG.VERSION},e)}finally{try{lock.releaseLock()}catch(_) {}}}
+function parseBody_(e){if(!e)return{};if(e.postData&&e.postData.contents){try{return JSON.parse(e.postData.contents)}catch(_) {}}const p=e.parameter||{};if(p.payload){try{return JSON.parse(p.payload)}catch(_) {}}return p}
