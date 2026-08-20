@@ -1,15 +1,19 @@
-/* QUẢN LÝ LỚP HỌC — GOOGLE SHEETS MENU BRIDGE 1.3
+/* QUẢN LÝ LỚP HỌC — GOOGLE SHEETS MENU BRIDGE 1.4
  * Spreadsheet: 174xQ29phs-Or7OOEKOM0IHylFJXg5SsqzOC27x7K3Wg
- * 10 tabs: HOC_SINH, DIEM_DANH, VI_PHAM, KHEN_THUONG, HOC_TAP,
+ *
+ * Website vẫn mở module như hiện tại.
+ * Mỗi module đọc dữ liệu từ đúng SHEET:
+ * HOC_SINH, DIEM_DANH, VI_PHAM, KHEN_THUONG, HOC_TAP,
  * TIEN_BO, NHAN_XET, LINK_HOC_SINH, CAU_HINH, NHAT_KY.
  *
- * MASTER DATA FLOW:
- * Website master roster → Apps Script Web App → HOC_SINH + LINK_HOC_SINH
- * Google Sheets → read bridge → website menus.
- *
- * IMPORTANT:
- * - Set SYNC_WEB_APP_URL after deploying google-apps-script/Code.gs as Web App.
- * - Empty URL = read-only/fallback mode; never pretends that a write succeeded.
+ * NGUYÊN TẮC AN TOÀN:
+ * - Không đổi menu/UI hiện tại.
+ * - Không xóa LocalStorage.
+ * - Không thay đổi logic CRUD hiện có.
+ * - Chỉ đồng bộ dữ liệu Google Sheets vào các mảng dữ liệu hiện hành
+ *   trước khi module website render.
+ * - Không dùng JSON dự phòng khi Google Sheets đã được cấu hình;
+ *   nếu tab lỗi/không có dữ liệu thì giữ mảng tương ứng rỗng.
  */
 (function(){
   'use strict';
@@ -17,10 +21,9 @@
   window.__LH_GOOGLE_MENU_BRIDGE__=true;
 
   const SHEET_ID='174xQ29phs-Or7OOEKOM0IHylFJXg5SsqzOC27x7K3Wg';
-  const SYNC_WEB_APP_URL=''; // Dán URL Web App Apps Script vào đây sau khi Deploy.
+  const SYNC_WEB_APP_URL='';
   const TAB_NAMES=['HOC_SINH','DIEM_DANH','VI_PHAM','KHEN_THUONG','HOC_TAP','TIEN_BO','NHAN_XET','LINK_HOC_SINH','CAU_HINH','NHAT_KY'];
   const KEY='QL_LOP_HOC_LE_HOANG_GOOGLE_SHEETS_2026_2027';
-  const STUDENT_JSON='DANH_SACH_HOC_SINH_5C_2026_2027.json';
 
   const ALIASES={
     id:['id','studentid','studentcode','maso','mahs','mahocsinh','mahocsinhvien','mahsinh','mahochsinh'],
@@ -65,28 +68,72 @@
       document.head.appendChild(s);
     });
   }
+
   function normalizeRecord(o){return {id:o.id||'',studentId:o.studentId||o.id||'',name:o.name||'',date:o.date||'',status:o.status||'',note:o.note||'',type:o.type||'',subject:o.subject||'',score:o.score||'',result:o.result||'',url:o.url||'',raw:o};}
-  function makeStudentCode(index){return 'HS'+String(index+1).padStart(3,'0');}
-  function mapStudent(raw,index){
-    const id=clean(raw.id||raw.studentId||raw.studentCode)||makeStudentCode(index);
-    return {id,studentCode:id,stt:Number(raw.stt||index+1),name:clean(raw.name),gender:clean(raw.gender),birthDate:clean(raw.birthDate),status:clean(raw.status)||'active',parentName:clean(raw.parentName),phone:clean(raw.phone),address:clean(raw.address),note:clean(raw.note),shareEnabled:true,className:clean(raw.className)||'5C',schoolYear:clean(raw.schoolYear)||'2026–2027'};
-  }
-  async function loadLocalStudents(){
-    try{const r=await fetch(STUDENT_JSON,{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const wrapper=await r.json();return (wrapper?.students||[]).map(mapStudent).filter(s=>s.name);}
-    catch(e){console.warn('[GOOGLE MENU BRIDGE] Không đọc được danh sách học sinh dự phòng:',e);return [];}
-  }
-  function buildStudentLinks(students){
-    return students.map(s=>{const q=encodeURIComponent(s.id);return {id:s.id,studentId:s.id,name:s.name,className:s.className||'5C',schoolYear:s.schoolYear||'2026–2027',profileUrl:'?student='+q,learningUrl:'?page=learning&student='+q,attendanceUrl:'?page=attendance&student='+q,violationsUrl:'?page=violations&student='+q,rewardsUrl:'?page=rewards&student='+q,progressUrl:'?page=progress&student='+q,commentsUrl:'?page=comments&student='+q};});
+
+  function normalizeStatus(v){
+    const s=norm(v);
+    if(['present','comat','co mat','p'].includes(s)) return 'present';
+    if(['excused','cophep','co phep','phep'].includes(s)) return 'excused';
+    if(['absent','vang','vangmat','vang mat','khongphep','khong phep'].includes(s)) return 'absent';
+    return clean(v)||'present';
   }
 
-  /* POST without CORS dependency: submit a hidden HTML form to Apps Script. */
-  function syncStudentsToGoogleSheet(students){
+  function mapStudent(raw,index){
+    const id=clean(raw.id||raw.studentId||raw.studentCode)||('HS'+String(index+1).padStart(3,'0'));
+    return {id,studentCode:id,stt:Number(raw.stt||index+1),name:clean(raw.name),gender:clean(raw.gender),birthDate:clean(raw.birthDate),status:clean(raw.status)||'active',parentName:clean(raw.parentName),phone:clean(raw.phone),address:clean(raw.address),note:clean(raw.note),shareEnabled:true,className:clean(raw.className)||'5C',schoolYear:clean(raw.schoolYear)||'2026–2027'};
+  }
+
+  /* ============================================================
+     SHEET → WEBSITE MODULE DATA ADAPTER
+     ============================================================ */
+  function applySheetDataToWebsiteModules(tabs){
+    try{
+      const mapStudents=(tabs.HOC_SINH||[]).map((r,i)=>mapStudent(r.raw||r,i)).filter(s=>s.name);
+      const mapAttendance=(tabs.DIEM_DANH||[]).map((r,i)=>({
+        id:clean(r.id)||('ATT_SHEET_'+i),studentId:clean(r.studentId),date:clean(r.date),status:normalizeStatus(r.status),note:clean(r.note)
+      })).filter(r=>r.studentId);
+      const mapViolations=(tabs.VI_PHAM||[]).map((r,i)=>({
+        id:clean(r.id)||('VIO_SHEET_'+i),studentId:clean(r.studentId),date:clean(r.date),type:clean(r.type)||'other',level:clean(r.raw?.mucdo||r.raw?.MucDo||r.raw?.mucDo)||'light',status:clean(r.raw?.trangthai||r.raw?.TrangThai)||'monitoring',note:clean(r.note),action:clean(r.raw?.noidung||r.raw?.NoiDung)
+      })).filter(r=>r.studentId);
+      const mapRewards=(tabs.KHEN_THUONG||[]).map((r,i)=>({
+        id:clean(r.id)||('REW_SHEET_'+i),studentId:clean(r.studentId),date:clean(r.date),type:clean(r.type)||'other',formType:'praise',note:clean(r.note)||clean(r.raw?.noidung||r.raw?.NoiDung)
+      })).filter(r=>r.studentId);
+      const mapLearning=(tabs.HOC_TAP||[]).map((r,i)=>({
+        id:clean(r.id)||('LRN_SHEET_'+i),studentId:clean(r.studentId),date:clean(r.date)||new Date().toISOString().slice(0,10),subject:clean(r.subject),result:clean(r.result||r.score),level:clean(r.raw?.mucdo||r.raw?.MucDo||r.raw?.mucDo),note:clean(r.note)
+      })).filter(r=>r.studentId);
+      const mapProgress=(tabs.TIEN_BO||[]).map((r,i)=>({
+        id:clean(r.id)||('PRO_SHEET_'+i),studentId:clean(r.studentId),date:clean(r.date),content:clean(r.raw?.noidung||r.raw?.NoiDung||r.note),level:clean(r.raw?.mucdo||r.raw?.MucDo||r.raw?.mucDo),note:clean(r.note)
+      })).filter(r=>r.studentId);
+      const mapComments=(tabs.NHAN_XET||[]).map((r,i)=>({
+        id:clean(r.id)||('COM_SHEET_'+i),studentId:clean(r.studentId),date:clean(r.date),subject:clean(r.subject),comment:clean(r.raw?.nhanxet||r.raw?.NhanXet||r.note)
+      })).filter(r=>r.studentId);
+
+      /* Preserve existing array references used by data.js. */
+      if(typeof students!=='undefined' && Array.isArray(students)){students.splice(0,students.length,...mapStudents);}
+      if(typeof attendanceRecords!=='undefined' && Array.isArray(attendanceRecords)){attendanceRecords.splice(0,attendanceRecords.length,...mapAttendance);}
+      if(typeof violationRecords!=='undefined' && Array.isArray(violationRecords)){violationRecords.splice(0,violationRecords.length,...mapViolations);}
+      if(typeof rewardRecords!=='undefined' && Array.isArray(rewardRecords)){rewardRecords.splice(0,rewardRecords.length,...mapRewards);}
+      if(typeof learningRecords!=='undefined' && Array.isArray(learningRecords)){learningRecords.splice(0,learningRecords.length,...mapLearning);}
+      if(typeof progressRecords!=='undefined' && Array.isArray(progressRecords)){progressRecords.splice(0,progressRecords.length,...mapProgress);}
+      if(typeof commentRecords!=='undefined' && Array.isArray(commentRecords)){commentRecords.splice(0,commentRecords.length,...mapComments);}
+
+      if(typeof syncAppDataReferences==='function') syncAppDataReferences();
+
+      window.GOOGLE_SHEET_MODULE_SOURCE={
+        students:'HOC_SINH',attendance:'DIEM_DANH',violations:'VI_PHAM',rewards:'KHEN_THUONG',learning:'HOC_TAP',progress:'TIEN_BO',comments:'NHAN_XET',links:'LINK_HOC_SINH',config:'CAU_HINH',log:'NHAT_KY'
+      };
+      window.dispatchEvent(new CustomEvent('google-sheet-modules-ready',{detail:{sheetId:SHEET_ID,tabs:Object.keys(tabs)}}));
+    }catch(e){console.error('[GOOGLE SHEETS MODULE ADAPTER]',e);}
+  }
+
+  function syncStudentsToGoogleSheet(studentsData){
     if(!SYNC_WEB_APP_URL){
       const msg='Chưa cấu hình Apps Script Web App URL; không giả mạo trạng thái đồng bộ.';
       if(typeof window.showToast==='function')window.showToast(msg,'warning');
       return Promise.resolve({ok:false,configured:false,error:msg});
     }
-    const payload=JSON.stringify({action:'sync_students',students});
+    const payload=JSON.stringify({action:'sync_students',students:studentsData});
     return new Promise(resolve=>{
       const frameName='lhSyncFrame_'+Date.now(),iframe=document.createElement('iframe'),form=document.createElement('form');
       iframe.name=frameName;iframe.style.display='none';document.body.appendChild(iframe);
@@ -100,24 +147,31 @@
   async function loadAll(){
     const out={},errors=[],sources={};
     for(const tab of TAB_NAMES){try{const r=await fetchTab(tab);out[tab]=r.objects.map(normalizeRecord);sources[tab]='google-sheets';}catch(e){out[tab]=[];sources[tab]='unavailable';errors.push(tab+': '+e.message);}}
-    const localStudents=await loadLocalStudents();
-    if((out.HOC_SINH||[]).length){window.GOOGLE_SHEETS_STUDENTS=out.HOC_SINH.map((r,i)=>mapStudent(r.raw||r,i)).filter(s=>s.name);sources.HOC_SINH='google-sheets';}
-    else{window.GOOGLE_SHEETS_STUDENTS=localStudents;sources.HOC_SINH='repository-json-fallback';}
-    if((out.LINK_HOC_SINH||[]).length){sources.LINK_HOC_SINH='google-sheets';}
-    else{out.LINK_HOC_SINH=buildStudentLinks(window.GOOGLE_SHEETS_STUDENTS);sources.LINK_HOC_SINH='generated-from-student-master';}
 
-    const payload={version:'1.3.0',sheetId:SHEET_ID,loadedAt:new Date().toISOString(),tabs:out,sources,errors};
+    /* IMPORTANT: website modules use Google Sheets as their source of truth. */
+    window.GOOGLE_SHEETS_STUDENTS=(out.HOC_SINH||[]).map((r,i)=>mapStudent(r.raw||r,i)).filter(s=>s.name);
+
+    const payload={version:'1.4.0',sheetId:SHEET_ID,loadedAt:new Date().toISOString(),tabs:out,sources,errors};
     try{localStorage.setItem(KEY,JSON.stringify(payload));}catch(e){console.warn('[GOOGLE MENU BRIDGE] localStorage:',e);}
     window.GOOGLE_SHEET_DATA=payload;
     window.GOOGLE_SHEET_CONFIG={sheetId:SHEET_ID,tabs:TAB_NAMES,key:KEY,errors,sources,studentCount:window.GOOGLE_SHEETS_STUDENTS.length,syncConfigured:Boolean(SYNC_WEB_APP_URL)};
     window.syncStudentsToGoogleSheet=()=>syncStudentsToGoogleSheet(window.GOOGLE_SHEETS_STUDENTS);
+
+    applySheetDataToWebsiteModules(out);
+
     window.__LH_GOOGLE_SHEETS_STATUS__={ok:errors.length===0,loadedTabs:TAB_NAMES.length-errors.length,totalTabs:TAB_NAMES.length,errors,sources,studentCount:window.GOOGLE_SHEETS_STUDENTS.length,syncConfigured:Boolean(SYNC_WEB_APP_URL),at:payload.loadedAt};
-    if(typeof window.showToast==='function'){const n=window.GOOGLE_SHEETS_STUDENTS.length;if(errors.length)window.showToast('Google Sheets: '+(TAB_NAMES.length-errors.length)+'/10 tab; danh sách hiện có '+n+' học sinh.','warning');else window.showToast('Đã kết nối Google Sheets: 10/10 tab; '+n+' học sinh.','success');}
+    if(typeof window.showToast==='function'){
+      const n=window.GOOGLE_SHEETS_STUDENTS.length;
+      if(errors.length)window.showToast('Google Sheets: '+(TAB_NAMES.length-errors.length)+'/10 tab; module website đang dùng đúng các tab đã đọc.','warning');
+      else window.showToast('Đã kết nối Google Sheets: 10/10 tab; các module website đã nhận đúng SHEET.','success');
+    }
     return payload;
   }
+
   window.loadGoogleSheetsMenuData=loadAll;
   window.getGoogleSheetTab=function(tab){return window.GOOGLE_SHEET_DATA?.tabs?.[tab]||[];};
   window.getGoogleSheetUrl=function(){return 'https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/edit';};
+  window.getGoogleSheetModuleSource=function(module){return window.GOOGLE_SHEET_MODULE_SOURCE?.[module]||'';};
   window.addEventListener('google-sheets-refresh',loadAll);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(loadAll,700),{once:true});else setTimeout(loadAll,700);
 })();
