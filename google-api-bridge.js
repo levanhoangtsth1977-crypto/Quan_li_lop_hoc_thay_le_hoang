@@ -1,13 +1,13 @@
 /* ============================================================
    QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG
-   GOOGLE API BRIDGE 5.0 — SAFE ROSTER SYNC
+   GOOGLE API BRIDGE 5.1 — SAFE ROSTER SYNC + A-Z DISPLAY SORT
    ============================================================ */
 "use strict";
 
 var GOOGLE_API_CONFIG=Object.freeze({
   url:"https://script.google.com/macros/s/AKfycbxnqx0824-jI7LzuAaK-Ys5V3_TdYg6uNT9wWkV_O1EfJapW2IrY_HJF-rv_PVsZM71bw/exec",
   timeout:15000,
-  version:"5.0.0",
+  version:"5.1.0",
   storageKey:"QL_LOP_HOC_LE_HOANG_2026_2027"
 });
 
@@ -33,16 +33,58 @@ function normalizeStudentForBridge(s){
   };
 }
 function validStudentList(list){return Array.isArray(list)&&list.length>0&&list.every(function(s){var n=normalizeStudentForBridge(s);return Boolean(n.id&&n.name);});}
+
+/* ------------------------------------------------------------
+   SORT A-Z CHỈ TRÊN BẢN SAO HIỂN THỊ
+   - KHÔNG sửa Google Sheets.
+   - KHÔNG đổi ID.
+   - KHÔNG sửa tên gốc.
+   - Ưu tiên TÊN (từ cuối cùng trong họ tên), sau đó họ tên đầy đủ,
+     cuối cùng ID để giữ thứ tự ổn định khi tên trùng.
+   ------------------------------------------------------------ */
+function bridgeRemoveVietnameseMarks(v){
+  return String(v??"")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .replace(/đ/g,"d").replace(/Đ/g,"D")
+    .trim().toLocaleLowerCase("vi");
+}
+function bridgeStudentGivenName(name){
+  var clean=bridgeText(name).replace(/\s+/g," ");
+  if(!clean)return "";
+  var parts=clean.split(" ");
+  return parts[parts.length-1];
+}
+function bridgeStudentSortKey(s){
+  var n=normalizeStudentForBridge(s);
+  return{
+    given:bridgeRemoveVietnameseMarks(bridgeStudentGivenName(n.name)),
+    full:bridgeRemoveVietnameseMarks(n.name),
+    id:bridgeRemoveVietnameseMarks(n.id)
+  };
+}
+function sortStudentsAZForDisplay(list){
+  if(!Array.isArray(list))return [];
+  return list.slice().sort(function(a,b){
+    var ka=bridgeStudentSortKey(a),kb=bridgeStudentSortKey(b);
+    return ka.given.localeCompare(kb.given,"vi",{sensitivity:"base",numeric:false})||
+           ka.full.localeCompare(kb.full,"vi",{sensitivity:"base",numeric:false})||
+           ka.id.localeCompare(kb.id,"vi",{sensitivity:"base",numeric:true});
+  });
+}
+
 function emptyLocalPayload(){return{version:"3.1.1",config:{},students:[],attendance:[],violations:[],rewards:[],learning:[],progress:[],comments:[]};}
 function readLocalPayload(){try{var raw=localStorage.getItem(GOOGLE_API_CONFIG.storageKey);if(!raw)return emptyLocalPayload();var d=JSON.parse(raw);return d&&typeof d==="object"&&!Array.isArray(d)?d:emptyLocalPayload();}catch(_){return emptyLocalPayload();}}
 function writeStudentsToLocal(list,source){
   if(!validStudentList(list))throw new Error("Google trả về danh sách học sinh rỗng hoặc thiếu ID/tên.");
-  var normalized=list.map(normalizeStudentForBridge),current=readLocalPayload();
-  var payload={version:current.version||"3.1.1",savedAt:new Date().toISOString(),config:current.config||{},students:normalized,attendance:Array.isArray(current.attendance)?current.attendance:[],violations:Array.isArray(current.violations)?current.violations:[],rewards:Array.isArray(current.rewards)?current.rewards:[],learning:Array.isArray(current.learning)?current.learning:[],progress:Array.isArray(current.progress)?current.progress:[],comments:Array.isArray(current.comments)?current.comments:[]};
+  var normalized=list.map(normalizeStudentForBridge);
+  var displaySorted=sortStudentsAZForDisplay(normalized);
+  var current=readLocalPayload();
+  var payload={version:current.version||"3.1.1",savedAt:new Date().toISOString(),config:current.config||{},students:displaySorted,attendance:Array.isArray(current.attendance)?current.attendance:[],violations:Array.isArray(current.violations)?current.violations:[],rewards:Array.isArray(current.rewards)?current.rewards:[],learning:Array.isArray(current.learning)?current.learning:[],progress:Array.isArray(current.progress)?current.progress:[],comments:Array.isArray(current.comments)?current.comments:[]};
   localStorage.setItem(GOOGLE_API_CONFIG.storageKey,JSON.stringify(payload));
   if(typeof window.loadClassData!=="function")throw new Error("Data Engine chưa nạp hàm loadClassData.");
   if(window.loadClassData()!==true)throw new Error("Data Engine từ chối nạp dữ liệu.");
-  return{success:true,ok:true,count:normalized.length,source:source};
+  return{success:true,ok:true,count:displaySorted.length,source:source,sort:"A-Z-by-given-name"};
 }
 function waitDataEngine(attempt){attempt=attempt||0;if(typeof window.loadClassData==="function")return Promise.resolve(true);if(attempt>=100)return Promise.resolve(false);return new Promise(function(resolve){setTimeout(function(){resolve(waitDataEngine(attempt+1));},100);}).then(function(v){return v;});}
 function api(action){
@@ -60,7 +102,7 @@ function refreshAllAfterSync(){["renderDashboard","renderStudents","renderAttend
 function syncStudentsVip(){
   return waitDataEngine().then(function(ready){if(!ready)throw new Error("Data Engine chưa sẵn sàng.");return fetchRemoteRoster();}).then(function(remote){
     writeStudentsToLocal(remote.list,"google-sheets-live");
-    window.__GOOGLE_CLASS_SYNC__={ok:true,count:remote.list.length,source:"google-sheets-live",fallbackUsed:false,autoRestore:false,at:new Date().toISOString()};
+    window.__GOOGLE_CLASS_SYNC__={ok:true,count:remote.list.length,source:"google-sheets-live",fallbackUsed:false,autoRestore:false,sort:"A-Z-by-given-name",at:new Date().toISOString()};
     refreshAllAfterSync();
     return window.__GOOGLE_CLASS_SYNC__;
   }).catch(function(error){
@@ -81,10 +123,10 @@ function installReplaceStudentsApi(){
   return true;
 }
 function initializeGoogleApiBridge(){
-  if(window.__GOOGLE_CLASS_BRIDGE_500__)return;
-  window.__GOOGLE_CLASS_BRIDGE_500__=true;
+  if(window.__GOOGLE_CLASS_BRIDGE_510__)return;
+  window.__GOOGLE_CLASS_BRIDGE_510__=true;
   installReplaceStudentsApi();
-  syncStudentsVip().then(function(result){if(typeof window.showToast==="function")window.showToast(result.ok?"Đã đọc danh sách học sinh từ Google Sheets: "+result.count+" em.":"Google chưa đọc được; dữ liệu hiện có được giữ nguyên.",result.ok?"success":"warning");});
+  syncStudentsVip().then(function(result){if(typeof window.showToast==="function")window.showToast(result.ok?"Đã đọc danh sách học sinh từ Google Sheets: "+result.count+" em — đã sắp xếp A–Z.":"Google chưa đọc được; dữ liệu hiện có được giữ nguyên.",result.ok?"success":"warning");});
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",initializeGoogleApiBridge,{once:true});else initializeGoogleApiBridge();
 
@@ -100,5 +142,5 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
   var oldGet=window.getStudentById;
   window.getStudentById=function(id){var s=students().find(function(x){return same(x,id);});return s||((typeof oldGet==="function")?oldGet(id):null);};
   window.filterValidStudentRecords=function(records){var list=Array.isArray(records)?records:[];return list.filter(function(r){return r&&students().some(function(s){return same(s,r.studentId);});});};
-  window.__QL_VI_SYNC_FIX__={version:"5.0.0",translate:function(v){var k=String(v??"").trim().toLocaleLowerCase("vi");return TEXT[k]||String(v??"");}};
+  window.__QL_VI_SYNC_FIX__={version:"5.1.0",translate:function(v){var k=String(v??"").trim().toLocaleLowerCase("vi");return TEXT[k]||String(v??"");}};
 })();
