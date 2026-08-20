@@ -1,45 +1,142 @@
 /* ============================================================
-   QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG
-   GOOGLE API BRIDGE 6.3 — 12-COLUMN STUDENT SCHEMA SAFE SYNC
-   - Không xóa danh sách khi Google trả rỗng/lỗi
-   - Import Excel/CSV có thể ghi lên Google bằng sync_students
-   - Không tạo studentCode
+   GOOGLE API BRIDGE 6.4 — STUDENT ROSTER RECOVERY
+   12-column HOC_SINH schema. No studentCode in HOC_SINH.
+   GET uses JSONP to avoid browser CORS/redirect failures.
+   POST uses hidden form + verification GET.
    ============================================================ */
 'use strict';
 
-var GOOGLE_API_CONFIG=Object.freeze({
-  url:'https://script.google.com/macros/s/AKfycbynklm7SobnkcEZKfAUGdMIBugA4lQ2kA3yOThHVjNoiJzCK7veuwO2vE1tR1QKI-nkIQ/exec',
-  timeout:15000,
-  version:'6.3.0',
-  storageKey:'QL_LOP_HOC_LE_HOANG_2026_2027'
-});
+(function(){
+  if(window.__LH_GOOGLE_BRIDGE_640__) return;
+  window.__LH_GOOGLE_BRIDGE_640__=true;
 
-var STUDENT_SCHEMA=Object.freeze(['id','name','gender','birthDate','status','parentName','phone','address','note','shareEnabled','createdAt','updatedAt']);
+  const CONFIG=Object.freeze({
+    url:'https://script.google.com/macros/s/AKfycbynklm7SobnkcEZKfAUGdMIBugA4lQ2kA3yOThHVjNoiJzCK7veuwO2vE1tR1QKI-nkIQ/exec',
+    timeout:20000,
+    version:'6.4.0',
+    storageKey:'QL_LOP_HOC_LE_HOANG_2026_2027'
+  });
+  const SCHEMA=Object.freeze(['id','name','gender','birthDate','status','parentName','phone','address','note','shareEnabled','createdAt','updatedAt']);
 
-function bridgeText(v){return String(v??'').trim().replace(/\s+/g,' ')}
-function bridgeKey(v){return bridgeText(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase().replace(/[^a-z0-9]/g,'')}
-function bridgeDate(v){var s=bridgeText(v);if(!s)return '';var iso=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);if(iso)return iso[3].padStart(2,'0')+iso[2].padStart(2,'0')+iso[1];var dmy=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/);if(dmy)return dmy[1].padStart(2,'0')+dmy[2].padStart(2,'0')+dmy[3];return s.replace(/\D/g,'')}
-function identityKey(s){return bridgeKey(s.name)+'|'+bridgeDate(s.birthDate)+'|'+bridgeKey(s.gender)}
-function canonicalRank(s){return /^STU_5C_2026_\d{3,4}$/i.test(bridgeText(s.id))?0:1}
-function normalizeStudentForBridge(s){s=s&&typeof s==='object'?s:{};return{id:bridgeText(s.id),name:bridgeText(s.name||s.studentName),gender:bridgeText(s.gender),birthDate:bridgeText(s.birthDate||s.dateOfBirth),status:bridgeText(s.status)||'active',parentName:bridgeText(s.parentName),phone:bridgeText(s.phone),address:bridgeText(s.address),note:bridgeText(s.note),shareEnabled:s.shareEnabled!==false,createdAt:bridgeText(s.createdAt),updatedAt:bridgeText(s.updatedAt)}}
-function validateStudentSchema(s){return STUDENT_SCHEMA.every(function(k){return Object.prototype.hasOwnProperty.call(s,k)})}
-function dedupeStudents(list){var by=new Map(),duplicates=[];(Array.isArray(list)?list:[]).map(normalizeStudentForBridge).filter(function(s){return s.id&&s.name&&validateStudentSchema(s)}).forEach(function(s){var k=identityKey(s);if(!k||k==='||')return;var old=by.get(k);if(!old){by.set(k,s);return}var keep=canonicalRank(s)<canonicalRank(old)?s:(canonicalRank(s)>canonicalRank(old)?old:(s.id<old.id?s:old));var drop=keep===old?s:old;by.set(k,keep);duplicates.push({keptId:keep.id,droppedId:drop.id,name:keep.name})});return{students:Array.from(by.values()),duplicates:duplicates}}
-function emptyLocalPayload(){return{version:'3.1.1',config:{},students:[],attendance:[],violations:[],rewards:[],learning:[],progress:[],comments:[]}}
-function readLocalPayload(){try{var raw=localStorage.getItem(GOOGLE_API_CONFIG.storageKey);if(!raw)return emptyLocalPayload();var d=JSON.parse(raw);return d&&typeof d==='object'&&!Array.isArray(d)?d:emptyLocalPayload()}catch(_){return emptyLocalPayload()}}
-function writeStudentsToLocal(list,source){var d=dedupeStudents(list);if(!d.students.length)throw new Error('Không có học sinh hợp lệ để nạp.');var cur=readLocalPayload();var payload={version:cur.version||'3.1.1',savedAt:new Date().toISOString(),config:cur.config||{},students:d.students,attendance:Array.isArray(cur.attendance)?cur.attendance:[],violations:Array.isArray(cur.violations)?cur.violations:[],rewards:Array.isArray(cur.rewards)?cur.rewards:[],learning:Array.isArray(cur.learning)?cur.learning:[],progress:Array.isArray(cur.progress)?cur.progress:[],comments:Array.isArray(cur.comments)?cur.comments:[]};localStorage.setItem(GOOGLE_API_CONFIG.storageKey,JSON.stringify(payload));if(typeof window.loadClassData==='function')window.loadClassData();return{ok:true,success:true,count:d.students.length,physicalCount:Array.isArray(list)?list.length:d.students.length,duplicateCount:d.duplicates.length,source:source,schema:STUDENT_SCHEMA.slice()}}
-function api(action){var controller=new AbortController(),timer=setTimeout(function(){controller.abort()},GOOGLE_API_CONFIG.timeout);return fetch(GOOGLE_API_CONFIG.url+'?action='+encodeURIComponent(action)+'&t='+Date.now(),{cache:'no-store',signal:controller.signal,redirect:'follow'}).then(function(r){if(!r.ok)throw new Error('API HTTP '+r.status);return r.json()}).finally(function(){clearTimeout(timer)})}
-function refreshAllAfterSync(){['renderDashboard','renderStudents','renderAttendance','renderViolations','renderRewards','renderLearningSafe','renderCommentsSafe','renderStatistics','renderStudentLinks','updateStudentSelects'].forEach(function(n){if(typeof window[n]==='function')try{window[n]()}catch(e){console.warn('[GOOGLE BRIDGE] '+n,e)}})}
-function fetchRemoteRoster(){return api('get_students').then(function(r){if(!r||r.ok!==true)throw new Error(r&&r.error||'Google API trả về lỗi.');var list=Array.isArray(r.students)?r.students:[];var d=dedupeStudents(list);if(!d.students.length)throw new Error('Google trả về 0 học sinh hợp lệ; giữ nguyên danh sách hiện có.');return{ok:true,list:d.students,physicalCount:Number(r.physicalCount)||list.length,logicalCount:d.students.length,duplicateCount:Number(r.duplicateCount)||d.duplicates.length,duplicates:d.duplicates,version:r.version||GOOGLE_API_CONFIG.version}})}
-function syncStudentsVip(){return fetchRemoteRoster().then(function(remote){var saved=writeStudentsToLocal(remote.list,'google-sheets-single-source');window.__GOOGLE_CLASS_SYNC__={ok:true,count:saved.count,physicalCount:remote.physicalCount,logicalCount:remote.logicalCount,duplicateCount:remote.duplicateCount,source:'google-sheets-single-source',fallbackUsed:false,autoRestore:false,schema:STUDENT_SCHEMA.slice(),at:new Date().toISOString()};refreshAllAfterSync();return window.__GOOGLE_CLASS_SYNC__}).catch(function(error){var local=readLocalPayload(),count=Array.isArray(local.students)?local.students.length:0;window.__GOOGLE_CLASS_SYNC__={ok:false,count:count,source:count?'local-preserved':'no-data',fallbackUsed:true,autoRestore:false,error:error.message,schema:STUDENT_SCHEMA.slice(),at:new Date().toISOString()};console.warn('[GOOGLE BRIDGE] Google lỗi/rỗng; GIỮ NGUYÊN local, không xóa:',error);refreshAllAfterSync();return window.__GOOGLE_CLASS_SYNC__})}
-function postStudentWrite(list){var students=Array.isArray(list)?list.map(normalizeStudentForBridge).filter(function(s){return s.id&&s.name&&validateStudentSchema(s)}):[];if(!students.length)return Promise.resolve({ok:false,error:'empty-students'});var payload=JSON.stringify({action:'sync_students',students:students});return new Promise(function(resolve){var iframe=document.createElement('iframe'),form=document.createElement('form'),name='LH_SYNC_'+Date.now()+'_'+Math.random().toString(36).slice(2),done=false;iframe.name=name;iframe.style.display='none';form.method='POST';form.action=GOOGLE_API_CONFIG.url;form.target=name;form.style.display='none';var input=document.createElement('input');input.type='hidden';input.name='payload';input.value=payload;form.appendChild(input);document.body.appendChild(iframe);document.body.appendChild(form);function finish(result){if(done)return;done=true;setTimeout(function(){iframe.remove();form.remove()},800);resolve(result)}iframe.addEventListener('load',function(){finish({ok:true,submitted:true,count:students.length,schema:STUDENT_SCHEMA.slice()})},{once:true});form.submit();setTimeout(function(){finish({ok:true,submitted:true,count:students.length,schema:STUDENT_SCHEMA.slice()})},12000)})}
-function verifyRemoteStudent(student){return api('get_students').then(function(r){var list=Array.isArray(r.students)?r.students:[],target=normalizeStudentForBridge(student),found=list.some(function(s){var x=normalizeStudentForBridge(s);return bridgeText(x.id)===bridgeText(target.id)||identityKey(x)===identityKey(target)});if(!found)throw new Error('Google chưa xác nhận học sinh vừa lưu.');return{ok:true,found:true,count:list.length}})}
-function syncStudentWriteBack(student,action){return postStudentWrite([student]).then(function(){return new Promise(function(resolve){setTimeout(function(){verifyRemoteStudent(student).then(function(){window.__GOOGLE_STUDENT_WRITE__={ok:true,action:action,studentId:student.id,verified:true,schema:STUDENT_SCHEMA.slice(),at:new Date().toISOString()};if(typeof window.showToast==='function')window.showToast('Đã đồng bộ học sinh sang Google Sheets.','success');resolve(window.__GOOGLE_STUDENT_WRITE__)}).catch(function(e){window.__GOOGLE_STUDENT_WRITE__={ok:false,action:action,studentId:student.id,verified:false,error:e.message,schema:STUDENT_SCHEMA.slice(),at:new Date().toISOString()};if(typeof window.showToast==='function')window.showToast('Google chưa xác nhận đồng bộ: '+student.name,'warning');resolve(window.__GOOGLE_STUDENT_WRITE__)})},900)})})}
-function syncRosterToGoogle(list,source){var students=Array.isArray(list)?list:[];if(!students.length)return Promise.resolve({ok:false,error:'Danh sách tải lên rỗng.'});return postStudentWrite(students).then(function(r){if(!r.ok)return r;window.__GOOGLE_ROSTER_UPLOAD__={ok:true,count:r.count,source:source||'import',at:new Date().toISOString()};if(typeof window.showToast==='function')window.showToast('Đã gửi '+r.count+' học sinh lên Google Sheets.','success');return window.__GOOGLE_ROSTER_UPLOAD__}).catch(function(e){window.__GOOGLE_ROSTER_UPLOAD__={ok:false,error:e.message,source:source||'import',at:new Date().toISOString()};if(typeof window.showToast==='function')window.showToast('Không tải được danh sách lên Google Sheets: '+e.message,'error');return window.__GOOGLE_ROSTER_UPLOAD__})}
-function installStudentWriteHooks(){if(window.__LH_STUDENT_WRITE_HOOKS_630__)return;window.__LH_STUDENT_WRITE_HOOKS_630__=true;var originalAdd=window.addStudent,originalUpdate=window.updateStudent;if(typeof originalAdd==='function')window.addStudent=function(data){var result=originalAdd.apply(this,arguments);if(result&&result.success&&result.student)syncStudentWriteBack(result.student,'add').catch(function(e){console.warn('[GOOGLE WRITE add]',e)});return result};if(typeof originalUpdate==='function')window.updateStudent=function(id,changes){var result=originalUpdate.apply(this,arguments);if(result&&result.success&&result.student)syncStudentWriteBack(result.student,'update').catch(function(e){console.warn('[GOOGLE WRITE update]',e)});return result}}
-function installReplaceStudentsApi(){if(typeof window.replaceStudents==='function'){if(window.replaceStudents.__GOOGLE_UPLOAD_WRAPPED__)return;var original=window.replaceStudents;window.replaceStudents=function(incoming,options){var result=original.apply(this,arguments),opts=options&&typeof options==='object'?options:{},source=String(opts.source||'').toLowerCase();if(result&&result.success!==false&&Array.isArray(incoming)&&incoming.length){var shouldUpload=/excel|csv|import|upload|sheet|google/.test(source);if(shouldUpload)syncRosterToGoogle(incoming,source)}return result};window.replaceStudents.__GOOGLE_UPLOAD_WRAPPED__=true;return}window.replaceStudents=function(incoming,options){var result;try{result=writeStudentsToLocal(Array.isArray(incoming)?incoming:[],options&&options.source||'runtime')}catch(e){result={ok:false,success:false,error:e.message}}if(result.ok&&Array.isArray(incoming)&&incoming.length)syncRosterToGoogle(incoming,options&&options.source||'runtime');return result}}
-function initializeGoogleApiBridge(){if(window.__GOOGLE_CLASS_BRIDGE_630__)return;window.__GOOGLE_CLASS_BRIDGE_630__=true;installReplaceStudentsApi();installStudentWriteHooks();syncStudentsVip().then(function(r){if(typeof window.showToast==='function')window.showToast(r.ok?'Google: '+r.count+' học sinh, schema 12 cột.':(r.count?'Google chưa kết nối; giữ '+r.count+' học sinh hiện có.':'Chưa đọc được Google; chưa xóa dữ liệu local.'),r.ok?'success':'warning')})}
-window.syncRosterToGoogle=syncRosterToGoogle;
-window.getGoogleStudentSyncStatus=function(){return window.__GOOGLE_CLASS_SYNC__||{ok:false,source:'not-started',schema:STUDENT_SCHEMA.slice()}};
-window.getGoogleStudentWriteStatus=function(){return window.__GOOGLE_STUDENT_WRITE__||{ok:false,source:'not-started',schema:STUDENT_SCHEMA.slice()}};
-window.getGoogleRosterUploadStatus=function(){return window.__GOOGLE_ROSTER_UPLOAD__||{ok:false,source:'not-started',schema:STUDENT_SCHEMA.slice()}};
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(initializeGoogleApiBridge,300)},{once:true});else setTimeout(initializeGoogleApiBridge,300);
+  function txt(v){return String(v??'').trim().replace(/\s+/g,' ')}
+  function key(v){return txt(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLowerCase().replace(/[^a-z0-9]/g,'')}
+  function dateKey(v){
+    if(v instanceof Date&&!isNaN(v.getTime())) return String(v.getDate()).padStart(2,'0')+String(v.getMonth()+1).padStart(2,'0')+v.getFullYear();
+    const s=txt(v); if(!s)return '';
+    let m=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/); if(m)return m[3].padStart(2,'0')+m[2].padStart(2,'0')+m[1];
+    m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/); if(m)return m[1].padStart(2,'0')+m[2].padStart(2,'0')+m[3];
+    return s.replace(/\D/g,'');
+  }
+  function identity(s){return key(s.name)+'|'+dateKey(s.birthDate)+'|'+key(s.gender)}
+  function normalize(s){s=s&&typeof s==='object'?s:{};return{
+    id:txt(s.id||s.studentId||''), name:txt(s.name||s.studentName||s.hoTen||''), gender:txt(s.gender||s.gioiTinh||''),
+    birthDate:txt(s.birthDate||s.dateOfBirth||s.ngaySinh||''), status:txt(s.status)||'active', parentName:txt(s.parentName||s.phuHuynh||''),
+    phone:txt(s.phone||s.dienThoai||''), address:txt(s.address||s.diaChi||''), note:txt(s.note||s.ghiChu||''),
+    shareEnabled:s.shareEnabled!==false, createdAt:txt(s.createdAt)||new Date().toISOString(), updatedAt:txt(s.updatedAt)||new Date().toISOString()
+  }}
+  function valid(s){return !!(s.id&&s.name&&SCHEMA.every(k=>Object.prototype.hasOwnProperty.call(s,k)))}
+  function dedupe(list){
+    const map=new Map(), dup=[];
+    (Array.isArray(list)?list:[]).map(normalize).filter(valid).forEach(s=>{
+      const k=identity(s), old=map.get(k);
+      if(!old){map.set(k,s);return}
+      const keep=/^STU_5C_2026_/i.test(s.id)?s:(/^STU_5C_2026_/i.test(old.id)?old:(s.id<old.id?s:old));
+      map.set(k,keep); dup.push({keptId:keep.id,name:keep.name});
+    });
+    return {students:[...map.values()],duplicateCount:dup.length,duplicates:dup};
+  }
+  function localPayload(){try{const x=JSON.parse(localStorage.getItem(CONFIG.storageKey)||'null');return x&&typeof x==='object'?x:{students:[]}}catch(_){return{students:[]}}}
+  function saveLocal(list,source){
+    const d=dedupe(list); if(!d.students.length) throw new Error('Không có học sinh hợp lệ.');
+    const old=localPayload();
+    const p={version:old.version||'3.1.1',savedAt:new Date().toISOString(),config:old.config||{},students:d.students,
+      attendance:Array.isArray(old.attendance)?old.attendance:[],violations:Array.isArray(old.violations)?old.violations:[],rewards:Array.isArray(old.rewards)?old.rewards:[],learning:Array.isArray(old.learning)?old.learning:[],progress:Array.isArray(old.progress)?old.progress:[],comments:Array.isArray(old.comments)?old.comments:[]};
+    localStorage.setItem(CONFIG.storageKey,JSON.stringify(p));
+    if(typeof window.loadClassData==='function') try{window.loadClassData()}catch(e){console.warn(e)}
+    if(typeof window.syncAppDataReferences==='function') try{window.syncAppDataReferences()}catch(e){console.warn(e)}
+    return {ok:true,count:d.students.length,source,duplicateCount:d.duplicateCount,schema:SCHEMA.slice()};
+  }
+  function refresh(){['renderDashboard','renderStudents','renderAttendance','renderViolations','renderRewards','renderLearningSafe','renderCommentsSafe','renderStatistics','renderStudentLinks','updateStudentSelects'].forEach(n=>{if(typeof window[n]==='function')try{window[n]()}catch(e){}})}
+
+  function jsonp(action){
+    return new Promise((resolve,reject)=>{
+      const cb='__LH_JSONP_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const script=document.createElement('script'); let done=false;
+      const timer=setTimeout(()=>finish(new Error('Google API timeout')),CONFIG.timeout);
+      function finish(err,data){if(done)return;done=true;clearTimeout(timer);try{delete window[cb]}catch(_){}script.remove();err?reject(err):resolve(data)}
+      window[cb]=data=>finish(null,data);
+      script.onerror=()=>finish(new Error('Không truy cập được Google Apps Script Web App.'));
+      script.src=CONFIG.url+'?action='+encodeURIComponent(action)+'&callback='+encodeURIComponent(cb)+'&_='+Date.now();
+      document.head.appendChild(script);
+    });
+  }
+
+  function loadGoogleSheetsMenuData(){
+    return jsonp('get_students').then(r=>{
+      if(!r||r.ok!==true) throw new Error(r&&r.error||'Google API trả lỗi.');
+      const list=Array.isArray(r.students)?r.students:[];
+      if(!list.length) throw new Error('Google trả về 0 học sinh; không ghi đè dữ liệu hiện có.');
+      const saved=saveLocal(list,'google-sheets');
+      window.__GOOGLE_CLASS_SYNC__={ok:true,count:saved.count,physicalCount:Number(r.physicalCount)||list.length,logicalCount:saved.count,duplicateCount:Number(r.duplicateCount)||saved.duplicateCount,source:'google-sheets',fallbackUsed:false,schema:SCHEMA.slice(),at:new Date().toISOString()};
+      refresh();
+      if(typeof window.showToast==='function') window.showToast('Đã tải '+saved.count+' học sinh từ Google Sheets.','success');
+      return window.__GOOGLE_CLASS_SYNC__;
+    }).catch(err=>{
+      const n=Array.isArray(localPayload().students)?localPayload().students.length:0;
+      window.__GOOGLE_CLASS_SYNC__={ok:false,count:n,source:n?'local-preserved':'no-data',fallbackUsed:true,error:err.message,schema:SCHEMA.slice(),at:new Date().toISOString()};
+      refresh();
+      if(typeof window.showToast==='function') window.showToast(n?'Google chưa kết nối; giữ danh sách hiện có.':'Chưa tải được danh sách Google Sheets.','warning');
+      return window.__GOOGLE_CLASS_SYNC__;
+    });
+  }
+
+  function postStudents(list){
+    const students=(Array.isArray(list)?list:[]).map(normalize).filter(valid);
+    if(!students.length)return Promise.reject(new Error('Danh sách học sinh rỗng hoặc thiếu ID/họ tên.'));
+    return new Promise((resolve,reject)=>{
+      const name='LH_POST_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const iframe=document.createElement('iframe'),form=document.createElement('form');
+      iframe.name=name;iframe.style.display='none';form.method='POST';form.action=CONFIG.url;form.target=name;form.style.display='none';
+      const input=document.createElement('input');input.type='hidden';input.name='payload';input.value=JSON.stringify({action:'sync_students',students});form.appendChild(input);
+      document.body.appendChild(iframe);document.body.appendChild(form);
+      let done=false;const timer=setTimeout(()=>finish(true),12000);
+      function finish(ok){if(done)return;done=true;clearTimeout(timer);setTimeout(()=>{iframe.remove();form.remove()},500);ok?resolve({ok:true,count:students.length}):reject(new Error('Không gửi được dữ liệu.'))}
+      iframe.addEventListener('load',()=>finish(true),{once:true});
+      try{form.submit()}catch(e){finish(false)}
+    });
+  }
+  function verify(list){return jsonp('get_students').then(r=>{if(!r||r.ok!==true)throw new Error(r&&r.error||'Không đọc lại được Google.');const remote=Array.isArray(r.students)?r.students:[];const ok=list.every(s=>{const n=normalize(s);return remote.some(x=>{const y=normalize(x);return n.id===y.id||identity(n)===identity(y)})});if(!ok)throw new Error('Google chưa xác nhận đầy đủ danh sách vừa tải lên.');return r})}
+  function syncRosterToGoogle(list,source){
+    return postStudents(list).then(()=>verify(list)).then(r=>{
+      window.__GOOGLE_ROSTER_UPLOAD__={ok:true,count:Array.isArray(list)?list.length:0,source:source||'import',verified:true,remoteCount:Array.isArray(r.students)?r.students.length:0,schema:SCHEMA.slice(),at:new Date().toISOString()};
+      if(typeof window.showToast==='function')window.showToast('Đã tải danh sách lên Google Sheets và kiểm tra lại thành công.','success');
+      return window.__GOOGLE_ROSTER_UPLOAD__;
+    }).catch(e=>{window.__GOOGLE_ROSTER_UPLOAD__={ok:false,error:e.message,source:source||'import',verified:false,schema:SCHEMA.slice(),at:new Date().toISOString()};if(typeof window.showToast==='function')window.showToast('Tải danh sách lên Google thất bại: '+e.message,'error');return window.__GOOGLE_ROSTER_UPLOAD__});
+  }
+
+  function hookReplace(){
+    if(typeof window.replaceStudents!=='function'){setTimeout(hookReplace,300);return}
+    if(window.replaceStudents.__LH_GOOGLE_640__)return;
+    const original=window.replaceStudents;
+    function wrapped(incoming,options){
+      const result=original.apply(this,arguments);const opts=options&&typeof options==='object'?options:{};const source=String(opts.source||'').toLowerCase();
+      if(result&&result.success!==false&&Array.isArray(incoming)&&incoming.length&&/excel|csv|import|upload|sheet|google/.test(source)) syncRosterToGoogle(incoming,source);
+      return result;
+    }
+    wrapped.__LH_GOOGLE_640__=true;window.replaceStudents=wrapped;
+  }
+  function hookWrites(){
+    if(typeof window.addStudent==='function'&&!window.addStudent.__LH_GOOGLE_640__){const f=window.addStudent;const w=function(){const r=f.apply(this,arguments);if(r&&r.success&&r.student)syncRosterToGoogle([r.student],'add');return r};w.__LH_GOOGLE_640__=true;window.addStudent=w}
+    if(typeof window.updateStudent==='function'&&!window.updateStudent.__LH_GOOGLE_640__){const f=window.updateStudent;const w=function(){const r=f.apply(this,arguments);if(r&&r.success&&r.student)syncRosterToGoogle([r.student],'update');return r};w.__LH_GOOGLE_640__=true;window.updateStudent=w}
+  }
+  function installHooks(){hookReplace();hookWrites();setTimeout(hookWrites,1000);setTimeout(hookWrites,2500)}
+
+  window.loadGoogleSheetsMenuData=loadGoogleSheetsMenuData;
+  window.syncGoogleSheetsNow=loadGoogleSheetsMenuData;
+  window.syncRosterToGoogle=syncRosterToGoogle;
+  window.getGoogleStudentSyncStatus=()=>window.__GOOGLE_CLASS_SYNC__||{ok:false,source:'not-started',schema:SCHEMA.slice()};
+  window.getGoogleRosterUploadStatus=()=>window.__GOOGLE_ROSTER_UPLOAD__||{ok:false,source:'not-started',schema:SCHEMA.slice()};
+
+  function init(){installHooks();setTimeout(loadGoogleSheetsMenuData,500)}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+})();
