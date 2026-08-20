@@ -1,130 +1,23 @@
-/* GOOGLE SHEETS RECORDS BRIDGE 2.1 — AUTHORITATIVE EVENT REPLACE
-   - HOC_SINH remains the full authoritative roster and is untouched.
-   - DIEM_DANH on the Web contains ONLY records returned from Google Sheets that are not PRESENT.
-   - VI_PHAM on the Web contains ONLY actual violation records returned from Google Sheets.
-   - KHEN_THUONG on the Web contains ONLY actual reward records returned from Google Sheets.
-   - Google Sheets is authoritative for the three event arrays.
-   - Pull REPLACES event arrays; it never merges stale browser records into them.
-   - On boot, an empty event snapshot is pushed first so legacy PRESENT rows are purged by Code.gs.
-   - Existing menus/functions are not modified; only this Google event bridge is patched.
-*/
+/* GOOGLE SHEETS RECORDS BRIDGE 2.2 — AUTHORITATIVE EVENT REPLACE + ROSTER VISIBILITY */
 (function(){
-  'use strict';
-  if(window.__LH_GOOGLE_RECORDS_BRIDGE_210__)return;
-  window.__LH_GOOGLE_RECORDS_BRIDGE_210__=true;
-
-  const API='https://script.google.com/macros/s/AKfycbynklm7SobnkcEZKfAUGdMIBugA4lQ2kA3yOThHVjNoiJzCK7veuwO2vE1tR1QKI-nkIQ/exec';
-  let syncing=false;
-  const clean=v=>String(v??'').trim().replace(/\s+/g,' ');
-
-  function records(name){
-    try{
-      if(name==='attendanceRecords'&&Array.isArray(attendanceRecords))return attendanceRecords;
-      if(name==='violationRecords'&&Array.isArray(violationRecords))return violationRecords;
-      if(name==='rewardRecords'&&Array.isArray(rewardRecords))return rewardRecords;
-    }catch(_){}
-    try{return Array.isArray(window[name])?window[name]:[]}catch(_){return[]}
-  }
-
-  function replaceArray(name,incoming){
-    const target=records(name),source=Array.isArray(incoming)?incoming:[];
-    target.splice(0,target.length,...source);
-    return target;
-  }
-
-  const jsonp=action=>new Promise((resolve,reject)=>{
-    const cb='LH_REC_'+Date.now()+'_'+Math.random().toString(36).slice(2),s=document.createElement('script');
-    const timer=setTimeout(()=>finish(Error('Google Sheets timeout')),15000);
-    function finish(err,data){clearTimeout(timer);try{delete window[cb]}catch(_){}s.remove();err?reject(err):resolve(data)}
-    window[cb]=d=>finish(null,d);s.onerror=()=>finish(Error('Không truy cập được Google Apps Script'));
-    s.src=API+'?action='+encodeURIComponent(action)+'&callback='+encodeURIComponent(cb)+'&_='+Date.now();document.head.appendChild(s);
-  });
-
-  function post(payload){
-    return new Promise((resolve,reject)=>{
-      const name='LH_REC_POST_'+Date.now(),iframe=document.createElement('iframe'),form=document.createElement('form');
-      iframe.name=name;iframe.style.display='none';form.method='POST';form.target=name;form.action=API;form.style.display='none';
-      const input=document.createElement('input');input.type='hidden';input.name='payload';input.value=JSON.stringify(payload);form.appendChild(input);document.body.append(iframe,form);
-      let done=false;
-      const finish=ok=>{if(done)return;done=true;setTimeout(()=>{iframe.remove();form.remove()},500);ok?resolve({ok:true}):reject(Error('Không gửi được dữ liệu Google Sheets'))};
-      iframe.onload=()=>finish(true);
-      try{form.submit()}catch(e){finish(false)}
-      setTimeout(()=>finish(true),12000);
-    });
-  }
-
-  function snapshot(){
-    return {
-      DIEM_DANH:records('attendanceRecords').filter(r=>!/^present$/i.test(clean(r.status))&&clean(r.studentId)),
-      VI_PHAM:records('violationRecords').filter(r=>clean(r.studentId)),
-      KHEN_THUONG:records('rewardRecords').filter(r=>clean(r.studentId))
-    };
-  }
-
-  function pullIntoApp(data){
-    if(!data||data.ok!==true)return false;
-    replaceArray('attendanceRecords',(data.DIEM_DANH||[]).filter(r=>!/^present$/i.test(clean(r.status))&&clean(r.studentId)));
-    replaceArray('violationRecords',(data.VI_PHAM||[]).filter(r=>clean(r.studentId)));
-    replaceArray('rewardRecords',(data.KHEN_THUONG||[]).filter(r=>clean(r.studentId)));
-    try{if(typeof syncAppDataReferences==='function')syncAppDataReferences()}catch(_){}
-    try{if(typeof renderAttendance==='function')renderAttendance()}catch(_){}
-    try{if(typeof renderViolations==='function')renderViolations()}catch(_){}
-    try{if(typeof renderRewards==='function')renderRewards()}catch(_){}
-    window.GOOGLE_SHEET_EVENT_DATA={version:'2.1',mode:'REPLACE',loadedAt:new Date().toISOString(),tabs:data};
-    return true;
-  }
-
-  async function pull(){
-    try{const data=await jsonp('get_events');pullIntoApp(data);return data}
-    catch(e){console.warn('[GOOGLE RECORDS] pull:',e.message);return null}
-  }
-
-  async function push(){
-    if(syncing)return{ok:false,busy:true};
-    syncing=true;
-    try{
-      const result=await post({action:'sync_events',records:snapshot()});
-      window.GOOGLE_SHEET_EVENT_SYNC={ok:true,at:new Date().toISOString(),result};
-      return result;
-    }catch(e){
-      window.GOOGLE_SHEET_EVENT_SYNC={ok:false,at:new Date().toISOString(),error:e.message};
-      console.warn('[GOOGLE RECORDS] push:',e.message);
-      return{ok:false,error:e.message};
-    }finally{syncing=false}
-  }
-
-  function wrap(name){
-    if(typeof window[name]!=='function'||window[name].__lhWrapped)return;
-    const original=window[name];
-    function wrapped(){
-      const result=original.apply(this,arguments);
-      setTimeout(async()=>{await push();await pull()},100);
-      return result;
-    }
-    wrapped.__lhWrapped=true;
-    wrapped.__lhOriginal=original;
-    window[name]=wrapped;
-  }
-
-  function installWrappers(){
-    ['saveAttendanceRecord','addViolation','deleteViolation','addReward','deleteReward'].forEach(wrap);
-  }
-
-  async function boot(){
-    installWrappers();
-    /* Clean legacy PRESENT rows already stored in Sheets, then reload the
-       authoritative event sets. HOC_SINH is never touched here. */
-    await push();
-    await pull();
-    installWrappers();
-    if(window.__LH_GOOGLE_RECORDS_TIMER__)clearInterval(window.__LH_GOOGLE_RECORDS_TIMER__);
-    window.__LH_GOOGLE_RECORDS_TIMER__=setInterval(installWrappers,1000);
-  }
-
-  window.syncGoogleSheetEvents=push;
-  window.pullGoogleSheetEvents=pull;
-  window.getGoogleSheetEventData=()=>window.GOOGLE_SHEET_EVENT_DATA||null;
-
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,1200),{once:true});
-  else setTimeout(boot,1200);
+'use strict';
+if(window.__LH_GOOGLE_RECORDS_BRIDGE_220__)return;
+window.__LH_GOOGLE_RECORDS_BRIDGE_220__=true;
+const API='https://script.google.com/macros/s/AKfycbynklm7SobnkcEZKfAUGdMIBugA4lQ2kA3yOThHVjNoiJzCK7veuwO2vE1tR1QKI-nkIQ/exec';
+const clean=v=>String(v??'').trim().replace(/\s+/g,' ');
+const present=r=>/^present$/i.test(clean(r&&r.status));
+function arr(n){try{if(Array.isArray(window[n]))return window[n]}catch(_){}try{return Array.isArray(window[n])?window[n]:[]}catch(_){return[]}}
+function replace(n,list){const a=arr(n),x=Array.isArray(list)?list:[];a.splice(0,a.length,...x);return a}
+function jsonp(action){return new Promise((resolve,reject)=>{const cb='LH220_'+Date.now()+'_'+Math.random().toString(36).slice(2),s=document.createElement('script'),tm=setTimeout(()=>finish(Error('Google Sheets timeout')),15000);function finish(e,d){clearTimeout(tm);try{delete window[cb]}catch(_){}s.remove();e?reject(e):resolve(d)}window[cb]=d=>finish(null,d);s.onerror=()=>finish(Error('Không truy cập được Google Apps Script'));s.src=API+'?action='+encodeURIComponent(action)+'&callback='+encodeURIComponent(cb)+'&_='+Date.now();document.head.appendChild(s)})}
+function post(payload){return new Promise((resolve,reject)=>{const n='LH220_'+Date.now(),f=document.createElement('iframe'),form=document.createElement('form');f.name=n;f.style.display='none';form.method='POST';form.target=n;form.action=API;form.style.display='none';const i=document.createElement('input');i.type='hidden';i.name='payload';i.value=JSON.stringify(payload);form.appendChild(i);document.body.append(f,form);let done=false;const finish=ok=>{if(done)return;done=true;setTimeout(()=>{f.remove();form.remove()},700);ok?resolve({ok:true}):reject(Error('Không gửi được dữ liệu Google Sheets'))};f.onload=()=>finish(true);try{form.submit()}catch(e){finish(false)}setTimeout(()=>finish(true),15000)})}
+function eventSnapshot(){return{DIEM_DANH:arr('attendanceRecords').filter(r=>clean(r.studentId)&&!present(r)),VI_PHAM:arr('violationRecords').filter(r=>clean(r.studentId)),KHEN_THUONG:arr('rewardRecords').filter(r=>clean(r.studentId))}}
+function applyEvents(d){if(!d||d.ok!==true)return false;replace('attendanceRecords',(d.DIEM_DANH||[]).filter(r=>clean(r.studentId)&&!present(r)));replace('violationRecords',(d.VI_PHAM||[]).filter(r=>clean(r.studentId)));replace('rewardRecords',(d.KHEN_THUONG||[]).filter(r=>clean(r.studentId)));try{if(typeof window.syncAppDataReferences==='function')window.syncAppDataReferences()}catch(_){}try{if(typeof window.renderAttendance==='function')window.renderAttendance()}catch(_){}try{if(typeof window.renderViolations==='function')window.renderViolations()}catch(_){}try{if(typeof window.renderRewards==='function')window.renderRewards()}catch(_){}window.GOOGLE_SHEET_EVENT_DATA={version:'2.2',mode:'REPLACE',loadedAt:new Date().toISOString(),tabs:d};return true}
+async function pull(){try{const d=await jsonp('get_events');applyEvents(d);return d}catch(e){console.warn('[GOOGLE EVENTS]',e.message);return null}}
+async function push(){try{return await post({action:'sync_events',records:eventSnapshot()})}catch(e){console.warn('[GOOGLE EVENTS PUSH]',e.message);return{ok:false,error:e.message}}}
+async function roster(){try{const d=await jsonp('get_students');if(!d||d.ok!==true||!Array.isArray(d.students)||!d.students.length)return false;const list=d.students;window.students=list;window.studentList=list;window.currentStudents=list;window.appData=window.appData||{};window.appData.students=list;try{localStorage.setItem('QL_LOP_HOC_LE_HOANG_2026_2027',JSON.stringify({version:'2.2',savedAt:new Date().toISOString(),students:list}))}catch(_){}try{if(typeof window.renderStudents==='function')window.renderStudents()}catch(_){}try{if(typeof window.renderDashboard==='function')window.renderDashboard()}catch(_){}const body=document.getElementById('studentTableBody');if(body&&list.length){body.innerHTML=list.map((s,i)=>'<tr><td>'+(i+1)+'</td><td><strong>'+String(s.name??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))+'</strong></td><td>'+String(s.gender??'')+'</td><td>'+String(s.birthDate??'')+'</td><td>—</td><td><span class="status-badge active">Đang học</span></td><td></td></tr>').join('')}window.__LH_ROSTER_RECOVERY__={ok:true,count:list.length,source:'GOOGLE_RECORDS_BRIDGE'};return true}catch(e){console.warn('[GOOGLE ROSTER]',e.message);return false}}
+function wrap(n){try{if(typeof window[n]!=='function'||window[n].__lh220)return;const o=window[n];const w=function(){const r=o.apply(this,arguments);setTimeout(async()=>{await push();await pull()},150);return r};w.__lh220=true;w.__lhOriginal=o;window[n]=w}catch(_) {}}
+function install(){['saveAttendanceRecord','addViolation','deleteViolation','addReward','deleteReward'].forEach(wrap)}
+async function boot(){install();await push();await pull();await roster();install();if(window.__LH220_TIMER__)clearInterval(window.__LH220_TIMER__);window.__LH220_TIMER__=setInterval(install,1000)}
+window.syncGoogleSheetEvents=push;window.pullGoogleSheetEvents=pull;window.getGoogleSheetEventData=()=>window.GOOGLE_SHEET_EVENT_DATA||null;
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,1200),{once:true});else setTimeout(boot,1200);
 })();
