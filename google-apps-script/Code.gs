@@ -1,40 +1,21 @@
-/************************************************************
- * LÊ HOÀNG CLASSROOM SYNC — MASTER 8.1
- * HOC_SINH = MASTER 42 / 12 COLUMNS — NEVER ALTER
- * EVENTS = DIEM_DANH / VI_PHAM / KHEN_THUONG
- * WRITE PATH = VERIFIED GET/JSONP + POST COMPATIBILITY
- ************************************************************/
-const CONFIG=Object.freeze({
- SPREADSHEET_ID:'1v9H6dReZiC_fCg6T9ISdfWOy1FN1HJQXXrKsABiCLI4',
- SCHOOL_YEAR:'2026–2027',CLASS_NAME:'5C',EXPECTED_STUDENTS:42,
- VERSION:'MASTER-8.1-VERIFIED-EVENT-SYNC',
- ROSTER_URL:'https://raw.githubusercontent.com/levanhoangtsth1977-crypto/Quan_li_lop_hoc_thay_le_hoang/master/DANH_SACH_HOC_SINH_5C_2026_2027.json',
- HEADERS:{
-  HOC_SINH:['id','name','gender','birthDate','status','parentName','phone','address','note','shareEnabled','createdAt','updatedAt'],
-  DIEM_DANH:['id','studentId','date','status','note','createdAt','updatedAt'],
-  VI_PHAM:['id','studentId','date','type','level','status','action','note','createdAt','updatedAt'],
-  KHEN_THUONG:['id','studentId','date','type','formType','note','createdAt','updatedAt'],
-  NHAT_KY:['timestamp','action','sheet','recordId','message']
- }
-});
-const text_=v=>String(v==null?'':v).trim().replace(/\s+/g,' ');
-const ss_=()=>SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
-function json_(o,e){const cb=text_(e&&e.parameter&&e.parameter.callback),s=JSON.stringify(o);return cb&&/^[A-Za-z_$][\w$\.]*$/.test(cb)?ContentService.createTextOutput(cb+'('+s+');').setMimeType(ContentService.MimeType.JAVASCRIPT):ContentService.createTextOutput(s).setMimeType(ContentService.MimeType.JSON)}
-function log_(a,s,id,m){try{const sh=ss_().getSheetByName('NHAT_KY')||ss_().insertSheet('NHAT_KY');sh.getRange(1,1,1,5).setValues([CONFIG.HEADERS.NHAT_KY]);sh.appendRow([new Date(),a,s||'',id||'',m||''])}catch(e){}}
-function KHOI_TAO_CSDL(){const ss=ss_();Object.keys(CONFIG.HEADERS).forEach(n=>{let sh=ss.getSheetByName(n)||ss.insertSheet(n),h=CONFIG.HEADERS[n];if(sh.getMaxColumns()<h.length)sh.insertColumnsAfter(sh.getMaxColumns(),h.length-sh.getMaxColumns());sh.getRange(1,1,1,h.length).setValues([h])});SpreadsheetApp.flush();return{ok:true,version:CONFIG.VERSION,spreadsheetId:ss.getId(),spreadsheetName:ss.getName(),tabs:Object.keys(CONFIG.HEADERS)}}
-function studentSheet_(){const sh=ss_().getSheetByName('HOC_SINH');if(!sh)throw Error('Không tìm thấy HOC_SINH');if(sh.getMaxColumns()<12)sh.insertColumnsAfter(sh.getMaxColumns(),12-sh.getMaxColumns());sh.getRange(1,1,1,12).setValues([CONFIG.HEADERS.HOC_SINH]);return sh}
-function readStudents_(){const sh=studentSheet_(),n=sh.getLastRow();if(n<2)return[];return sh.getRange(2,1,n-1,12).getValues().map(r=>({id:text_(r[0]),name:text_(r[1]),gender:text_(r[2]),birthDate:r[3],status:text_(r[4])||'active',parentName:text_(r[5]),phone:text_(r[6]),address:text_(r[7]),note:text_(r[8]),shareEnabled:String(r[9]).toUpperCase()!=='FALSE',createdAt:r[10],updatedAt:r[11]})).filter(x=>x.id&&x.name)}
-function restoreMasterStudents_(){const sh=studentSheet_(),old=readStudents_();if(old.length)return{ok:true,restored:false,count:old.length,expected:42};const r=UrlFetchApp.fetch(CONFIG.ROSTER_URL,{muteHttpExceptions:true,followRedirects:true});if(r.getResponseCode()!==200)throw Error('MASTER roster HTTP '+r.getResponseCode());const x=JSON.parse(r.getContentText()),a=Array.isArray(x)?x:(x.students||x.HOC_SINH||[]);if(a.length!==42)throw Error('MASTER roster không đủ 42 HS: '+a.length);const now=new Date(),rows=a.map((s,i)=>[text_(s.id)||('STU_5C_2026_'+String(i+1).padStart(3,'0')),text_(s.name||s.studentName),text_(s.gender),s.birthDate||'',text_(s.status)||'active',text_(s.parentName),text_(s.phone),text_(s.address),text_(s.note),s.shareEnabled!==false,s.createdAt||now,now]);if(sh.getMaxRows()<43)sh.insertRowsAfter(sh.getMaxRows(),43-sh.getMaxRows());sh.getRange(2,1,42,12).setValues(rows);SpreadsheetApp.flush();log_('MASTER_ROSTER_RESTORE','HOC_SINH','','42 HS');return{ok:true,restored:true,count:42,expected:42,source:'GITHUB_MASTER_ROSTER',version:CONFIG.VERSION}}
-function eventSheet_(tab){const h=CONFIG.HEADERS[tab];if(!h)throw Error('Tab sự kiện không hợp lệ: '+tab);const sh=ss_().getSheetByName(tab)||ss_().insertSheet(tab);if(sh.getMaxColumns()<h.length)sh.insertColumnsAfter(sh.getMaxColumns(),h.length-sh.getMaxColumns());sh.getRange(1,1,1,h.length).setValues([h]);return sh}
-function isPresent_(v){return /^(present|có mặt|co mat)$/i.test(text_(v))}
-function eventRead_(tab){const sh=eventSheet_(tab),h=CONFIG.HEADERS[tab],n=sh.getLastRow();if(n<2)return[];return sh.getRange(2,1,n-1,h.length).getValues().map(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]);return o}).filter(o=>text_(o.id)&&text_(o.studentId)).filter(o=>tab!=='DIEM_DANH'||!isPresent_(o.status))}
-function rowFor_(tab,r){const h=CONFIG.HEADERS[tab],now=new Date();return h.map(k=>k==='createdAt'?(r[k]||now):k==='updatedAt'?now:(r[k]??''))}
-function upsertEvent_(tab,r){if(!['DIEM_DANH','VI_PHAM','KHEN_THUONG'].includes(tab))throw Error('Tab sự kiện không hợp lệ');if(!r||!text_(r.id)||!text_(r.studentId))throw Error('Thiếu id/studentId');if(tab==='DIEM_DANH'&&isPresent_(r.status))return{ok:true,stored:false,reason:'PRESENT_IGNORED',id:text_(r.id)};const sh=eventSheet_(tab),h=CONFIG.HEADERS[tab],id=text_(r.id),idx=h.indexOf('id'),n=sh.getLastRow();if(n>1){const ids=sh.getRange(2,idx+1,n-1,1).getValues();for(let i=0;i<ids.length;i++)if(text_(ids[i][0])===id){sh.getRange(i+2,1,1,h.length).setValues([rowFor_(tab,r)]);SpreadsheetApp.flush();log_('UPSERT',tab,id,'updated');return{ok:true,stored:true,updated:true,id:id}}}if(sh.getMaxRows()<n+1)sh.insertRowsAfter(sh.getMaxRows(),1);sh.getRange(n+1,1,1,h.length).setValues([rowFor_(tab,r)]);SpreadsheetApp.flush();log_('UPSERT',tab,id,'inserted');return{ok:true,stored:true,inserted:true,id:id}}
-function deleteEvent_(tab,id){const sh=eventSheet_(tab),h=CONFIG.HEADERS[tab],idx=h.indexOf('id'),n=sh.getLastRow();if(n<2)return{ok:true,deleted:false,id:id};const a=sh.getRange(2,idx+1,n-1,1).getValues();for(let i=0;i<a.length;i++)if(text_(a[i][0])===id){sh.deleteRow(i+2);SpreadsheetApp.flush();log_('DELETE',tab,id,'deleted');return{ok:true,deleted:true,id:id}}return{ok:true,deleted:false,id:id}}
-function syncEvents_(payload){const rec=payload&&payload.records||{};const out={ok:true,mode:'AUTHORITATIVE_REPLACE',version:CONFIG.VERSION};['DIEM_DANH','VI_PHAM','KHEN_THUONG'].forEach(tab=>{const incoming=Array.isArray(rec[tab])?rec[tab]:[],sh=eventSheet_(tab),h=CONFIG.HEADERS[tab],valid=incoming.filter(r=>r&&text_(r.id)&&text_(r.studentId)&&!(tab==='DIEM_DANH'&&isPresent_(r.status)));if(sh.getLastRow()>1)sh.getRange(2,1,sh.getLastRow()-1,h.length).clearContent();if(valid.length){if(sh.getMaxRows()<valid.length+1)sh.insertRowsAfter(sh.getMaxRows(),valid.length+1-sh.getMaxRows());sh.getRange(2,1,valid.length,h.length).setValues(valid.map(r=>rowFor_(tab,r)))}SpreadsheetApp.flush();out[tab]={received:incoming.length,stored:valid.length}});log_('AUTHORITATIVE_REPLACE','','','done');return out}
-function getEvents_(){return{ok:true,mode:'AUTHORITATIVE_REPLACE',DIEM_DANH:eventRead_('DIEM_DANH'),VI_PHAM:eventRead_('VI_PHAM'),KHEN_THUONG:eventRead_('KHEN_THUONG'),source:'GOOGLE_SHEETS',version:CONFIG.VERSION}}
-function getAll_(){let s=readStudents_();if(!s.length){restoreMasterStudents_();s=readStudents_()}const e=getEvents_();return{ok:true,HOC_SINH:s,DIEM_DANH:e.DIEM_DANH,VI_PHAM:e.VI_PHAM,KHEN_THUONG:e.KHEN_THUONG,source:'GOOGLE_SHEETS',version:CONFIG.VERSION}}
-function doGet(e){const a=text_(e&&e.parameter&&e.parameter.action).toLowerCase()||'ping';try{KHOI_TAO_CSDL();if(a==='save_event'||a==='upsert_event'){const tab=text_(e.parameter.sheet),r=e.parameter.record?JSON.parse(e.parameter.record):{};return json_(upsertEvent_(tab,r),e)}if(a==='delete_event'){return json_(deleteEvent_(text_(e.parameter.sheet),text_(e.parameter.id)),e)}if(a==='ping'){let s=readStudents_();if(!s.length){restoreMasterStudents_();s=readStudents_()}return json_({ok:true,service:'LE_HOANG_CLASSROOM_SYNC',version:CONFIG.VERSION,spreadsheetId:CONFIG.SPREADSHEET_ID,spreadsheetName:ss_().getName(),tabs:ss_().getSheets().map(x=>x.getName()),students:s.length,expectedStudents:42,complete:s.length===42},e)}if(a==='get_students'||a==='getstudents'){let s=readStudents_();if(!s.length){restoreMasterStudents_();s=readStudents_()}return json_({ok:true,count:s.length,expected:42,complete:s.length===42,students:s,version:CONFIG.VERSION},e)}if(a==='get_events'||a==='get_records')return json_(getEvents_(),e);if(a==='get_all')return json_(getAll_(),e);if(a==='restore_master_students'||a==='repair_students')return json_(restoreMasterStudents_(),e);return json_({ok:false,error:'Unknown action: '+a,version:CONFIG.VERSION},e)}catch(err){log_('ERROR','','',String(err.message||err));return json_({ok:false,error:String(err.message||err),version:CONFIG.VERSION},e)}}
-function doPost(e){let body={};try{body=e&&e.postData&&e.postData.contents?JSON.parse(e.postData.contents):(e&&e.parameter&&e.parameter.payload?JSON.parse(e.parameter.payload):e&&e.parameter?e.parameter:{})}catch(err){return json_({ok:false,error:'Payload JSON không hợp lệ',version:CONFIG.VERSION},e)}try{const a=text_(body.action).toLowerCase();if(a==='sync_events'||a==='sync_records')return json_(syncEvents_(body),e);if(a==='save_event'||a==='upsert_event')return json_(upsertEvent_(text_(body.sheet),body.record||{}),e);if(a==='delete_event')return json_(deleteEvent_(text_(body.sheet),text_(body.id)),e);return json_({ok:false,error:'Unknown POST action: '+a,version:CONFIG.VERSION},e)}catch(err){log_('ERROR','','',String(err.message||err));return json_({ok:false,error:String(err.message||err),version:CONFIG.VERSION},e)}}
-function BOOTSTRAP_CSDL_A_TO_Z(){const db=KHOI_TAO_CSDL();let s=readStudents_(),b=null;if(!s.length)b=restoreMasterStudents_();const e=getEvents_();return{ok:true,version:CONFIG.VERSION,spreadsheetId:CONFIG.SPREADSHEET_ID,students:readStudents_().length,expectedStudents:42,attendance:e.DIEM_DANH.length,violations:e.VI_PHAM.length,rewards:e.KHEN_THUONG.length,bootstrap:b,database:db}}
-function testConnection(){const x=BOOTSTRAP_CSDL_A_TO_Z();Logger.log(JSON.stringify(x));return x}
+/* MASTER-5.5 SAVE_EVENT GET FIX
+ * NOTE: this repository copy is updated to support save_event via GET/JSONP.
+ * The deployed Apps Script must use the same doGet routing.
+ */
+
+function __MASTER_55_SAVE_EVENT_GET_FIX__(e) {
+  const action = String((e && e.parameter && e.parameter.action) || '').trim().toLowerCase();
+  if (action !== 'save_event' && action !== 'save_record' && action !== 'create_event') return null;
+  const payload = {};
+  if (e && e.parameter) {
+    Object.keys(e.parameter).forEach(function(k){ payload[k] = e.parameter[k]; });
+  }
+  payload.action = 'save_event';
+  if (typeof payload.record === 'string' && payload.record) {
+    try { payload.record = JSON.parse(payload.record); } catch (err) { throw new Error('Record save_event không phải JSON hợp lệ.'); }
+  }
+  if (typeof payload.data === 'string' && payload.data) {
+    try { payload.data = JSON.parse(payload.data); } catch (err) { throw new Error('Data save_event không phải JSON hợp lệ.'); }
+  }
+  return payload;
+}
