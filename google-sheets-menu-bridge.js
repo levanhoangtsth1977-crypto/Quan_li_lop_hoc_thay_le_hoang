@@ -1,11 +1,11 @@
-/* GOOGLE SHEETS MENU BRIDGE 6.0 — CURRENT MASTER DELEGATION */
+/* GOOGLE SHEETS MENU BRIDGE 7.0 — CURRENT MASTER SHEET */
 (function(){
 'use strict';
-if(window.__LH_GOOGLE_MENU_BRIDGE_600__)return;
-window.__LH_GOOGLE_MENU_BRIDGE_600__=true;
-const SHEET_ID='174xQ29phs-Or7OOEKOM0IHylFJXg5SsqzOC27x7K3Wg';
-const WEB_APP_URL='https://script.google.com/macros/s/AKfycbynklm7SobnkcEZKfAUGdMIBugA4lQ2kA3yOThHVjNoiJzCK7veuwO2vE1tR1QKI-nkIQ/exec';
-const VERSION='MASTER-6.0-DELEGATED';
+if(window.__LH_GOOGLE_MENU_BRIDGE_700__)return;
+window.__LH_GOOGLE_MENU_BRIDGE_700__=true;
+const SHEET_ID='1v9H6dReZiC_fCg6T9ISdfWOy1FN1HJQXXrKsABiCLI4';
+const WEB_APP_URL='https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
+const VERSION='MASTER-7.0-CURRENT-SHEET';
 function load(){if(typeof window.loadGoogleSheetsMenuData==='function'&&window.loadGoogleSheetsMenuData!==load)return window.loadGoogleSheetsMenuData();return Promise.resolve(null)}
 window.getGoogleSheetTab=tab=>window.GOOGLE_SHEET_DATA?.tabs?.[tab]||[];
 window.getGoogleSheetUrl=()=>`https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
