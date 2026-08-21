@@ -30,7 +30,7 @@ function studentName(r){
   const id=S(r.studentId??r.student_id??r.idHocSinh??r.studentID??r.student);
   const a=studentsList();
   const x=a.find(s=>S(s?.id??s?.studentId)===id);
-  return x?S(x.name??x.fullName??x.hoTen):S(r.studentName??r.hocSinh??r.name??id||'Học sinh');
+  return x?S(x.name??x.fullName??x.hoTen):S(r.studentName??r.hocSinh??r.name??id??'Học sinh');
 }
 function dateValue(r){return r?.date??r?.ngay??r?.createdAt??r?.created_at??r?.timestamp??'';}
 function dateText(v){const s=S(v),m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}/${m[2]}/${m[1]}`:s;}
