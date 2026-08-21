@@ -18,27 +18,34 @@ jobs:
           ref: master
           fetch-depth: 0
 
-      - name: Inject script into index.html only if missing
+      - name: Force activate latest Vi Pham menu module
         shell: bash
         run: |
           set -e
-          TAG='<script src="violations-menu-fix.js?v=1.0"></script>'
-          if ! grep -Fq 'violations-menu-fix.js' index.html; then
-            python3 - <<'PY'
-from pathlib import Path
-p=Path('index.html')
-s=p.read_text(encoding='utf-8')
-tag='<script src="violations-menu-fix.js?v=1.0"></script>'
-needle='<script src="script.js"></script>'
-if needle in s:
-    s=s.replace(needle, needle+'\n'+tag, 1)
-else:
-    s=s.replace('</body>', tag+'\n</body>', 1)
-p.write_text(s, encoding='utf-8')
-PY
-          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          import re
+          # Remove every previous injection of this module, regardless of version.
+          s = re.sub(r'<script\s+src=["\']violations-menu-fix\.js(?:\?[^"\']*)?["\']\s*></script>\s*', '', s, flags=re.I)
+          # Add the current module after script.js so it runs after the main app code.
+          tag = '<script src="violations-menu-fix.js?v=2.0"></script>'
+          needle = '<script src="script.js"></script>'
+          if needle in s:
+              s = s.replace(needle, needle + '\n' + tag, 1)
+          else:
+              s = s.replace('</body>', tag + '\n</body>', 1)
+          p.write_text(s, encoding='utf-8')
+          PY
 
-      - name: Commit only the injection change
+      - name: Verify module is injected exactly once
+        shell: bash
+        run: |
+          set -e
+          test "$(grep -o 'violations-menu-fix.js?v=2.0' index.html | wc -l | tr -d ' ')" = "1"
+
+      - name: Commit activation change only
         shell: bash
         run: |
           git config user.name 'github-actions[bot]'
@@ -48,5 +55,5 @@ PY
             exit 0
           fi
           git add index.html
-          git commit -m 'fix: activate Vi Pham menu module only'
+          git commit -m 'fix: force latest Vi Pham menu module'
           git push origin HEAD:master
