@@ -1,0 +1,42 @@
+name: Inject Google Sheets Auto Sync
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+
+jobs:
+  inject:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Attach auto sync bridge
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('index.html')
+          text=p.read_text(encoding='utf-8')
+          tag='<script src="google-sheets-auto-sync.js?v=1.0"></script>'
+          marker='</body>'
+          if marker not in text:
+              raise SystemExit('Không tìm thấy </body>')
+          if tag not in text:
+              text=text.replace(marker,'    '+tag+'\n'+marker,1)
+              p.write_text(text,encoding='utf-8')
+              print('AUTO_SYNC_ATTACHED')
+          else:
+              print('AUTO_SYNC_ALREADY_ATTACHED')
+      - name: Commit
+        shell: bash
+        run: |
+          if git diff --quiet -- index.html; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'fix: attach automatic Google Sheets event sync'
+          git push
