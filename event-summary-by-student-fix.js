@@ -1,8 +1,8 @@
-/* EVENT SUMMARY BY STUDENT FIX 5.0 — 1 HS/1 DÒNG + KHÔNG HIỆN BLOCK CŨ */
+/* EVENT SUMMARY BY STUDENT FIX 6.0 — GIỮ KHỐI CHUẨN, XÓA KHỐI TRÙNG PHÍA DƯỚI */
 (function(){
 'use strict';
-if(window.__LH_EVENT_SUMMARY_BY_STUDENT_50__)return;
-window.__LH_EVENT_SUMMARY_BY_STUDENT_50__=true;
+if(window.__LH_EVENT_SUMMARY_BY_STUDENT_60__)return;
+window.__LH_EVENT_SUMMARY_BY_STUDENT_60__=true;
 const $=id=>document.getElementById(id),clean=v=>String(v??'').trim(),norm=v=>clean(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(),esc=v=>clean(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 function records(name,getter){try{if(typeof window[getter]==='function'){const a=window[getter]();if(Array.isArray(a))return a.slice()}}catch(_){}return Array.isArray(window[name])?window[name].slice():[]}
 function students(){try{if(typeof window.getStudentsSafe==='function'){const a=window.getStudentsSafe();if(Array.isArray(a))return a}}catch(_){}return Array.isArray(window.students)?window.students:[]}
@@ -10,11 +10,32 @@ function studentName(id){const sid=clean(id);try{if(typeof window.getStudentById
 function date(v){const s=clean(v),m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}/${m[2]}/${m[1]}`:s}
 function group(list){const m=new Map();list.forEach(r=>{const id=clean(r&&r.studentId);if(!id)return;if(!m.has(id))m.set(id,[]);m.get(id).push(r)});return[...m.entries()].map(([studentId,items])=>({studentId,name:studentName(studentId),items:items.sort((a,b)=>clean(b.date).localeCompare(clean(a.date)))})).sort((a,b)=>a.name.localeCompare(b.name,'vi'))}
 function ensureBox(){const page=$('page-statistics');if(!page)return null;let box=$('lhEventStatistics');if(!box){box=document.createElement('div');box.id='lhEventStatistics';box.className='dashboard-panel';const grid=$('statisticsGrid');if(grid)grid.replaceWith(box);else page.appendChild(box)}return box}
-function removeLegacy(){const page=$('page-statistics');if(!page)return;[...page.querySelectorAll('*')].forEach(el=>{if(el.id==='lhEventStatistics')return;const t=clean(el.textContent);if(t.includes('Theo dõi toàn bộ quá trình')&&t.includes('Tổng hợp dữ liệu từ toàn bộ quá trình')){let x=el;while(x.parentElement&&x.parentElement!==page&&clean(x.parentElement.textContent).includes('Theo dõi toàn bộ quá trình'))x=x.parentElement;if(x!==page)x.remove()}});const grid=$('statisticsGrid');if(grid&&grid!==$('lhEventStatistics'))grid.remove()}
+function removeLegacy(){
+ const page=$('page-statistics');
+ const keep=$('lhEventStatistics');
+ if(!page||!keep)return;
+ const legacyTitle='Theo dõi toàn bộ quá trình';
+ const legacySub='Tổng hợp dữ liệu từ toàn bộ quá trình theo dõi';
+ const candidates=[...page.querySelectorAll('*')].filter(el=>el!==keep&&!keep.contains(el));
+ const remove=new Set();
+ candidates.forEach(el=>{
+   const t=clean(el.textContent);
+   if(!t.includes(legacyTitle)||!t.includes(legacySub))return;
+   let x=el;
+   while(x.parentElement&&x.parentElement!==page&&x.parentElement!==keep){
+     const pt=clean(x.parentElement.textContent);
+     if(pt.includes(legacyTitle)&&pt.includes(legacySub))x=x.parentElement;else break;
+   }
+   if(x!==page&&!keep.contains(x))remove.add(x);
+ });
+ remove.forEach(x=>x.remove());
+ const grid=$('statisticsGrid');
+ if(grid&&grid!==keep)grid.remove();
+}
 function render(kind){const box=ensureBox();if(!box)return;const att=records('attendanceRecords','getAttendanceRecords').filter(r=>['absent','excused','vắng','có phép','co phep','không phép','khong phep'].includes(norm(r.status))),vio=records('violationRecords','getViolationRecords'),rew=records('rewardRecords','getRewardRecords'),rows=group(({attendance:att,violation:vio,reward:rew})[kind]||[]);let title,icon,head,empty;if(kind==='attendance'){title='HS vắng';icon='📌';head='<th>Tổng vắng</th><th>Có phép</th><th>Không phép</th><th>Ngày vắng</th><th>Thao tác</th>';empty='Chưa có học sinh vắng'}else if(kind==='violation'){title='HS vi phạm';icon='⚠️';head='<th>Số lần</th><th>Ngày / Nội dung / Mức độ</th><th>Thao tác</th>';empty='Chưa có học sinh vi phạm'}else{title='HS khen thưởng';icon='🏆';head='<th>Số lần</th><th>Ngày / Thành tích / Hình thức</th><th>Thao tác</th>';empty='Chưa có học sinh được khen thưởng'}let body;if(!rows.length)body=`<tr><td colspan="7"><div class="empty-state"><strong>${empty}</strong><p>Dữ liệu sẽ tự động tổng hợp theo từng học sinh.</p></div></td></tr>`;else body=rows.map((r,i)=>{if(kind==='attendance'){const exc=r.items.filter(x=>['excused','có phép','co phep'].includes(norm(x.status))).length,days=[...new Set(r.items.map(x=>date(x.date)))].join(', ');return `<tr><td>${i+1}</td><td><strong>${esc(r.name)}</strong></td><td><strong>${r.items.length}</strong></td><td>${exc}</td><td>${r.items.length-exc}</td><td>${esc(days)}</td><td><span class="muted">Dữ liệu gốc</span></td></tr>`}const details=r.items.map(x=>`<div class="lh-event-detail"><strong>${esc(date(x.date))}</strong> — ${esc(x.type||x.note||'Chưa ghi')} — ${esc(kind==='violation'?(x.level||x.status||'Chưa ghi'):(x.formType||'Chưa ghi'))}</div>`).join(''),dels=r.items.map(x=>`<button type="button" class="icon-button danger" title="Xóa đúng lượt ${esc(date(x.date))}" data-lh-delete-kind="${kind}" data-lh-delete-id="${esc(x.id)}"><i class="fa-solid fa-trash"></i></button>`).join(' ');return `<tr><td>${i+1}</td><td><strong>${esc(r.name)}</strong></td><td><strong>${r.items.length}</strong></td><td>${details}</td><td>${dels}</td></tr>`}).join('');box.innerHTML=`<div class="panel-header"><div><h3>${icon} ${title}</h3><p>1 học sinh = 1 dòng · ${rows.length} học sinh</p></div><div class="lh-stat-buttons"><button type="button" class="button secondary" data-lh-stat-kind="attendance">📌 HS vắng</button> <button type="button" class="button secondary" data-lh-stat-kind="violation">⚠️ HS vi phạm</button> <button type="button" class="button secondary" data-lh-stat-kind="reward">🏆 HS khen thưởng</button></div></div><div class="table-container"><table class="data-table"><thead><tr><th>STT</th><th>Học sinh</th>${head}</tr></thead><tbody>${body}</tbody></table></div>`;removeLegacy()}
 async function del(kind,id){if(kind==='attendance')return;const fn=kind==='violation'?window.deleteViolation:window.deleteReward;if(typeof fn!=='function'){if(window.showToast)window.showToast('Chức năng xóa chưa được nạp.','error');return}if(!confirm('Xóa đúng 1 lượt này?\nCác lượt khác của học sinh vẫn giữ nguyên.'))return;const result=await fn(id);if(result===false||(result&&result.success===false)){if(window.showToast)window.showToast(result&&result.message||'Không thể xóa lượt.','error');return}try{if(window.syncAppDataReferences)window.syncAppDataReferences()}catch(_){}render(window.__LH_STAT_KIND__||'attendance');if(window.updateBadges)window.updateBadges()}
 document.addEventListener('click',e=>{const b=e.target.closest?.('[data-lh-stat-kind]');if(b){e.preventDefault();e.stopPropagation();window.__LH_STAT_KIND__=b.dataset.lhStatKind;render(window.__LH_STAT_KIND__);return}const d=e.target.closest?.('[data-lh-delete-id]');if(d){e.preventDefault();e.stopPropagation();del(d.dataset.lhDeleteKind,d.dataset.lhDeleteId)}},true);
-function install(){render(window.__LH_STAT_KIND__||'attendance');setTimeout(()=>render(window.__LH_STAT_KIND__||'attendance'),300);setTimeout(()=>render(window.__LH_STAT_KIND__||'attendance'),1000);setTimeout(()=>render(window.__LH_STAT_KIND__||'attendance'),2500)}
+function install(){render(window.__LH_STAT_KIND__||'attendance');[300,1000,2500].forEach(ms=>setTimeout(()=>{removeLegacy();if($('lhEventStatistics'))render(window.__LH_STAT_KIND__||'attendance')},ms))}
 const observer=new MutationObserver(()=>{const page=$('page-statistics');if(page){removeLegacy();if(!$('lhEventStatistics'))render(window.__LH_STAT_KIND__||'attendance')}});observer.observe(document.body,{childList:true,subtree:true});
 window.__LH_EVENT_SUMMARY_API__={renderAbsenceSummary:()=>render('attendance'),renderGroupedViolations:()=>render('violation'),renderGroupedRewards:()=>render('reward'),refreshAll:()=>render(window.__LH_STAT_KIND__||'attendance')};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
