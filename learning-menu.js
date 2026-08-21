@@ -1,77 +1,413 @@
 /* =========================================================
-   HỌC TẬP — GIAI ĐOẠN 1 — MASTER
+   HỌC TẬP — GIAI ĐOẠN 1 — MASTER V2
    6 môn | 20 nhận xét/môn | Google Sheets HOC_TAP
-   Không đụng module khác.
+   CHỈ tác động module Học tập.
    ========================================================= */
 (function () {
   'use strict';
-  if (window.__LH_LEARNING_MODULE_V1__) return;
-  window.__LH_LEARNING_MODULE_V1__ = true;
+
+  /* V2 cố ý khác V1 để không bị trình duyệt giữ module cũ trong cache. */
+  if (window.__LH_LEARNING_MODULE_V2__) return;
+  window.__LH_LEARNING_MODULE_V2__ = true;
 
   const SUBJECTS = ['Toán','Tiếng Việt','Khoa học','Lịch sử và Địa lí','Công nghệ','Đạo đức'];
   const LEVELS = ['Tốt','Đạt','Chưa đạt'];
-  const RESULT_TYPES = [{value:'DIEM',label:'Điểm'},{value:'MUC_DAT',label:'Mức đạt'}];
+  const RESULT_TYPES = [
+    {value:'DIEM',label:'Điểm'},
+    {value:'MUC_DAT',label:'Mức đạt'}
+  ];
+
   const COMMENTS = {
     'Toán': {
-      'Tốt':['Nắm chắc kiến thức, thực hiện tốt các phép tính và bài toán đã học.','Tính toán chính xác, trình bày bài giải rõ ràng, khoa học.','Vận dụng tốt kiến thức toán học để giải quyết các bài toán.','Có khả năng phân tích đề và lựa chọn cách giải phù hợp.','Thực hiện tốt các dạng bài, biết kiểm tra kết quả.','Có tư duy toán học tốt, chủ động tìm cách giải hợp lí.','Hoàn thành tốt yêu cầu học tập và có tiến bộ rõ rệt.'],
-      'Đạt':['Nắm được kiến thức cơ bản và hoàn thành các bài tập được giao.','Thực hiện được các phép tính và bài toán theo yêu cầu.','Biết vận dụng kiến thức đã học vào giải một số bài toán.','Cơ bản biết phân tích đề và lựa chọn cách giải.','Hoàn thành phần lớn yêu cầu, cần chú ý hơn khi tính toán.','Có tiến bộ trong thực hiện bài tập và trình bày bài giải.','Đáp ứng yêu cầu cơ bản, cần rèn thêm kĩ năng vận dụng.'],
-      'Chưa đạt':['Chưa nắm chắc một số kiến thức, cần tăng cường luyện tập.','Còn nhầm lẫn khi thực hiện phép tính, cần kiểm tra bài kĩ hơn.','Gặp khó khăn khi phân tích đề và lựa chọn cách giải.','Cần rèn thêm kĩ năng tính toán và trình bày bài giải.','Chưa vận dụng tốt kiến thức vào giải quyết bài toán.','Cần chủ động luyện tập và củng cố kiến thức thường xuyên.']
+      'Tốt': [
+        'Nắm chắc kiến thức, thực hiện tốt các phép tính và bài toán đã học.',
+        'Tính toán chính xác, trình bày bài giải rõ ràng, khoa học.',
+        'Vận dụng tốt kiến thức toán học để giải quyết các bài toán.',
+        'Có khả năng phân tích đề và lựa chọn cách giải phù hợp.',
+        'Thực hiện tốt các dạng bài, biết kiểm tra kết quả.',
+        'Có tư duy toán học tốt, chủ động tìm cách giải hợp lí.',
+        'Hoàn thành tốt yêu cầu học tập và có tiến bộ rõ rệt.'
+      ],
+      'Đạt': [
+        'Nắm được kiến thức cơ bản và hoàn thành các bài tập được giao.',
+        'Thực hiện được các phép tính và bài toán theo yêu cầu.',
+        'Biết vận dụng kiến thức đã học vào giải một số bài toán.',
+        'Cơ bản biết phân tích đề và lựa chọn cách giải.',
+        'Hoàn thành phần lớn yêu cầu, cần chú ý hơn khi tính toán.',
+        'Có tiến bộ trong thực hiện bài tập và trình bày bài giải.',
+        'Đáp ứng yêu cầu cơ bản, cần rèn thêm kĩ năng vận dụng.'
+      ],
+      'Chưa đạt': [
+        'Chưa nắm chắc một số kiến thức, cần tăng cường luyện tập.',
+        'Còn nhầm lẫn khi thực hiện phép tính, cần kiểm tra bài kĩ hơn.',
+        'Gặp khó khăn khi phân tích đề và lựa chọn cách giải.',
+        'Cần rèn thêm kĩ năng tính toán và trình bày bài giải.',
+        'Chưa vận dụng tốt kiến thức vào giải quyết bài toán.',
+        'Cần chủ động luyện tập và củng cố kiến thức thường xuyên.'
+      ]
     },
     'Tiếng Việt': {
-      'Tốt':['Đọc rõ ràng, lưu loát, biết thể hiện giọng đọc phù hợp.','Nắm tốt nội dung bài đọc và trả lời câu hỏi chính xác.','Viết bài mạch lạc, dùng từ phù hợp, diễn đạt tự nhiên.','Có vốn từ phong phú, biết sử dụng từ ngữ phù hợp.','Viết câu đúng ngữ pháp, trình bày bài sạch đẹp.','Biết xây dựng bài viết có bố cục rõ ràng và nội dung phù hợp.','Chủ động phát biểu, trao đổi và vận dụng tốt kiến thức tiếng Việt.'],
-      'Đạt':['Đọc đúng và nắm được nội dung cơ bản của bài đọc.','Trả lời được các câu hỏi liên quan đến nội dung bài.','Viết được đoạn văn, bài văn theo yêu cầu.','Biết sử dụng từ ngữ và đặt câu phù hợp với yêu cầu.','Nắm được những kiến thức tiếng Việt cơ bản đã học.','Bài viết cơ bản rõ ý, cần chú ý hơn cách diễn đạt.','Có tiến bộ trong đọc, viết và trình bày bài.'],
-      'Chưa đạt':['Đọc còn chậm, cần luyện đọc thường xuyên để tăng độ lưu loát.','Chưa nắm chắc nội dung bài đọc, cần chú ý khi tìm thông tin.','Diễn đạt còn hạn chế, cần rèn cách dùng từ và đặt câu.','Bài viết còn thiếu ý, cần lập dàn ý trước khi viết.','Còn mắc lỗi chính tả, cần chú ý kiểm tra bài viết.','Cần tích cực đọc sách và luyện viết để nâng cao kĩ năng.']
+      'Tốt': [
+        'Đọc rõ ràng, lưu loát, biết thể hiện giọng đọc phù hợp.',
+        'Nắm tốt nội dung bài đọc và trả lời câu hỏi chính xác.',
+        'Viết bài mạch lạc, dùng từ phù hợp, diễn đạt tự nhiên.',
+        'Có vốn từ phong phú, biết sử dụng từ ngữ phù hợp.',
+        'Viết câu đúng ngữ pháp, trình bày bài sạch đẹp.',
+        'Biết xây dựng bài viết có bố cục rõ ràng và nội dung phù hợp.',
+        'Chủ động phát biểu, trao đổi và vận dụng tốt kiến thức tiếng Việt.'
+      ],
+      'Đạt': [
+        'Đọc đúng và nắm được nội dung cơ bản của bài đọc.',
+        'Trả lời được các câu hỏi liên quan đến nội dung bài.',
+        'Viết được đoạn văn, bài văn theo yêu cầu.',
+        'Biết sử dụng từ ngữ và đặt câu phù hợp với yêu cầu.',
+        'Nắm được những kiến thức tiếng Việt cơ bản đã học.',
+        'Bài viết cơ bản rõ ý, cần chú ý hơn cách diễn đạt.',
+        'Có tiến bộ trong đọc, viết và trình bày bài.'
+      ],
+      'Chưa đạt': [
+        'Đọc còn chậm, cần luyện đọc thường xuyên để tăng độ lưu loát.',
+        'Chưa nắm chắc nội dung bài đọc, cần chú ý khi tìm thông tin.',
+        'Diễn đạt còn hạn chế, cần rèn cách dùng từ và đặt câu.',
+        'Bài viết còn thiếu ý, cần lập dàn ý trước khi viết.',
+        'Còn mắc lỗi chính tả, cần chú ý kiểm tra bài viết.',
+        'Cần tích cực đọc sách và luyện viết để nâng cao kĩ năng.'
+      ]
     },
     'Khoa học': {
-      'Tốt':['Nắm chắc kiến thức khoa học và giải thích được các hiện tượng quen thuộc.','Biết quan sát, đặt câu hỏi và đưa ra dự đoán phù hợp.','Vận dụng tốt kiến thức khoa học vào thực tiễn cuộc sống.','Thực hiện tốt các hoạt động khám phá và thí nghiệm.','Biết thu thập, xử lí và trình bày thông tin khoa học.','Chủ động trao đổi, hợp tác và chia sẻ kết quả học tập.','Có ý thức vận dụng kiến thức để bảo vệ sức khỏe và môi trường.'],
-      'Đạt':['Nắm được các kiến thức khoa học cơ bản đã học.','Nhận biết và giải thích được một số hiện tượng quen thuộc.','Thực hiện được các hoạt động tìm hiểu khoa học theo hướng dẫn.','Biết quan sát và trình bày kết quả tìm hiểu.','Biết liên hệ một số kiến thức khoa học với thực tế.','Hoàn thành các nhiệm vụ học tập được giao.','Có tiến bộ trong quan sát, thực hành và trao đổi ý kiến.'],
-      'Chưa đạt':['Chưa nắm chắc một số kiến thức, cần ôn tập thường xuyên.','Cần tích cực quan sát và tham gia các hoạt động khám phá.','Gặp khó khăn khi giải thích một số hiện tượng khoa học.','Cần rèn kĩ năng thu thập và trình bày thông tin.','Chưa biết vận dụng tốt kiến thức vào những tình huống thực tế.','Cần chủ động học tập và thực hành để củng cố kiến thức.']
+      'Tốt': [
+        'Nắm chắc kiến thức khoa học và giải thích được các hiện tượng quen thuộc.',
+        'Biết quan sát, đặt câu hỏi và đưa ra dự đoán phù hợp.',
+        'Vận dụng tốt kiến thức khoa học vào thực tiễn cuộc sống.',
+        'Thực hiện tốt các hoạt động khám phá và thí nghiệm.',
+        'Biết thu thập, xử lí và trình bày thông tin khoa học.',
+        'Chủ động trao đổi, hợp tác và chia sẻ kết quả học tập.',
+        'Có ý thức vận dụng kiến thức để bảo vệ sức khỏe và môi trường.'
+      ],
+      'Đạt': [
+        'Nắm được các kiến thức khoa học cơ bản đã học.',
+        'Nhận biết và giải thích được một số hiện tượng quen thuộc.',
+        'Thực hiện được các hoạt động tìm hiểu khoa học theo hướng dẫn.',
+        'Biết quan sát và trình bày kết quả tìm hiểu.',
+        'Biết liên hệ một số kiến thức khoa học với thực tế.',
+        'Hoàn thành các nhiệm vụ học tập được giao.',
+        'Có tiến bộ trong quan sát, thực hành và trao đổi ý kiến.'
+      ],
+      'Chưa đạt': [
+        'Chưa nắm chắc một số kiến thức, cần ôn tập thường xuyên.',
+        'Cần tích cực quan sát và tham gia các hoạt động khám phá.',
+        'Gặp khó khăn khi giải thích một số hiện tượng khoa học.',
+        'Cần rèn kĩ năng thu thập và trình bày thông tin.',
+        'Chưa biết vận dụng tốt kiến thức vào những tình huống thực tế.',
+        'Cần chủ động học tập và thực hành để củng cố kiến thức.'
+      ]
     },
     'Lịch sử và Địa lí': {
-      'Tốt':['Nắm chắc các sự kiện lịch sử và biết sắp xếp theo trình tự.','Hiểu được ý nghĩa của các sự kiện lịch sử đã học.','Xác định tốt vị trí và đặc điểm của các khu vực trên bản đồ.','Biết khai thác thông tin từ bản đồ, lược đồ và tranh ảnh.','Có khả năng liên hệ kiến thức với thực tế địa phương và đất nước.','Chủ động tìm hiểu và trình bày tốt các nội dung lịch sử, địa lí.','Có ý thức trân trọng lịch sử, văn hóa và quê hương, đất nước.'],
-      'Đạt':['Nhớ được những sự kiện và nhân vật lịch sử cơ bản.','Hiểu được nội dung chính của các bài học lịch sử.','Nhận biết được một số đặc điểm địa lí của Việt Nam.','Đọc và khai thác được thông tin cơ bản từ bản đồ.','Biết liên hệ một số kiến thức với thực tế cuộc sống.','Hoàn thành các nhiệm vụ học tập theo yêu cầu.','Có tiến bộ trong ghi nhớ và trình bày kiến thức.'],
-      'Chưa đạt':['Chưa nhớ chắc một số sự kiện, nhân vật lịch sử đã học.','Cần rèn kĩ năng xác định vị trí và khai thác bản đồ.','Gặp khó khăn khi trình bày nguyên nhân và ý nghĩa sự kiện.','Chưa biết liên hệ tốt kiến thức địa lí với thực tế.','Cần hệ thống hóa kiến thức để ghi nhớ lâu hơn.','Cần tích cực đọc tài liệu và tham gia hoạt động học tập.']
+      'Tốt': [
+        'Nắm chắc các sự kiện lịch sử và biết sắp xếp theo trình tự.',
+        'Hiểu được ý nghĩa của các sự kiện lịch sử đã học.',
+        'Xác định tốt vị trí và đặc điểm của các khu vực trên bản đồ.',
+        'Biết khai thác thông tin từ bản đồ, lược đồ và tranh ảnh.',
+        'Có khả năng liên hệ kiến thức với thực tế địa phương và đất nước.',
+        'Chủ động tìm hiểu và trình bày tốt các nội dung lịch sử, địa lí.',
+        'Có ý thức trân trọng lịch sử, văn hóa và quê hương, đất nước.'
+      ],
+      'Đạt': [
+        'Nhớ được những sự kiện và nhân vật lịch sử cơ bản.',
+        'Hiểu được nội dung chính của các bài học lịch sử.',
+        'Nhận biết được một số đặc điểm địa lí của Việt Nam.',
+        'Đọc và khai thác được thông tin cơ bản từ bản đồ.',
+        'Biết liên hệ một số kiến thức với thực tế cuộc sống.',
+        'Hoàn thành các nhiệm vụ học tập theo yêu cầu.',
+        'Có tiến bộ trong ghi nhớ và trình bày kiến thức.'
+      ],
+      'Chưa đạt': [
+        'Chưa nhớ chắc một số sự kiện, nhân vật lịch sử đã học.',
+        'Cần rèn kĩ năng xác định vị trí và khai thác bản đồ.',
+        'Gặp khó khăn khi trình bày nguyên nhân và ý nghĩa sự kiện.',
+        'Chưa biết liên hệ tốt kiến thức địa lí với thực tế.',
+        'Cần hệ thống hóa kiến thức để ghi nhớ lâu hơn.',
+        'Cần tích cực đọc tài liệu và tham gia hoạt động học tập.'
+      ]
     },
     'Công nghệ': {
-      'Tốt':['Nắm tốt kiến thức công nghệ và biết vận dụng vào thực tế.','Thực hiện đúng quy trình và sử dụng dụng cụ an toàn.','Có kĩ năng thực hành tốt, cẩn thận và chính xác.','Chủ động tìm hiểu cách sử dụng các sản phẩm công nghệ.','Biết lựa chọn và sử dụng sản phẩm công nghệ phù hợp.','Có ý thức giữ gìn dụng cụ và bảo đảm an toàn khi thực hành.','Hoàn thành tốt nhiệm vụ thực hành và biết chia sẻ kết quả.'],
-      'Đạt':['Nắm được những kiến thức công nghệ cơ bản đã học.','Thực hiện được các thao tác theo hướng dẫn.','Biết sử dụng một số sản phẩm công nghệ phù hợp.','Có ý thức giữ gìn dụng cụ và bảo đảm an toàn.','Hoàn thành được nhiệm vụ thực hành theo yêu cầu.','Biết vận dụng một số kiến thức vào cuộc sống.','Có tiến bộ trong kĩ năng thực hành và sử dụng dụng cụ.'],
-      'Chưa đạt':['Chưa nắm chắc một số kiến thức công nghệ, cần ôn tập thêm.','Thao tác thực hành còn chậm, cần luyện tập theo quy trình.','Cần chú ý hơn đến quy tắc an toàn khi thực hành.','Chưa vận dụng tốt kiến thức công nghệ vào thực tế.','Cần chủ động hơn trong các hoạt động thực hành.','Cần rèn thêm kĩ năng sử dụng và bảo quản dụng cụ.']
+      'Tốt': [
+        'Nắm tốt kiến thức công nghệ và biết vận dụng vào thực tế.',
+        'Thực hiện đúng quy trình và sử dụng dụng cụ an toàn.',
+        'Có kĩ năng thực hành tốt, cẩn thận và chính xác.',
+        'Chủ động tìm hiểu cách sử dụng các sản phẩm công nghệ.',
+        'Biết lựa chọn và sử dụng sản phẩm công nghệ phù hợp.',
+        'Có ý thức giữ gìn dụng cụ và bảo đảm an toàn khi thực hành.',
+        'Hoàn thành tốt nhiệm vụ thực hành và biết chia sẻ kết quả.'
+      ],
+      'Đạt': [
+        'Nắm được những kiến thức công nghệ cơ bản đã học.',
+        'Thực hiện được các thao tác theo hướng dẫn.',
+        'Biết sử dụng một số sản phẩm công nghệ phù hợp.',
+        'Có ý thức giữ gìn dụng cụ và bảo đảm an toàn.',
+        'Hoàn thành được nhiệm vụ thực hành theo yêu cầu.',
+        'Biết vận dụng một số kiến thức vào cuộc sống.',
+        'Có tiến bộ trong kĩ năng thực hành và sử dụng dụng cụ.'
+      ],
+      'Chưa đạt': [
+        'Chưa nắm chắc một số kiến thức công nghệ, cần ôn tập thêm.',
+        'Thao tác thực hành còn chậm, cần luyện tập theo quy trình.',
+        'Cần chú ý hơn đến quy tắc an toàn khi thực hành.',
+        'Chưa vận dụng tốt kiến thức công nghệ vào thực tế.',
+        'Cần chủ động hơn trong các hoạt động thực hành.',
+        'Cần rèn thêm kĩ năng sử dụng và bảo quản dụng cụ.'
+      ]
     },
     'Đạo đức': {
-      'Tốt':['Biết thực hiện tốt những việc làm phù hợp với chuẩn mực đạo đức.','Có ý thức trách nhiệm với bản thân, gia đình, thầy cô và bạn bè.','Biết tôn trọng, yêu thương và giúp đỡ mọi người xung quanh.','Có ý thức giữ gìn nội quy và thực hiện tốt trách nhiệm của mình.','Biết phân biệt việc làm đúng, việc làm chưa đúng và lựa chọn phù hợp.','Chủ động vận dụng những điều đã học vào các tình huống thực tế.','Có tiến bộ tốt trong nhận thức và thực hành các chuẩn mực đạo đức.'],
-      'Đạt':['Nhận biết được những hành vi phù hợp với chuẩn mực đạo đức.','Biết thực hiện những việc làm phù hợp với bản thân và tập thể.','Biết tôn trọng và giữ gìn mối quan hệ tốt đẹp với mọi người.','Có ý thức thực hiện nội quy trường lớp và nhiệm vụ được giao.','Biết lựa chọn cách ứng xử phù hợp trong một số tình huống.','Biết vận dụng một số điều đã học vào cuộc sống hằng ngày.','Hoàn thành yêu cầu học tập và có tiến bộ trong thực hành.'],
-      'Chưa đạt':['Chưa nhận biết đầy đủ một số hành vi phù hợp với chuẩn mực đạo đức.','Cần chú ý hơn khi lựa chọn cách ứng xử trong các tình huống.','Cần rèn ý thức thực hiện nội quy và trách nhiệm được giao.','Chưa thường xuyên vận dụng những điều đã học vào thực tế.','Cần mạnh dạn trao đổi và nêu cách giải quyết các tình huống đạo đức.','Cần rèn luyện thường xuyên để hình thành thói quen ứng xử phù hợp.']
+      'Tốt': [
+        'Biết thực hiện tốt những việc làm phù hợp với chuẩn mực đạo đức.',
+        'Có ý thức trách nhiệm với bản thân, gia đình, thầy cô và bạn bè.',
+        'Biết tôn trọng, yêu thương và giúp đỡ mọi người xung quanh.',
+        'Có ý thức giữ gìn nội quy và thực hiện tốt trách nhiệm của mình.',
+        'Biết phân biệt việc làm đúng, việc làm chưa đúng và lựa chọn phù hợp.',
+        'Chủ động vận dụng những điều đã học vào các tình huống thực tế.',
+        'Có tiến bộ tốt trong nhận thức và thực hành các chuẩn mực đạo đức.'
+      ],
+      'Đạt': [
+        'Nhận biết được những hành vi phù hợp với chuẩn mực đạo đức.',
+        'Biết thực hiện những việc làm phù hợp với bản thân và tập thể.',
+        'Biết tôn trọng và giữ gìn mối quan hệ tốt đẹp với mọi người.',
+        'Có ý thức thực hiện nội quy trường lớp và nhiệm vụ được giao.',
+        'Biết lựa chọn cách ứng xử phù hợp trong một số tình huống.',
+        'Biết vận dụng một số điều đã học vào cuộc sống hằng ngày.',
+        'Hoàn thành yêu cầu học tập và có tiến bộ trong thực hành.'
+      ],
+      'Chưa đạt': [
+        'Chưa nhận biết đầy đủ một số hành vi phù hợp với chuẩn mực đạo đức.',
+        'Cần chú ý hơn khi lựa chọn cách ứng xử trong các tình huống.',
+        'Cần rèn ý thức thực hiện nội quy và trách nhiệm được giao.',
+        'Chưa thường xuyên vận dụng những điều đã học vào thực tế.',
+        'Cần mạnh dạn trao đổi và nêu cách giải quyết các tình huống đạo đức.',
+        'Cần rèn luyện thường xuyên để hình thành thói quen ứng xử phù hợp.'
+      ]
     }
   };
 
-  const esc=v=>String(v==null?'':v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-  const now=()=>new Date().toISOString();
-  const today=()=>new Date().toISOString().slice(0,10);
-  const api=()=>window.GOOGLE_API_CONFIG&&window.GOOGLE_API_CONFIG.url;
-  function records(){if(!Array.isArray(window.learningRecords))window.learningRecords=[];return window.learningRecords;}
-  function students(){return Array.isArray(window.students)?window.students:(window.APP_DATA&&Array.isArray(window.APP_DATA.students)?window.APP_DATA.students:[]);}
-  function sid(s){return s&& (s.id||s.studentId||s.ID)||'';}
-  function sname(id){const s=students().find(x=>String(sid(x))===String(id));return s?(s.name||s.hoTen||s.hoten||s.fullName||id):id;}
-  function uid(){return 'HT_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);}
-  function toast(m){if(typeof window.showToast==='function')window.showToast(m);else alert(m);}
-  function jsonp(action,params){return new Promise((resolve,reject)=>{const url=api();if(!url)return reject(Error('Chưa có kết nối Google Apps Script'));const cb='__LH_HT_'+Date.now()+'_'+Math.random().toString(36).slice(2),sc=document.createElement('script');let done=false;const finish=(e,d)=>{if(done)return;done=true;clearTimeout(timer);try{delete window[cb]}catch(_){}sc.remove();e?reject(e):resolve(d)};const timer=setTimeout(()=>finish(Error('Google Apps Script phản hồi quá thời gian')),20000);window[cb]=d=>finish(null,d);sc.onerror=()=>finish(Error('Không kết nối được Google Apps Script'));const q=Object.assign({action,callback:cb,_:Date.now()},params||{});sc.src=url+'?'+Object.keys(q).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(typeof q[k]==='string'?q[k]:JSON.stringify(q[k]))).join('&');document.head.appendChild(sc);});}
-  function pack(r){return {result:JSON.stringify({content:r.content||'',resultType:r.resultType||'DIEM',score:r.score===''?'':r.score,comment:r.comment||''}),level:r.level||'',note:r.note||''};}
-  function unpack(r){let x={};try{x=JSON.parse(String(r.result||''));}catch(_){x={content:r.result||'',resultType:'DIEM',score:'',comment:''};}return Object.assign({},r,{content:x.content||'',resultType:x.resultType||'DIEM',score:x.score==null?'':x.score,comment:x.comment||'',note:r.note||''});}
-  async function saveRemote(r){const p=pack(r),record={id:r.id,studentId:r.studentId,date:r.date,subject:r.subject,result:p.result,level:p.level,note:p.note,createdAt:r.createdAt||now(),updatedAt:r.updatedAt||now()};const res=await jsonp('save_event',{payload:JSON.stringify({sheet:'HOC_TAP',record})});if(!res||res.ok!==true||res.saved!==true)throw Error(res&&res.error||'Google Sheets không xác nhận đã lưu');return res;}
-  async function loadRemote(){try{const res=await jsonp('get_all');if(!res||res.ok!==true)return false;const incoming=(res.HOC_TAP||[]).map(unpack);window.learningRecords=incoming;if(window.APP_DATA)window.APP_DATA.learning=incoming;localStorage.setItem('learningRecords',JSON.stringify(incoming));render();return true;}catch(e){console.warn('[HỌC TẬP]',e.message);return false;}}
-  function commentOptions(subject,level,current){if(!subject||!level)return '<option value="">-- Chọn mức đạt trước --</option>';const list=(COMMENTS[subject]&&COMMENTS[subject][level])||[];return '<option value="">-- Chọn nhận xét gợi ý --</option>'+list.map(x=>`<option ${x===current?'selected':''}>${esc(x)}</option>`).join('');}
-  function openForm(editId){const old=records().find(r=>String(r.id)===String(editId))||{},ss=students();const opts=ss.map(s=>{const id=sid(s),name=s.name||s.hoTen||s.hoten||s.fullName||id;return `<option value="${esc(id)}" ${String(id)===String(old.studentId||'')?'selected':''}>${esc(name)}</option>`;}).join('');const so=SUBJECTS.map(x=>`<option value="${esc(x)}" ${x===old.subject?'selected':''}>${esc(x)}</option>`).join('');const lo=LEVELS.map(x=>`<option value="${esc(x)}" ${x===old.level?'selected':''}>${esc(x)}</option>`).join('');document.body.insertAdjacentHTML('beforeend',`<div id="learningModal" class="modal-overlay" style="display:flex;z-index:9999"><div class="modal-card" style="max-width:650px;width:94%;max-height:92vh;overflow:auto"><div class="modal-header"><h3>📝 ${editId?'Chỉnh sửa':'Ghi nhận'} kết quả học tập</h3><button type="button" onclick="window.closeLearningForm()">×</button></div><form id="learningForm"><input type="hidden" name="id" value="${esc(old.id||'')}"><label>Ngày<input type="date" name="date" value="${esc(old.date||today())}" required></label><label>Học sinh<select name="studentId" required><option value="">-- Chọn học sinh --</option>${opts}</select></label><label>Môn học<select id="learningFormSubject" name="subject" required><option value="">-- Chọn môn học --</option>${so}</select></label><label>Nội dung đánh giá<input name="content" value="${esc(old.content||'')}" placeholder="Ví dụ: Phân số" required></label><label>Loại kết quả<select name="resultType">${RESULT_TYPES.map(x=>`<option value="${x.value}" ${x.value===(old.resultType||'DIEM')?'selected':''}>${x.label}</option>`).join('')}</select></label><label>Điểm (0–10)<input type="number" name="score" min="0" max="10" step="0.1" value="${esc(old.score??'')}" placeholder="Không bắt buộc"></label><label>Mức đạt<select id="learningFormLevel" name="level"><option value="">-- Chọn mức đạt --</option>${lo}</select></label><label>Nhận xét<textarea id="learningFormComment" name="comment" rows="4" placeholder="Có thể chọn nhận xét gợi ý hoặc tự nhập">${esc(old.comment||'')}</textarea><select id="learningCommentPreset" style="margin-top:6px">${commentOptions(old.subject,old.level,old.comment)}</select></label><label>Ghi chú<textarea name="note" rows="2">${esc(old.note||'')}</textarea></label><div class="modal-actions"><button type="button" onclick="window.closeLearningForm()">Hủy</button><button class="btn-primary" type="submit">💾 ${editId?'Cập nhật':'Lưu kết quả'}</button></div></form></div></div>`);const form=document.getElementById('learningForm'),sub=form.querySelector('#learningFormSubject'),lev=form.querySelector('#learningFormLevel'),preset=form.querySelector('#learningCommentPreset'),comment=form.querySelector('#learningFormComment');function refreshPresets(){preset.innerHTML=commentOptions(sub.value,lev.value,comment.value);}sub.addEventListener('change',refreshPresets);lev.addEventListener('change',refreshPresets);preset.addEventListener('change',()=>{if(preset.value)comment.value=preset.value;});form.addEventListener('submit',saveForm);}
-  async function saveForm(e){e.preventDefault();const f=new FormData(e.target),id=String(f.get('id')||uid()),score=String(f.get('score')||'').trim();if(score!==''&&(Number(score)<0||Number(score)>10))return toast('Điểm phải từ 0 đến 10.');const old=records().find(r=>String(r.id)===id),item={id,studentId:String(f.get('studentId')||''),date:String(f.get('date')||''),subject:String(f.get('subject')||''),content:String(f.get('content')||''),resultType:String(f.get('resultType')||'DIEM'),score:score===''?'':Number(score),level:String(f.get('level')||''),comment:String(f.get('comment')||''),note:String(f.get('note')||''),createdAt:old&&old.createdAt||now(),updatedAt:now()};if(!item.studentId||!item.date||!item.subject||!item.content)return toast('Vui lòng nhập đủ Ngày, Học sinh, Môn học và Nội dung.');try{await saveRemote(item);const a=records(),i=a.findIndex(r=>String(r.id)===id);if(i>=0)a[i]=item;else a.unshift(item);window.learningRecords=a;if(window.APP_DATA)window.APP_DATA.learning=a;localStorage.setItem('learningRecords',JSON.stringify(a));closeForm();render();toast(old?'Đã cập nhật và lưu vào Google Sheets.':'Đã lưu kết quả vào Google Sheets.');}catch(err){toast('LƯU THẤT BẠI: '+err.message);console.error(err);}}
-  function closeForm(){document.getElementById('learningModal')?.remove();}
-  async function deleteLearning(id){if(!confirm('Bạn có chắc muốn xóa lượt ghi nhận này?'))return;try{const res=await jsonp('delete_event',{sheet:'HOC_TAP',id});if(!res||res.ok!==true||res.deleted!==true)throw Error(res&&res.error||'Google Sheets không xác nhận xóa');window.learningRecords=records().filter(r=>String(r.id)!==String(id));if(window.APP_DATA)window.APP_DATA.learning=window.learningRecords;localStorage.setItem('learningRecords',JSON.stringify(window.learningRecords));render();toast('Đã xóa lượt học tập trên Google Sheets.');}catch(e){toast('XÓA THẤT BẠI: '+e.message);}}
-  function withinPeriod(date,period){if(period==='all')return true;const d=new Date(date||0),nowD=new Date();if(isNaN(d.getTime()))return true;const diff=nowD-d;if(period==='week')return diff<=7*86400000&&diff>=-86400000;if(period==='month')return d.getFullYear()===nowD.getFullYear()&&d.getMonth()===nowD.getMonth();if(period==='semester')return diff<=183*86400000&&diff>=-86400000;return true;}
-  function render(){const root=document.querySelector('#page-learning')||document.querySelector('[data-page="learning"]');if(!root)return;const q=String(root.querySelector('#learningSearch')?.value||'').toLowerCase(),sub=root.querySelector('#learningSubject')?.value||'',period=root.querySelector('#learningPeriod')?.value||'all',tbody=root.querySelector('#learningTbody');if(!tbody)return;let a=records().filter(r=>!q||sname(r.studentId).toLowerCase().includes(q)||String(r.content||'').toLowerCase().includes(q)||String(r.comment||'').toLowerCase().includes(q)).filter(r=>!sub||r.subject===sub).filter(r=>withinPeriod(r.date,period));if(!a.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:28px">Chưa có dữ liệu học tập.<br><small>Hãy bấm “Ghi nhận kết quả” để bắt đầu.</small></td></tr>';return;}tbody.innerHTML=a.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.date)}</td><td><strong>${esc(sname(r.studentId))}</strong></td><td>${esc(r.subject)}</td><td>${esc(r.content)}</td><td>${r.score!==''&&r.score!=null?esc(r.score):(esc(r.level)||'—')}</td><td>${esc(r.comment)||'—'}</td><td><button type="button" onclick="window.editLearning('${esc(r.id)}')">✏️</button> <button type="button" onclick="window.deleteLearning('${esc(r.id)}')">🗑️</button></td></tr>`).join('');}
-  window.LEARNING_SUBJECTS=SUBJECTS.slice();
-  window.LEARNING_COMMENTS=COMMENTS;
-  window.openLearningForm=openForm;window.closeLearningForm=closeForm;window.editLearning=openForm;window.deleteLearning=deleteLearning;window.renderLearning=render;window.loadLearningRecords=loadRemote;
-  document.addEventListener('input',e=>{if(e.target.id==='learningSearch')render();});
-  document.addEventListener('change',e=>{if(['learningSubject','learningPeriod'].includes(e.target.id))render();});
-  window.addEventListener('google-sheets-data-ready',e=>{const d=e&&e.detail||window.GOOGLE_SHEET_DATA;if(d&&Array.isArray(d.HOC_TAP)){window.learningRecords=d.HOC_TAP.map(unpack);if(window.APP_DATA)window.APP_DATA.learning=window.learningRecords;localStorage.setItem('learningRecords',JSON.stringify(window.learningRecords));render();}else loadRemote();});
-  window.addEventListener('google-sheets-refresh',()=>setTimeout(loadRemote,100));
-  document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{if(records().length)render();else loadRemote();},300));
+  const esc = v => String(v == null ? '' : v).replace(/[&<>'\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\"':'&quot;'}[c]));
+  const now = () => new Date().toISOString();
+  const today = () => new Date().toISOString().slice(0,10);
+  const api = () => window.GOOGLE_API_CONFIG && window.GOOGLE_API_CONFIG.url;
+
+  function records() {
+    if (!Array.isArray(window.learningRecords)) window.learningRecords = [];
+    return window.learningRecords;
+  }
+  function students() {
+    return Array.isArray(window.students) ? window.students :
+      (window.APP_DATA && Array.isArray(window.APP_DATA.students) ? window.APP_DATA.students : []);
+  }
+  function sid(s) { return s && (s.id || s.studentId || s.ID) || ''; }
+  function sname(id) {
+    const s = students().find(x => String(sid(x)) === String(id));
+    return s ? (s.name || s.hoTen || s.hoten || s.fullName || id) : id;
+  }
+  function uid() { return 'HT_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
+  function toast(m) { if (typeof window.showToast === 'function') window.showToast(m); else alert(m); }
+
+  function jsonp(action, params) {
+    return new Promise((resolve, reject) => {
+      const url = api();
+      if (!url) return reject(Error('Chưa có kết nối Google Apps Script'));
+      const cb = '__LH_HT_V2_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+      const sc = document.createElement('script');
+      let done = false;
+      const finish = (e,d) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        try { delete window[cb]; } catch (_) {}
+        sc.remove();
+        e ? reject(e) : resolve(d);
+      };
+      const timer = setTimeout(() => finish(Error('Google Apps Script phản hồi quá thời gian')), 20000);
+      window[cb] = d => finish(null,d);
+      sc.onerror = () => finish(Error('Không kết nối được Google Apps Script'));
+      const q = Object.assign({action,callback:cb,_:Date.now()}, params || {});
+      sc.src = url + '?' + Object.keys(q).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(typeof q[k] === 'string' ? q[k] : JSON.stringify(q[k]))).join('&');
+      document.head.appendChild(sc);
+    });
+  }
+
+  function pack(r) {
+    return {result:JSON.stringify({content:r.content||'',resultType:r.resultType||'DIEM',score:r.score===''?'':r.score,comment:r.comment||''}),level:r.level||'',note:r.note||''};
+  }
+  function unpack(r) {
+    let x = {};
+    try { x = JSON.parse(String(r.result || '')); } catch (_) { x = {content:r.result||'',resultType:'DIEM',score:'',comment:''}; }
+    return Object.assign({}, r, {content:x.content||'',resultType:x.resultType||'DIEM',score:x.score==null?'':x.score,comment:x.comment||'',note:r.note||''});
+  }
+  async function saveRemote(r) {
+    const p = pack(r);
+    const record = {id:r.id,studentId:r.studentId,date:r.date,subject:r.subject,result:p.result,level:p.level,note:p.note,createdAt:r.createdAt||now(),updatedAt:r.updatedAt||now()};
+    const res = await jsonp('save_event',{payload:JSON.stringify({sheet:'HOC_TAP',record})});
+    if (!res || res.ok !== true || res.saved !== true) throw Error(res && res.error || 'Google Sheets không xác nhận đã lưu');
+    return res;
+  }
+  async function loadRemote() {
+    try {
+      const res = await jsonp('get_all');
+      if (!res || res.ok !== true) return false;
+      const incoming = (res.HOC_TAP || []).map(unpack);
+      window.learningRecords = incoming;
+      if (window.APP_DATA) window.APP_DATA.learning = incoming;
+      localStorage.setItem('learningRecords', JSON.stringify(incoming));
+      syncSubjectSelectors();
+      render();
+      return true;
+    } catch(e) {
+      console.warn('[HỌC TẬP V2]', e.message);
+      return false;
+    }
+  }
+
+  function commentOptions(subject, level, current) {
+    if (!subject || !level) return '<option value="">-- Chọn môn và mức đạt trước --</option>';
+    const list = (COMMENTS[subject] && COMMENTS[subject][level]) || [];
+    return '<option value="">-- Chọn nhận xét gợi ý --</option>' + list.map(x => `<option value="${esc(x)}" ${x===current?'selected':''}>${esc(x)}</option>`).join('');
+  }
+
+  /* Đồng bộ mọi bộ chọn Môn học thuộc RIÊNG trang Học tập. */
+  function syncSubjectSelectors() {
+    const root = document.querySelector('#page-learning') || document.querySelector('[data-page="learning"]');
+    if (!root) return;
+    root.querySelectorAll('select#learningSubject, select[name="subject"], select[data-learning-subject]').forEach(sel => {
+      const current = sel.value;
+      const first = sel.querySelector('option[value=""]');
+      sel.innerHTML = (first ? '<option value="">' + esc(first.textContent || '-- Chọn môn học --') + '</option>' : '<option value="">-- Chọn môn học --</option>') + SUBJECTS.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
+      if (SUBJECTS.includes(current)) sel.value = current;
+    });
+  }
+
+  function openForm(editId) {
+    document.getElementById('learningModal')?.remove();
+    const old = records().find(r => String(r.id) === String(editId)) || {};
+    const ss = students();
+    const opts = ss.map(s => {
+      const id = sid(s), name = s.name || s.hoTen || s.hoten || s.fullName || id;
+      return `<option value="${esc(id)}" ${String(id)===String(old.studentId||'')?'selected':''}>${esc(name)}</option>`;
+    }).join('');
+    const so = SUBJECTS.map(x => `<option value="${esc(x)}" ${x===old.subject?'selected':''}>${esc(x)}</option>`).join('');
+    const lo = LEVELS.map(x => `<option value="${esc(x)}" ${x===old.level?'selected':''}>${esc(x)}</option>`).join('');
+
+    document.body.insertAdjacentHTML('beforeend', `<div id="learningModal" class="modal-overlay" style="display:flex;z-index:9999"><div class="modal-card" style="max-width:650px;width:94%;max-height:92vh;overflow:auto"><div class="modal-header"><h3>📝 ${editId?'Chỉnh sửa':'Ghi nhận'} kết quả học tập</h3><button type="button" onclick="window.closeLearningForm()">×</button></div><form id="learningForm"><input type="hidden" name="id" value="${esc(old.id||'')}"><label>Ngày<input type="date" name="date" value="${esc(old.date||today())}" required></label><label>Học sinh<select name="studentId" required><option value="">-- Chọn học sinh --</option>${opts}</select></label><label>Môn học<select id="learningFormSubject" name="subject" required><option value="">-- Chọn môn học --</option>${so}</select></label><label>Nội dung đánh giá<input name="content" value="${esc(old.content||'')}" placeholder="Ví dụ: Phân số" required></label><label>Loại kết quả<select name="resultType">${RESULT_TYPES.map(x=>`<option value="${x.value}" ${x.value===(old.resultType||'DIEM')?'selected':''}>${x.label}</option>`).join('')}</select></label><label>Điểm (0–10)<input type="number" name="score" min="0" max="10" step="0.1" value="${esc(old.score??'')}" placeholder="Không bắt buộc"></label><label>Mức đạt<select id="learningFormLevel" name="level"><option value="">-- Chọn mức đạt --</option>${lo}</select></label><label style="display:block">Nhận xét<select id="learningCommentPreset" style="display:block;width:100%;margin-top:6px;padding:9px;border:1px solid #d1d5db;border-radius:8px">${commentOptions(old.subject,old.level,old.comment)}</select><textarea id="learningFormComment" name="comment" rows="4" style="display:block;width:100%;margin-top:8px" placeholder="Nhận xét sẽ tự điền từ danh sách hoặc có thể chỉnh sửa">${esc(old.comment||'')}</textarea></label><label>Ghi chú<textarea name="note" rows="2">${esc(old.note||'')}</textarea></label><div class="modal-actions"><button type="button" onclick="window.closeLearningForm()">Hủy</button><button class="btn-primary" type="submit">💾 ${editId?'Cập nhật':'Lưu kết quả'}</button></div></form></div></div>`);
+
+    const form = document.getElementById('learningForm');
+    const sub = form.querySelector('#learningFormSubject');
+    const lev = form.querySelector('#learningFormLevel');
+    const preset = form.querySelector('#learningCommentPreset');
+    const comment = form.querySelector('#learningFormComment');
+    function refreshPresets() {
+      preset.innerHTML = commentOptions(sub.value, lev.value, comment.value);
+    }
+    sub.addEventListener('change', refreshPresets);
+    lev.addEventListener('change', refreshPresets);
+    preset.addEventListener('change', () => { if (preset.value) comment.value = preset.value; });
+    form.addEventListener('submit', saveForm);
+  }
+
+  async function saveForm(e) {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const id = String(f.get('id') || uid());
+    const score = String(f.get('score') || '').trim();
+    if (score !== '' && (Number(score) < 0 || Number(score) > 10)) return toast('Điểm phải từ 0 đến 10.');
+    const old = records().find(r => String(r.id) === id);
+    const item = {id,studentId:String(f.get('studentId')||''),date:String(f.get('date')||''),subject:String(f.get('subject')||''),content:String(f.get('content')||''),resultType:String(f.get('resultType')||'DIEM'),score:score===''?'':Number(score),level:String(f.get('level')||''),comment:String(f.get('comment')||''),note:String(f.get('note')||''),createdAt:old&&old.createdAt||now(),updatedAt:now()};
+    if (!item.studentId || !item.date || !item.subject || !item.content) return toast('Vui lòng nhập đủ Ngày, Học sinh, Môn học và Nội dung.');
+    try {
+      await saveRemote(item);
+      const a = records(), i = a.findIndex(r => String(r.id) === id);
+      if (i >= 0) a[i] = item; else a.unshift(item);
+      window.learningRecords = a;
+      if (window.APP_DATA) window.APP_DATA.learning = a;
+      localStorage.setItem('learningRecords', JSON.stringify(a));
+      closeForm();
+      render();
+      toast(old ? 'Đã cập nhật và lưu vào Google Sheets.' : 'Đã lưu kết quả vào Google Sheets.');
+    } catch(err) {
+      toast('LƯU THẤT BẠI: ' + err.message);
+      console.error(err);
+    }
+  }
+
+  function closeForm() { document.getElementById('learningModal')?.remove(); }
+
+  async function deleteLearning(id) {
+    if (!confirm('Bạn có chắc muốn xóa lượt ghi nhận này?')) return;
+    try {
+      const res = await jsonp('delete_event',{sheet:'HOC_TAP',id});
+      if (!res || res.ok !== true || res.deleted !== true) throw Error(res && res.error || 'Google Sheets không xác nhận xóa');
+      window.learningRecords = records().filter(r => String(r.id) !== String(id));
+      if (window.APP_DATA) window.APP_DATA.learning = window.learningRecords;
+      localStorage.setItem('learningRecords', JSON.stringify(window.learningRecords));
+      render();
+      toast('Đã xóa lượt học tập trên Google Sheets.');
+    } catch(e) { toast('XÓA THẤT BẠI: ' + e.message); }
+  }
+
+  function withinPeriod(date, period) {
+    if (period === 'all') return true;
+    const d = new Date(date || 0), nowD = new Date();
+    if (isNaN(d.getTime())) return true;
+    const diff = nowD - d;
+    if (period === 'week') return diff <= 7*86400000 && diff >= -86400000;
+    if (period === 'month') return d.getFullYear() === nowD.getFullYear() && d.getMonth() === nowD.getMonth();
+    if (period === 'semester') return diff <= 183*86400000 && diff >= -86400000;
+    return true;
+  }
+
+  function render() {
+    syncSubjectSelectors();
+    const root = document.querySelector('#page-learning') || document.querySelector('[data-page="learning"]');
+    if (!root) return;
+    const q = String(root.querySelector('#learningSearch')?.value || '').toLowerCase();
+    const sub = root.querySelector('#learningSubject')?.value || '';
+    const period = root.querySelector('#learningPeriod')?.value || 'all';
+    const tbody = root.querySelector('#learningTbody');
+    if (!tbody) return;
+    let a = records().filter(r => !q || sname(r.studentId).toLowerCase().includes(q) || String(r.content||'').toLowerCase().includes(q) || String(r.comment||'').toLowerCase().includes(q)).filter(r => !sub || r.subject === sub).filter(r => withinPeriod(r.date,period));
+    if (!a.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:28px">Chưa có dữ liệu học tập.<br><small>Hãy bấm “Ghi nhận kết quả” để bắt đầu.</small></td></tr>';
+      return;
+    }
+    tbody.innerHTML = a.map((r,i) => `<tr><td>${i+1}</td><td>${esc(r.date)}</td><td><strong>${esc(sname(r.studentId))}</strong></td><td>${esc(r.subject)}</td><td>${esc(r.content)}</td><td>${r.score!==''&&r.score!=null?esc(r.score):(esc(r.level)||'—')}</td><td>${esc(r.comment)||'—'}</td><td><button type="button" onclick="window.editLearning('${esc(r.id)}')">✏️</button> <button type="button" onclick="window.deleteLearning('${esc(r.id)}')">🗑️</button></td></tr>`).join('');
+  }
+
+  window.LEARNING_SUBJECTS = SUBJECTS.slice();
+  window.LEARNING_COMMENTS = COMMENTS;
+  window.openLearningForm = openForm;
+  window.closeLearningForm = closeForm;
+  window.editLearning = openForm;
+  window.deleteLearning = deleteLearning;
+  window.renderLearning = render;
+  window.loadLearningRecords = loadRemote;
+  window.syncLearningSubjects = syncSubjectSelectors;
+
+  document.addEventListener('input', e => { if (e.target.id === 'learningSearch') render(); });
+  document.addEventListener('change', e => { if (['learningSubject','learningPeriod'].includes(e.target.id)) render(); });
+
+  window.addEventListener('google-sheets-data-ready', e => {
+    const d = e && e.detail || window.GOOGLE_SHEET_DATA;
+    if (d && Array.isArray(d.HOC_TAP)) {
+      window.learningRecords = d.HOC_TAP.map(unpack);
+      if (window.APP_DATA) window.APP_DATA.learning = window.learningRecords;
+      localStorage.setItem('learningRecords', JSON.stringify(window.learningRecords));
+      render();
+    } else loadRemote();
+  });
+  window.addEventListener('google-sheets-refresh', () => setTimeout(loadRemote, 100));
+
+  function boot() {
+    syncSubjectSelectors();
+    setTimeout(syncSubjectSelectors, 300);
+    setTimeout(syncSubjectSelectors, 1000);
+    if (records().length) render(); else loadRemote();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, {once:true});
+  else boot();
 })();
