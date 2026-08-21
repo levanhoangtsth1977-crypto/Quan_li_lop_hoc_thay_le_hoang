@@ -1,0 +1,52 @@
+name: Inject Vi Pham Menu Fix
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  inject:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Inject script into index.html only if missing
+        shell: bash
+        run: |
+          set -e
+          TAG='<script src="violations-menu-fix.js?v=1.0"></script>'
+          if ! grep -Fq 'violations-menu-fix.js' index.html; then
+            python3 - <<'PY'
+from pathlib import Path
+p=Path('index.html')
+s=p.read_text(encoding='utf-8')
+tag='<script src="violations-menu-fix.js?v=1.0"></script>'
+needle='<script src="script.js"></script>'
+if needle in s:
+    s=s.replace(needle, needle+'\n'+tag, 1)
+else:
+    s=s.replace('</body>', tag+'\n</body>', 1)
+p.write_text(s, encoding='utf-8')
+PY
+          fi
+
+      - name: Commit only the injection change
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git diff --quiet -- index.html; then
+            echo 'No change needed.'
+            exit 0
+          fi
+          git add index.html
+          git commit -m 'fix: activate Vi Pham menu module only'
+          git push origin HEAD:master
