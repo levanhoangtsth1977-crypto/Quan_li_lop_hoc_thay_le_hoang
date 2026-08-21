@@ -1,30 +1,239 @@
-/* GOOGLE SHEETS RECORDS BRIDGE 15.0 — SERIALIZED EVENT WRITE / DIRECT ATTENDANCE SAVE */
+/* GOOGLE SHEETS RECORDS BRIDGE 16.0 — INDEPENDENT EVENT SYNC / BULK ATTENDANCE FIX */
 (function(){
 'use strict';
-if(window.__LH_GOOGLE_RECORDS_BRIDGE_1500__)return;
-window.__LH_GOOGLE_RECORDS_BRIDGE_1500__=true;
+
+if(window.__LH_GOOGLE_RECORDS_BRIDGE_1600__)return;
+window.__LH_GOOGLE_RECORDS_BRIDGE_1600__=true;
+
 const API='https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
 const SHEET_ID='1v9H6dReZiC_fCg6T9ISdfWOy1FN1HJQXXrKsABiCLI4';
-const VERSION='MASTER-15.0-SERIALIZED-EVENT-WRITE';
-const SCHEMA={DIEM_DANH:['id','studentId','date','status','note','createdAt','updatedAt'],VI_PHAM:['id','studentId','date','type','level','status','action','note','createdAt','updatedAt'],KHEN_THUONG:['id','studentId','date','type','formType','note','createdAt','updatedAt']};
-const clean=v=>String(v==null?'':v).trim().replace(/\s+/g,' '),now=()=>new Date().toISOString(),today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')},rid=p=>p+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,9);
+const VERSION='MASTER-16.0-INDEPENDENT-EVENT-SYNC';
+
+const SCHEMA={
+  DIEM_DANH:['id','studentId','date','status','note','createdAt','updatedAt'],
+  VI_PHAM:['id','studentId','date','type','level','status','action','note','createdAt','updatedAt'],
+  KHEN_THUONG:['id','studentId','date','type','formType','note','createdAt','updatedAt']
+};
+
+const clean=v=>String(v==null?'':v).trim().replace(/\s+/g,' ');
+const now=()=>new Date().toISOString();
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const rid=p=>p+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);
+
 const queues={DIEM_DANH:Promise.resolve(),VI_PHAM:Promise.resolve(),KHEN_THUONG:Promise.resolve()};
-function jsonp(action,params){return new Promise((resolve,reject)=>{const cb='LH1500_'+Date.now()+'_'+Math.random().toString(36).slice(2),s=document.createElement('script');let done=false;const end=(e,d)=>{if(done)return;done=true;clearTimeout(t);try{delete window[cb]}catch(_){}s.remove();e?reject(e):resolve(d)};const t=setTimeout(()=>end(Error('Google Apps Script không phản hồi sau 20 giây')),20000);window[cb]=d=>end(null,d);s.onerror=()=>end(Error('Không truy cập được Google Apps Script'));const q=Object.assign({action,callback:cb,_:Date.now()},params||{});s.src=API+'?'+Object.keys(q).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(typeof q[k]==='string'?q[k]:JSON.stringify(q[k]))).join('&');document.head.appendChild(s)})}
-function normalize(tab,r){if(!SCHEMA[tab])throw Error('Sheet không được phép: '+tab);const o={};SCHEMA[tab].forEach(k=>o[k]=r&&r[k]??'');if(!clean(o.id))o.id=rid(tab.toLowerCase());if(!clean(o.studentId))throw Error(tab+': thiếu studentId');if(!clean(o.date))o.date=today();if(!clean(o.createdAt))o.createdAt=now();o.updatedAt=now();return o}
-async function verify(tab,id){const v=await jsonp('get_events');if(!v||v.ok!==true)throw Error(v&&v.error||'Không đọc được dữ liệu Google Sheets');const list=Array.isArray(v[tab])?v[tab]:[];if(!list.some(x=>clean(x&&x.id)===clean(id)))throw Error('Google Sheets chưa xác minh bản ghi '+id);return true}
-async function save(tab,r){const rec=normalize(tab,r);const a=await jsonp('save_event',{sheet:tab,payload:JSON.stringify({sheet:tab,record:rec})});if(!a||a.ok!==true||a.stored!==true)throw Error(a&&a.error||'Google Sheets không lưu '+tab);await verify(tab,rec.id);applyLocal(tab,rec);return{ok:true,verified:true,stored:true,sheet:tab,id:rec.id,row:a.row||null,record:rec}}
-function enqueue(tab,record){const run=queues[tab].then(()=>syncRecordNow(tab,record));queues[tab]=run.catch(()=>{});return run}
-function applyLocal(tab,rec){const map={DIEM_DANH:'attendanceRecords',VI_PHAM:'violationRecords',KHEN_THUONG:'rewardRecords'},key=map[tab],list=window[key];if(!Array.isArray(list))return;const i=list.findIndex(x=>clean(x&&x.id)===clean(rec.id));if(i<0)list.push(rec);else list[i]=rec;try{if(typeof window.syncAppDataReferences==='function')window.syncAppDataReferences();if(typeof window.renderAttendance==='function'&&tab==='DIEM_DANH')window.renderAttendance();if(typeof window.renderViolations==='function'&&tab==='VI_PHAM')window.renderViolations();if(typeof window.renderRewards==='function'&&tab==='KHEN_THUONG')window.renderRewards();if(typeof window.renderDashboard==='function')window.renderDashboard()}catch(_){} }
-function showResult(ok,msg){try{if(typeof window.showToast==='function')window.showToast(msg,ok?'success':'error');else console[ok?'log':'error']('[LH1500]',msg)}catch(_){} }
-async function syncRecordNow(tab,record){try{const r=await save(tab,record);showResult(true,'Google Sheets: '+tab+' đã lưu và xác minh');window.dispatchEvent(new CustomEvent('google-sheet-record-saved',{detail:r}));return r}catch(e){showResult(false,'Google Sheets: '+tab+' lưu thất bại — '+e.message);window.dispatchEvent(new CustomEvent('google-sheet-record-error',{detail:{sheet:tab,error:e.message,record:record}}));throw e}}
-function syncRecord(tab,record){return enqueue(tab,record)}
-function wrapActions(){if(window.__LH1500_ACTIONS_WRAPPED__)return true;if(typeof window.saveAttendanceRecord!=='function'||typeof window.addViolation!=='function'||typeof window.addReward!=='function')return false;window.__LH1500_ACTIONS_WRAPPED__=true;
- const oldAttendance=window.saveAttendanceRecord;window.saveAttendanceRecord=function(studentId,date,status,note){const result=oldAttendance.apply(this,arguments);if(result&&result.success!==false){const rec={id:rid('dd'),studentId:studentId,date:date||today(),status:status||'',note:note||'',createdAt:now(),updatedAt:now()};syncRecord('DIEM_DANH',rec).catch(()=>{});}return result};
- const oldViolation=window.addViolation;window.addViolation=function(data){const result=oldViolation.apply(this,arguments);if(result&&result.success!==false&&result.record)syncRecord('VI_PHAM',result.record).catch(()=>{});return result};
- const oldReward=window.addReward;window.addReward=function(data){const result=oldReward.apply(this,arguments);if(result&&result.success!==false&&result.record)syncRecord('KHEN_THUONG',result.record).catch(()=>{});return result};
- return true}
-async function pull(){try{const v=await jsonp('get_events');if(!v||v.ok!==true)throw Error(v&&v.error||'Google Sheets không trả dữ liệu');const map={DIEM_DANH:'attendanceRecords',VI_PHAM:'violationRecords',KHEN_THUONG:'rewardRecords'};Object.keys(map).forEach(tab=>{const key=map[tab],data=Array.isArray(v[tab])?v[tab]:[];if(Array.isArray(window[key]))window[key].splice(0,window[key].length,...data)});if(typeof window.syncAppDataReferences==='function')try{window.syncAppDataReferences()}catch(_){};['renderAttendance','renderViolations','renderRewards','renderDashboard'].forEach(f=>{try{if(typeof window[f]==='function')window[f]()}catch(_){}});window.GOOGLE_SHEET_EVENT_DATA={ok:true,version:VERSION,loadedAt:now(),sheetId:SHEET_ID,webAppUrl:API,counts:{attendance:(v.DIEM_DANH||[]).length,violations:(v.VI_PHAM||[]).length,rewards:(v.KHEN_THUONG||[]).length}};window.dispatchEvent(new CustomEvent('google-sheets-data-ready',{detail:window.GOOGLE_SHEET_EVENT_DATA}));return window.GOOGLE_SHEET_EVENT_DATA}catch(e){window.GOOGLE_SHEET_EVENT_DATA={ok:false,version:VERSION,sheetId:SHEET_ID,error:e.message};console.error('[LH1500]',e);return null}}
-window.syncGoogleSheetEvents=pull;window.pullGoogleSheetEvents=pull;window.saveRecordToGoogleSheets=syncRecord;window.forceGoogleSheetEventSync=pull;window.GOOGLE_RECORDS_API={url:API,sheetId:SHEET_ID,version:VERSION};
-function init(){let n=0;const t=setInterval(()=>{if(wrapActions()||++n>40)clearInterval(t)},250);setTimeout(pull,1000)}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+const sentIds={DIEM_DANH:new Set(),VI_PHAM:new Set(),KHEN_THUONG:new Set()};
+
+function jsonp(action,params){
+  return new Promise((resolve,reject)=>{
+    const cb='LH1600_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    const s=document.createElement('script');
+    let done=false;
+    const end=(e,d)=>{
+      if(done)return;
+      done=true;
+      clearTimeout(t);
+      try{delete window[cb]}catch(_){}
+      s.remove();
+      e?reject(e):resolve(d);
+    };
+    const t=setTimeout(()=>end(Error('Google Apps Script không phản hồi sau 20 giây')),20000);
+    window[cb]=d=>end(null,d);
+    s.onerror=()=>end(Error('Không truy cập được Google Apps Script'));
+    const q=Object.assign({action,callback:cb,_:Date.now()},params||{});
+    s.src=API+'?'+Object.keys(q).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(typeof q[k]==='string'?q[k]:JSON.stringify(q[k]))).join('&');
+    document.head.appendChild(s);
+  });
+}
+
+function normalize(tab,r){
+  if(!SCHEMA[tab])throw Error('Sheet không được phép: '+tab);
+  const o={};
+  SCHEMA[tab].forEach(k=>o[k]=r&&r[k]!==undefined&&r[k]!==null?r[k]:'');
+  if(!clean(o.id))o.id=rid(tab.toLowerCase());
+  if(!clean(o.studentId))throw Error(tab+': thiếu studentId');
+  if(!clean(o.date))o.date=today();
+  if(!clean(o.createdAt))o.createdAt=now();
+  o.updatedAt=now();
+  return o;
+}
+
+async function verify(tab,id){
+  const v=await jsonp('get_events');
+  if(!v||v.ok!==true)throw Error(v&&v.error||'Không đọc được dữ liệu Google Sheets');
+  const list=Array.isArray(v[tab])?v[tab]:[];
+  if(!list.some(x=>clean(x&&x.id)===clean(id)))throw Error('Google Sheets chưa xác minh bản ghi '+id);
+  return true;
+}
+
+function applyLocal(tab,rec){
+  const map={DIEM_DANH:'attendanceRecords',VI_PHAM:'violationRecords',KHEN_THUONG:'rewardRecords'};
+  const key=map[tab],list=window[key];
+  if(!Array.isArray(list))return;
+  const i=list.findIndex(x=>clean(x&&x.id)===clean(rec.id));
+  if(i<0)list.push(rec);else list[i]=rec;
+  try{
+    if(typeof window.syncAppDataReferences==='function')window.syncAppDataReferences();
+    if(tab==='DIEM_DANH'&&typeof window.renderAttendance==='function')window.renderAttendance();
+    if(tab==='VI_PHAM'&&typeof window.renderViolations==='function')window.renderViolations();
+    if(tab==='KHEN_THUONG'&&typeof window.renderRewards==='function')window.renderRewards();
+    if(typeof window.renderDashboard==='function')window.renderDashboard();
+  }catch(_){}
+}
+
+function showResult(ok,msg){
+  try{
+    if(typeof window.showToast==='function')window.showToast(msg,ok?'success':'error');
+    else console[ok?'log':'error']('[LH1600]',msg);
+  }catch(_){}
+}
+
+async function saveOne(tab,record){
+  const rec=normalize(tab,record);
+  if(sentIds[tab].has(rec.id))return{ok:true,duplicate:true,sheet:tab,id:rec.id,record:rec};
+  sentIds[tab].add(rec.id);
+  try{
+    const a=await jsonp('save_event',{sheet:tab,payload:JSON.stringify({sheet:tab,record:rec})});
+    if(!a||a.ok!==true||a.saved!==true)throw Error(a&&a.error||'Google Sheets không lưu '+tab);
+    await verify(tab,a.id||rec.id);
+    applyLocal(tab,rec);
+    showResult(true,'Google Sheets: '+tab+' đã lưu');
+    const result={ok:true,verified:true,saved:true,sheet:tab,id:a.id||rec.id,record:rec,row:a.row||null};
+    window.dispatchEvent(new CustomEvent('google-sheet-record-saved',{detail:result}));
+    return result;
+  }catch(e){
+    sentIds[tab].delete(rec.id);
+    showResult(false,'Google Sheets: '+tab+' lưu thất bại — '+e.message);
+    window.dispatchEvent(new CustomEvent('google-sheet-record-error',{detail:{sheet:tab,error:e.message,record:rec}}));
+    throw e;
+  }
+}
+
+function enqueue(tab,record){
+  const run=queues[tab].then(()=>saveOne(tab,record));
+  queues[tab]=run.catch(()=>{});
+  return run;
+}
+
+function syncRecord(tab,record){
+  if(!SCHEMA[tab])return Promise.reject(Error('Tab không hợp lệ: '+tab));
+  return enqueue(tab,record);
+}
+
+function pull(){
+  return jsonp('get_events').then(v=>{
+    if(!v||v.ok!==true)throw Error(v&&v.error||'Google Sheets không trả dữ liệu');
+    const map={DIEM_DANH:'attendanceRecords',VI_PHAM:'violationRecords',KHEN_THUONG:'rewardRecords'};
+    Object.keys(map).forEach(tab=>{
+      const key=map[tab],data=Array.isArray(v[tab])?v[tab]:[];
+      if(Array.isArray(window[key]))window[key].splice(0,window[key].length,...data);
+    });
+    if(typeof window.syncAppDataReferences==='function')try{window.syncAppDataReferences()}catch(_){}
+    ['renderAttendance','renderViolations','renderRewards','renderDashboard'].forEach(f=>{try{if(typeof window[f]==='function')window[f]()}catch(_){}});
+    window.GOOGLE_SHEET_EVENT_DATA={ok:true,version:VERSION,loadedAt:now(),sheetId:SHEET_ID,webAppUrl:API,counts:{attendance:(v.DIEM_DANH||[]).length,violations:(v.VI_PHAM||[]).length,rewards:(v.KHEN_THUONG||[]).length}};
+    window.dispatchEvent(new CustomEvent('google-sheets-data-ready',{detail:window.GOOGLE_SHEET_EVENT_DATA}));
+    return window.GOOGLE_SHEET_EVENT_DATA;
+  }).catch(e=>{
+    window.GOOGLE_SHEET_EVENT_DATA={ok:false,version:VERSION,sheetId:SHEET_ID,error:e.message};
+    console.error('[LH1600]',e);
+    return null;
+  });
+}
+
+function getStudentId(value){
+  if(value===null||value===undefined)return'';
+  if(typeof value==='string')return clean(value);
+  if(typeof value==='object')return clean(value.studentId||value.id||value.studentCode||value.code||'');
+  return clean(value);
+}
+
+function independentWrap(name,tab,build){
+  const marker='__LH1600_WRAPPED_'+name+'__';
+  if(window[marker])return true;
+  const old=window[name];
+  if(typeof old!=='function')return false;
+  window[marker]=true;
+  window[name]=function(){
+    const args=Array.prototype.slice.call(arguments);
+    let result;
+    try{result=old.apply(this,args)}catch(e){throw e}
+    try{
+      const records=build(result,args);
+      if(Array.isArray(records))records.forEach(r=>{if(r)syncRecord(tab,r).catch(()=>{})});
+      else if(records)syncRecord(tab,records).catch(()=>{});
+    }catch(e){console.error('[LH1600] build '+tab,e)}
+    return result;
+  };
+  return true;
+}
+
+function wrapActions(){
+  independentWrap('saveAttendanceRecord','DIEM_DANH',(result,args)=>{
+    if(!result||result.success===false)return null;
+    const studentId=getStudentId(args[0]);
+    if(!studentId)return null;
+    return {id:rid('dd'),studentId,date:args[1]||today(),status:args[2]||'',note:args[3]||'',createdAt:now(),updatedAt:now()};
+  });
+
+  independentWrap('addViolation','VI_PHAM',(result,args)=>{
+    if(!result||result.success===false)return null;
+    const r=result.record||result.data||result;
+    if(!r)return null;
+    return normalize('VI_PHAM',Object.assign({},r,{studentId:r.studentId||getStudentId(args[0])}));
+  });
+
+  independentWrap('addReward','KHEN_THUONG',(result,args)=>{
+    if(!result||result.success===false)return null;
+    const r=result.record||result.data||result;
+    if(!r)return null;
+    return normalize('KHEN_THUONG',Object.assign({},r,{studentId:r.studentId||getStudentId(args[0])}));
+  });
+}
+
+/*
+ * Điểm danh thường là một thao tác BULK: nút Lưu điểm danh có thể
+ * gọi engine nội bộ một lần nhưng thay đổi nhiều học sinh.
+ * Hook này đọc toàn bộ attendanceRecords sau khi nút lưu chạy,
+ * rồi gửi TỪNG học sinh thành một event riêng. Không đụng HOC_SINH.
+ */
+function hookBulkAttendance(){
+  const button=document.getElementById('saveAttendance');
+  if(!button||button.__LH1600_BULK_HOOK__)return!!button;
+  button.__LH1600_BULK_HOOK__=true;
+  button.addEventListener('click',function(){
+    setTimeout(function(){
+      const list=Array.isArray(window.attendanceRecords)?window.attendanceRecords:[];
+      const dateEl=document.getElementById('attendanceDate');
+      const date=(dateEl&&dateEl.value)||today();
+      const records=[];
+      list.forEach(r=>{
+        if(!r)return;
+        const sid=getStudentId(r.studentId||r.id);
+        if(!sid)return;
+        const status=clean(r.status||'');
+        if(!status||/^(present|có mặt|co mat)$/i.test(status))return;
+        records.push({id:rid('dd'),studentId:sid,date:r.date||date,status:status,note:r.note||'',createdAt:now(),updatedAt:now()});
+      });
+      records.forEach(r=>syncRecord('DIEM_DANH',r).catch(()=>{}));
+    },1200);
+  },false);
+}
+
+function init(){
+  let n=0;
+  const timer=setInterval(()=>{
+    wrapActions();
+    hookBulkAttendance();
+    if(++n>80)clearInterval(timer);
+  },250);
+  setTimeout(pull,1200);
+}
+
+window.syncGoogleSheetEvents=pull;
+window.pullGoogleSheetEvents=pull;
+window.saveRecordToGoogleSheets=syncRecord;
+window.forceGoogleSheetEventSync=pull;
+window.GOOGLE_RECORDS_API={url:API,sheetId:SHEET_ID,version:VERSION};
+
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
+else init();
 })();
