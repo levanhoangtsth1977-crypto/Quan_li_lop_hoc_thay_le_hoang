@@ -1,16 +1,5 @@
-/* TRIỆU PHÚ HỌC ĐƯỜNG — BOOT/ROSTER FIX 1.0 */
+/* TRIỆU PHÚ HỌC ĐƯỜNG — BOOT/ROSTER FIX 1.1 — SAFE */
 (function(){'use strict';
-function refreshRosterUI(){
-  var sel=document.getElementById('student');
-  var list=window.GameData&&window.GameData.getStudents?window.GameData.getStudents():[];
-  if(!sel||!list.length)return;
-  sel.innerHTML='';
-  list.forEach(function(s){
-    var id=String(s.id||s.studentCode||s.studentId||s.name||s.studentName||'');
-    var name=s.name||s.studentName||id;
-    var o=document.createElement('option');o.value=id;o.textContent=name;sel.appendChild(o);
-  });
-}
-window.addEventListener('gameRosterReady',refreshRosterUI);
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(refreshRosterUI,50);});else setTimeout(refreshRosterUI,50);
+function refreshRosterUI(){var sel=document.getElementById('student'),list=window.GameData&&window.GameData.getStudents?window.GameData.getStudents():[];if(!sel)return;if(!list.length){sel.innerHTML='<option value="">⏳ Đang tải học sinh...</option>';return;}var current=sel.value;sel.innerHTML='';list.forEach(function(s){var id=String(s.id||s.studentCode||s.studentId||s.name||s.studentName||''),name=s.name||s.studentName||id,o=document.createElement('option');o.value=id;o.textContent=name;sel.appendChild(o)});if(current&&Array.prototype.some.call(sel.options,function(o){return o.value===current}))sel.value=current}
+window.addEventListener('gameRosterReady',refreshRosterUI);window.addEventListener('gameRosterError',refreshRosterUI);if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){refreshRosterUI();setTimeout(refreshRosterUI,100)});else{refreshRosterUI();setTimeout(refreshRosterUI,100)}var n=0,t=setInterval(function(){refreshRosterUI();if(++n>=30)clearInterval(t)},500);
 })();
