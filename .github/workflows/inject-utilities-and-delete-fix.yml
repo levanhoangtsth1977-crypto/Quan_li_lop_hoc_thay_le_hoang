@@ -15,14 +15,12 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
-          # Replace every stale utility version with V4 so browser/CDN cannot keep the old module.
-          s=s.replace('<script src="tien-ich.js?v=1.0"></script>','<script src="tien-ich.js?v=4.0"></script>')
-          s=s.replace('<script src="tien-ich.js?v=2.0"></script>','<script src="tien-ich.js?v=4.0"></script>')
-          s=s.replace('<script src="tien-ich.js?v=3.0"></script>','<script src="tien-ich.js?v=4.0"></script>')
-          if '<script src="tien-ich.js?v=4.0"></script>' not in s:
-              s=s.replace('</body>','<script src="tien-ich.js?v=4.0"></script>\n</body>',1)
+          s=re.sub(r'<script\s+src=["\']tien-ich\.js(?:\?v=[^"\']*)?["\']\s*></script>', '<script src="tien-ich.js?v=5.0"></script>', s)
+          if '<script src="tien-ich.js?v=5.0"></script>' not in s:
+              s=s.replace('</body>','<script src="tien-ich.js?v=5.0"></script>\n</body>',1)
           if '<script src="delete-event-compat-fix.js?v=1.0"></script>' not in s:
               s=s.replace('</body>','<script src="delete-event-compat-fix.js?v=1.0"></script>\n</body>',1)
           p.write_text(s,encoding='utf-8')
@@ -31,6 +29,6 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           if ! git diff --quiet -- index.html; then
             git add index.html
-            git commit -m "Load Tiện ích V4 and refresh cache"
+            git commit -m "Load Tiện ích V5 and refresh cache"
             git push
           fi
