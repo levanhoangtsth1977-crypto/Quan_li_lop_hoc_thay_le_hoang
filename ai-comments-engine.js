@@ -103,12 +103,12 @@ Tốt:[
 ]};
 
 function clean(v){return String(v==null?'':v).trim().replace(/\s+/g,' ')}
-function esc(v){return clean(v).replace(/[&<>\'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}
+function esc(v){return clean(v).replace(/[&<>\'\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}
 function uid(){return'NX_'+Date.now()+'_'+Math.random().toString(36).slice(2,9)}
 function today(){const d=new Date();return d.toISOString().slice(0,10)}
 function students(){return Array.isArray(window.students)?window.students:Array.isArray(window.GOOGLE_SHEETS_STUDENTS)?window.GOOGLE_SHEETS_STUDENTS:[]}
-function levelFromScore(v){const n=Number(String(v).replace(',','.'));if(!Number.isFinite(n)||n<0||n>10)return'';if(n>=9)return'Tốt';if(n>=7)return'Đạt';return'Chưa đạt'}
-function scoreRange(level){return level==='Tốt'?'9–10':level==='Đạt'?'7–8,9':'0–6,9'}
+function levelFromScore(v){const n=Number(String(v).replace(',','.'));if(!Number.isFinite(n)||n<0||n>10)return'';if(n>=8)return'Tốt';if(n>=5)return'Đạt';return'Chưa đạt'}
+function scoreRange(level){return level==='Tốt'?'8–10':level==='Đạt'?'5–7,9':'0–4,9'}
 function hash(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return h}
 function makeComment(subject,level,studentId){const bank=BANK[level==='Chưa đạt'?'Cần cố gắng':level]||BANK.Đạt;const i=hash(String(studentId||'')+subject+level)%bank.length;return bank[i].replace('{f}',FOCUS[subject]||subject)}
 function load(){try{const x=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(x)?x:[]}catch(e){return[]}}
