@@ -1,0 +1,32 @@
+name: Install final classroom utilities
+on:
+  push:
+    branches: [master]
+permissions:
+  contents: write
+jobs:
+  install:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replace legacy utility scripts with final utility
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          import re
+          s=re.sub(r'<script[^>]+src=["\'](?:tien-ich|tien-ich-v6|tien-ich-v7|tien-ich-bootstrap-v7|tien-ich-v7-final|tien-ich-final)[^>]*></script>\s*', '', s, flags=re.I)
+          tag='<script src="tien-ich-final.js?v=20260823"></script>'
+          if tag not in s:
+              s=s.replace('</body>', tag+'\n</body>', 1)
+          p.write_text(s,encoding='utf-8')
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          if ! git diff --quiet -- index.html; then
+            git add index.html
+            git commit -m "Install final utilities only"
+            git push
+          fi
