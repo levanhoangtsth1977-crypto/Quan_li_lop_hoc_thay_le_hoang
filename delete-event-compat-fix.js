@@ -1,0 +1,14 @@
+/* DELETE EVENT COMPATIBILITY FIX
+   Hỗ trợ cả API mới delete_event và các API triển khai cũ.
+*/
+(function(){
+'use strict';
+if(window.__LH_DELETE_EVENT_COMPAT_10__)return;window.__LH_DELETE_EVENT_COMPAT_10__=true;
+const API=(window.GOOGLE_RECORDS_API&&window.GOOGLE_RECORDS_API.url)||'https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
+const clean=v=>String(v??'').trim();
+function call(action,params){return new Promise((resolve,reject)=>{const cb='LHDEL_'+Date.now()+'_'+Math.random().toString(36).slice(2),s=document.createElement('script');let done=false;const finish=(err,data)=>{if(done)return;done=true;clearTimeout(timer);try{delete window[cb]}catch(_){}s.remove();err?reject(err):resolve(data)};const timer=setTimeout(()=>finish(Error('API không phản hồi')),15000);window[cb]=d=>finish(null,d);s.onerror=()=>finish(Error('Không truy cập được API'));const q=Object.assign({action,callback:cb,_:Date.now()},params||{});s.src=API+'?'+Object.keys(q).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(q[k])).join('&');document.head.appendChild(s)})}
+async function remote(tab,id){const actions=tab==='VI_PHAM'?['delete_event','delete_violation','deleteViolation','remove_violation']:['delete_event','delete_reward','deleteReward','remove_reward'];let last='';for(const action of actions){try{const r=await call(action,{sheet:tab,id:clean(id),recordId:clean(id)});if(r&&r.ok===true&&r.deleted===true)return r;last=r&&r.error||'';if(!/Unknown action/i.test(last))break}catch(e){last=e.message}}throw Error(last||'API chưa hỗ trợ xóa sự kiện')}
+function wrap(name,tab,label){const old=window[name];if(typeof old!=='function'||old.__LH_DELETE_COMPAT__)return;const fn=async function(id){const sid=clean(id);if(!sid)return false;if(!confirm('Xóa đúng 1 lượt '+label+' này?\nCác lượt khác của học sinh vẫn giữ nguyên.'))return false;try{await remote(tab,sid);const list=tab==='VI_PHAM'?window.violationRecords:window.rewardRecords;if(Array.isArray(list)){const i=list.findIndex(x=>clean(x&&x.id)===sid);if(i>=0)list.splice(i,1)}try{if(typeof window.syncAppDataReferences==='function')window.syncAppDataReferences();if(tab==='VI_PHAM'&&typeof window.renderViolations==='function')window.renderViolations();if(tab==='KHEN_THUONG'&&typeof window.renderRewards==='function')window.renderRewards();if(window.__LH_EVENT_SUMMARY_API__)window.__LH_EVENT_SUMMARY_API__.refreshAll()}catch(_){}if(window.showToast)window.showToast('Đã xóa đúng 1 lượt '+label+'.','success');return true}catch(e){if(window.showToast)window.showToast('Không thể xóa lượt — '+e.message,'error');return false}};fn.__LH_DELETE_COMPAT__=true;window[name]=fn}
+function install(){wrap('deleteViolation','VI_PHAM','vi phạm');wrap('deleteReward','KHEN_THUONG','khen thưởng')}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,1500),{once:true});else setTimeout(install,1500);
+})();
