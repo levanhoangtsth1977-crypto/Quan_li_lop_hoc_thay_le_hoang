@@ -1,0 +1,17 @@
+/* EVENT DELETE V9 — DIRECT API / FALLBACK ACTIONS */
+(function(){
+'use strict';
+if(window.__LH_EVENT_DELETE_V9__)return;
+window.__LH_EVENT_DELETE_V9__=true;
+const API='https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
+const clean=v=>String(v??'').trim();
+function jsonp(action,params){return new Promise((resolve,reject)=>{const cb='LHDEL9_'+Date.now()+'_'+Math.random().toString(36).slice(2),s=document.createElement('script');let done=false;const finish=(err,data)=>{if(done)return;done=true;clearTimeout(timer);try{delete window[cb]}catch(_){}s.remove();err?reject(err):resolve(data)};const timer=setTimeout(()=>finish(Error('Google Apps Script không phản hồi sau 20 giây')),20000);window[cb]=d=>finish(null,d);s.onerror=()=>finish(Error('Không truy cập được Google Apps Script'));const q=Object.assign({action,callback:cb,_:Date.now()},params||{});s.src=API+'?'+Object.keys(q).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(q[k])).join('&');document.head.appendChild(s)})}
+async function remoteDelete(kind,id){const sheet=kind==='reward'?'KHEN_THUONG':'VI_PHAM';const actions=kind==='reward'?['delete_event','delete_reward','deletereward','remove_reward','delete_reward_record','remove_reward_record']:['delete_event','delete_violation','deleteviolation','remove_violation','delete_vio','remove_vio'];let last='';for(const action of actions){try{const r=await jsonp(action,{sheet,id:clean(id),recordId:clean(id)});if(r&&r.ok===true&&r.deleted===true)return r;last=r&&r.error||('Unknown action: '+action)}catch(e){last=e.message}}throw Error(last||'Không thể xóa bản ghi')}
+function localRemove(kind,id){const key=kind==='reward'?'rewardRecords':'violationRecords';const list=window[key];if(Array.isArray(list)){const i=list.findIndex(x=>clean(x&&x.id)===clean(id));if(i>=0)list.splice(i,1)}try{if(typeof window.syncAppDataReferences==='function')window.syncAppDataReferences();if(kind==='reward'&&typeof window.renderRewards==='function')window.renderRewards();if(kind==='violation'&&typeof window.renderViolations==='function')window.renderViolations();if(window.__LH_EVENT_SUMMARY_API__)window.__LH_EVENT_SUMMARY_API__.refreshAll();if(typeof window.updateBadges==='function')window.updateBadges()}catch(_){}
+}
+async function deleteOne(kind,id){const sid=clean(id);if(!sid)return false;if(!confirm('Xóa đúng 1 lượt này?\nCác lượt khác của học sinh vẫn giữ nguyên.'))return false;try{await remoteDelete(kind,sid);localRemove(kind,sid);if(typeof window.showToast==='function')window.showToast('Đã xóa đúng 1 lượt '+(kind==='reward'?'khen thưởng':'vi phạm')+' trên Google Sheets.','success');return true}catch(e){if(typeof window.showToast==='function')window.showToast('Không thể xóa lượt — '+e.message,'error');return false}}
+window.LH_DELETE_EVENT_V9={deleteOne,remoteDelete};
+window.deleteViolation=async function(id){return deleteOne('violation',id)};
+window.deleteReward=async function(id){return deleteOne('reward',id)};
+document.addEventListener('click',e=>{const b=e.target.closest?.('[data-lh-delete-id]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();deleteOne(b.dataset.lhDeleteKind==='reward'?'reward':'violation',b.dataset.lhDeleteId)},true);
+})();
