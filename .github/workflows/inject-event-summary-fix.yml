@@ -19,7 +19,7 @@ jobs:
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
           s = re.sub(r'<script[^>]+src=["\']event-summary-by-student-fix\.js[^>]*></script>\s*', '', s, flags=re.I)
-          tag = '<script src="event-summary-by-student-fix.js?v=5.0"></script>\n'
+          tag = '<script src="event-summary-by-student-fix.js?v=7.0"></script>\n'
           if '</body>' not in s:
               raise SystemExit('Không tìm thấy </body> trong index.html')
           s = s.replace('</body>', tag + '</body>', 1)
@@ -29,6 +29,6 @@ jobs:
             git config user.name github-actions[bot]
             git config user.email 41898282+github-actions[bot]@users.noreply.github.com
             git add index.html
-            git commit -m "Load event summary fix 5.0"
+            git commit -m "fix: load event summary 7.0"
             git push
           fi
