@@ -71,9 +71,7 @@ window.__LH_VIOLATIONS_MENU_API__={refresh:render};
    DELETE ALL — VI PHAM + KHEN THUONG
    Dùng API backend nếu có; không xóa HOC_SINH/DIEM_DANH.
    ============================================================ */
-function apiUrl(){
-  return window.GAS_API_URL || window.API_URL || window.SCRIPT_URL || window.GOOGLE_APPS_SCRIPT_URL || '';
-}
+function apiUrl(){ return 'https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec'; }
 async function callDeleteAll(sheet){
   const url=apiUrl();
   if(!url) throw new Error('Chưa cấu hình URL Google Apps Script.');
@@ -83,7 +81,8 @@ async function callDeleteAll(sheet){
   if(!data.ok) throw new Error(data.error||'API xóa tất cả thất bại.');
   return data;
 }
-function injectDeleteAllButton(){
+function injectDeleteAllButton(){ return; // disabled: final bridge below is the single source of truth
+
   const page=document.querySelector('#page-violations');
   if(!page) return;
   const host=page.querySelector('.page-actions')||page.querySelector('.page-header');
@@ -144,7 +143,7 @@ window.renderLearning=renderLearning;const init=()=>{ensurePage();renderLearning
 if(window.__LH_EVENT_DELETE_ALL_BRIDGE__) return;
 window.__LH_EVENT_DELETE_ALL_BRIDGE__=true;
 const S=v=>String(v??'').trim();
-const API=()=>window.GAS_API_URL||window.API_URL||window.SCRIPT_URL||window.GOOGLE_APPS_SCRIPT_URL||'';
+const API=()=>"https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec";
 const endpoint=(action,sheet)=>{const u=API();return u?u+'?action='+encodeURIComponent(action)+'&sheet='+encodeURIComponent(sheet):'';};
 async function removeOne(sheet,id){
   const u=endpoint('delete_event',sheet);if(!u)throw new Error('Thiếu URL Google Apps Script.');
