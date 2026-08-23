@@ -1,4 +1,4 @@
-/* GOOGLE API BRIDGE 7.2 — CONFIRMED MASTER API + LEARNING PHASE 1 + AI COMMENTS */
+/* GOOGLE API BRIDGE 7.2 — CONFIRMED MASTER API + LEARNING PHASE 1 + AI COMMENTS + DELETE-ALL FINAL */
 'use strict';
 (function(){
 if(window.__LH_GOOGLE_BRIDGE_720__)return;
@@ -15,7 +15,8 @@ function load(){return jsonp('get_all').then(r=>{if(!r||r.ok!==true)throw Error(
 function loadRecordsBridge(){if(window.__LH_GOOGLE_RECORDS_BRIDGE_1400__)return;const s=document.createElement('script');s.src='./google-sheets-records-bridge.js?v=14.0.0';s.async=false;s.onload=()=>window.dispatchEvent(new Event('google-sheets-refresh'));s.onerror=()=>console.warn('[LH720] Không tải được records bridge');document.head.appendChild(s)}
 function loadLearningModule(){if(window.__LH_LEARNING_MODULE_LOADED__)return;window.__LH_LEARNING_MODULE_LOADED__=true;const s=document.createElement('script');s.src='./learning-menu.js?v=2.0.0';s.async=false;s.onload=()=>{window.__LH_LEARNING_MODULE_READY__=true;window.dispatchEvent(new Event('learning-module-ready'));if(typeof window.renderLearning==='function')window.renderLearning()};s.onerror=()=>{window.__LH_LEARNING_MODULE_READY__=false;console.warn('[LH720] Không tải được learning-menu.js')};document.head.appendChild(s)}
 function loadAiCommentsEngine(){if(window.__LH_AI_COMMENTS_ENGINE_V1__)return;const s=document.createElement('script');s.src='./ai-comments-engine.js?v=1.0.0';s.async=false;s.onload=()=>window.dispatchEvent(new Event('ai-comments-engine-ready'));s.onerror=()=>console.warn('[LH720] Không tải được ai-comments-engine.js');document.head.appendChild(s)}
+function loadDeleteAllFinal(){if(window.__LH_DELETE_ALL_MASTER_FINAL__)return;const s=document.createElement('script');s.src='./event-delete-all-ui.js?v=MASTER-FINAL-20260823-2';s.async=false;s.onload=()=>window.dispatchEvent(new Event('delete-all-final-ready'));s.onerror=()=>console.warn('[LH720] Không tải được delete-all-final');document.head.appendChild(s)}
 window.loadGoogleSheetsMenuData=load;window.syncGoogleSheetsNow=load;window.getGoogleStudentRoster=()=>Array.isArray(window.students)?window.students:[];window.getGoogleWebAppUrl=()=>CFG.url;window.getGoogleSpreadsheetId=()=>CFG.sheetId;window.GOOGLE_API_CONFIG=CFG;
-function init(){loadRecordsBridge();loadLearningModule();loadAiCommentsEngine();setTimeout(load,500);setTimeout(load,2500)}
+function init(){loadRecordsBridge();loadLearningModule();loadAiCommentsEngine();loadDeleteAllFinal();setTimeout(load,500);setTimeout(load,2500)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
