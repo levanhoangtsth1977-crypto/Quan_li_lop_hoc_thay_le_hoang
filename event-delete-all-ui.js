@@ -1,118 +1,23 @@
 /* ============================================================
-   DELETE-ALL UI — MASTER FINAL
-   - Chỉ còn 1 nút Xóa tất cả ở mỗi trang VI_PHAM/KHEN_THUONG.
-   - Chặn toàn bộ handler cũ gây lỗi URL Google Apps Script.
-   - Gọi trực tiếp Apps Script bằng JSONP.
-   - Không đụng HOC_SINH/DIEM_DANH.
+   DELETE ALL MASTER FINAL 2
+   - Exactly 1 button per page.
+   - Direct Google Apps Script backend.
+   - Removes legacy duplicate buttons/handlers by interception.
    ============================================================ */
-(function () {
-  'use strict';
-  if (window.__LH_DELETE_ALL_MASTER_FINAL__) return;
-  window.__LH_DELETE_ALL_MASTER_FINAL__ = true;
-
-  const API = 'https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
-  const norm = v => String(v ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
-
-  function sheetForButton(button) {
-    const page = button?.closest?.('#page-violations,#page-rewards,[data-page-section="violations"],[data-page-section="rewards"]');
-    if (page) {
-      if (page.id === 'page-rewards' || page.dataset.pageSection === 'rewards') return 'KHEN_THUONG';
-      if (page.id === 'page-violations' || page.dataset.pageSection === 'violations') return 'VI_PHAM';
-    }
-    const text = norm(button?.textContent);
-    if (text.includes('khen thưởng')) return 'KHEN_THUONG';
-    if (text.includes('vi phạm')) return 'VI_PHAM';
-    return '';
-  }
-
-  function isDeleteAllButton(el) {
-    if (!el || !el.matches?.('button,[role="button"],a')) return false;
-    const text = norm(el.textContent);
-    return text.includes('xóa tất cả') || text.includes('xoá tất cả') || el.dataset?.deleteAll === 'true';
-  }
-
-  function jsonp(sheet) {
-    return new Promise((resolve, reject) => {
-      const callback = '__LH_DELETE_ALL_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-      const script = document.createElement('script');
-      let finished = false;
-      const finish = (error, data) => {
-        if (finished) return;
-        finished = true;
-        clearTimeout(timer);
-        try { delete window[callback]; } catch (_) {}
-        script.remove();
-        error ? reject(error) : resolve(data);
-      };
-      window[callback] = data => finish(null, data);
-      script.onerror = () => finish(new Error('Không truy cập được Google Apps Script.'));
-      const timer = setTimeout(() => finish(new Error('Google Apps Script không phản hồi sau 20 giây.')), 20000);
-      const query = new URLSearchParams({action:'delete_all_events',sheet,callback,_:String(Date.now())});
-      script.src = API + '?' + query.toString();
-      document.head.appendChild(script);
-    });
-  }
-
-  function toast(message, type) {
-    if (typeof window.showToast === 'function') window.showToast(message, type || 'info');
-    else alert(message);
-  }
-
-  async function deleteAll(sheet, button) {
-    const label = sheet === 'VI_PHAM' ? 'toàn bộ lượt vi phạm' : 'toàn bộ lượt khen thưởng';
-    if (!confirm('XÓA ' + label.toUpperCase() + '?\n\nChỉ xóa dữ liệu trong ' + sheet + '.\nKhông xóa học sinh và điểm danh.')) return;
-    if (button) { button.disabled = true; button.dataset.lhDeleteAllBusy = '1'; button.textContent = '⏳ Đang xóa...'; }
-    try {
-      const result = await jsonp(sheet);
-      if (!result || result.ok !== true || result.deleted !== true) throw new Error(result?.error || 'API không xác nhận xóa.');
-      toast('Đã xóa ' + Number(result.deletedCount || 0) + ' lượt ' + (sheet === 'VI_PHAM' ? 'vi phạm.' : 'khen thưởng.'), 'success');
-      try {
-        if (typeof window.refreshAllData === 'function') await window.refreshAllData();
-        else if (typeof window.refreshAll === 'function') await window.refreshAll();
-        else if (typeof window.loadClassData === 'function') await window.loadClassData();
-      } catch (_) {}
-      setTimeout(() => location.reload(), 400);
-    } catch (error) {
-      toast('Không thể xóa tất cả — ' + (error?.message || error), 'error');
-      if (button) { button.disabled = false; button.dataset.lhDeleteAllBusy = '0'; }
-    }
-  }
-
-  function normalizeButtons() {
-    const groups = {VI_PHAM:[], KHEN_THUONG:[]};
-    document.querySelectorAll('button,[role="button"],a').forEach(el => {
-      if (!isDeleteAllButton(el)) return;
-      const sheet = sheetForButton(el);
-      if (sheet) groups[sheet].push(el);
-    });
-    Object.keys(groups).forEach(sheet => {
-      const buttons = groups[sheet];
-      if (!buttons.length) return;
-      const keep = buttons[0];
-      buttons.slice(1).forEach(el => el.remove());
-      keep.dataset.lhDeleteAllFinal = '1';
-      keep.dataset.lhDeleteAllSheet = sheet;
-      keep.removeAttribute('onclick');
-      keep.title = sheet === 'VI_PHAM' ? 'Xóa toàn bộ vi phạm' : 'Xóa toàn bộ khen thưởng';
-    });
-  }
-
-  document.addEventListener('click', event => {
-    const button = event.target?.closest?.('button,[role="button"],a');
-    if (!isDeleteAllButton(button)) return;
-    const sheet = button.dataset.lhDeleteAllSheet || sheetForButton(button);
-    if (!sheet) return;
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-    if (button.dataset.lhDeleteAllBusy === '1') return;
-    deleteAll(sheet, button);
-  }, true);
-
-  function install() { normalizeButtons(); }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, {once:true});
-  else install();
-  new MutationObserver(install).observe(document.documentElement, {childList:true, subtree:true});
-  [100,300,700,1500,3000].forEach(ms => setTimeout(install, ms));
-  window.LE_HOANG_DELETE_ALL_EVENTS = deleteAll;
+(function(){
+'use strict';
+if(window.__LH_DELETE_ALL_MASTER_FINAL_2__)return;
+window.__LH_DELETE_ALL_MASTER_FINAL_2__=true;
+const API='https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
+const S=v=>String(v??'').trim();
+function pageOf(el){return el?.closest?.('#page-violations,#page-rewards,[data-page-section="violations"],[data-page-section="rewards"]')}
+function sheetOf(el){const p=pageOf(el);if(p?.id==='page-rewards'||p?.dataset.pageSection==='rewards')return'KHEN_THUONG';if(p?.id==='page-violations'||p?.dataset.pageSection==='violations')return'VI_PHAM';return''}
+function isAll(el){if(!el?.matches?.('button,[role="button"],a'))return false;const t=S(el.textContent).toLowerCase();return t.includes('xóa tất cả')||t.includes('xoá tất cả')||el.dataset.deleteAll==='true'||el.id==='lhDeleteAllViolations'||el.id==='lhDeleteAllRewards'}
+function jsonp(sheet){return new Promise((resolve,reject)=>{const cb='__LH_DA_'+Date.now()+'_'+Math.random().toString(36).slice(2),sc=document.createElement('script');let done=false;const finish=(e,d)=>{if(done)return;done=true;clearTimeout(timer);try{delete window[cb]}catch(_){}sc.remove();e?reject(e):resolve(d)};window[cb]=d=>finish(null,d);sc.onerror=()=>finish(new Error('Không truy cập được Google Apps Script.'));const timer=setTimeout(()=>finish(new Error('Google Apps Script không phản hồi.')),15000);sc.src=API+'?action=delete_all_events&sheet='+encodeURIComponent(sheet)+'&callback='+encodeURIComponent(cb)+'&_='+Date.now();document.head.appendChild(sc)})}
+function toast(m,t){if(typeof window.showToast==='function')window.showToast(m,t||'info');else alert(m)}
+async function run(sheet,b){if(!sheet)return;if(!confirm('XÓA TOÀN BỘ '+(sheet==='VI_PHAM'?'LƯỢT VI PHẠM':'LƯỢT KHEN THƯỞNG')+'?\n\nChỉ xóa dữ liệu của mục này. Không xóa học sinh và điểm danh.'))return;if(b){b.disabled=true;b.dataset.lhDeleteAllBusy='1';b.dataset.oldText=b.innerHTML;b.innerHTML='⏳ Đang xóa...'}try{const r=await jsonp(sheet);if(!r?.ok||!r.deleted)throw new Error(r?.error||'API không xác nhận xóa.');toast('Đã xóa '+Number(r.deletedCount||0)+' lượt '+(sheet==='VI_PHAM'?'vi phạm.':'khen thưởng.'),'success');window.dispatchEvent(new Event('google-sheets-refresh'));setTimeout(()=>location.reload(),500)}catch(e){toast('Không thể xóa tất cả — '+S(e.message||e),'error');if(b){b.disabled=false;b.dataset.lhDeleteAllBusy='0';b.innerHTML=b.dataset.oldText||'🗑️ Xóa tất cả'}}}
+function cleanDuplicates(){['#page-violations','#page-rewards'].forEach(sel=>{const p=document.querySelector(sel);if(!p)return;const all=[...p.querySelectorAll('button,[role="button"],a')].filter(isAll);if(!all.length)return;const keep=all[0];all.slice(1).forEach(x=>x.remove());const sheet=sheetOf(keep);keep.dataset.lhDeleteAllFinal='2';keep.dataset.lhDeleteAllSheet=sheet;keep.removeAttribute('onclick');keep.title=sheet==='VI_PHAM'?'Xóa toàn bộ vi phạm':'Xóa toàn bộ khen thưởng'})}
+document.addEventListener('click',e=>{const b=e.target.closest?.('button,[role="button"],a');if(!isAll(b))return;const sheet=b.dataset.lhDeleteAllSheet||sheetOf(b);if(!sheet)return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();if(b.dataset.lhDeleteAllBusy==='1')return;run(sheet,b)},true);
+function install(){cleanDuplicates();['violations','rewards'].forEach(type=>{const p=document.getElementById('page-'+type);if(!p)return;const sheet=type==='violations'?'VI_PHAM':'KHEN_THUONG';const existing=[...p.querySelectorAll('button,[role="button"],a')].filter(isAll);if(existing.length)return;const host=p.querySelector('.page-actions')||p.querySelector('.page-header');if(!host)return;const b=document.createElement('button');b.type='button';b.className='button danger';b.dataset.lhDeleteAllSheet=sheet;b.dataset.lhDeleteAllFinal='2';b.innerHTML='<i class="fa-solid fa-trash-can"></i> Xóa tất cả';host.appendChild(b)})}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();new MutationObserver(install).observe(document.documentElement,{childList:true,subtree:true});[100,300,700,1500,3000].forEach(x=>setTimeout(install,x));window.LE_HOANG_DELETE_ALL_EVENTS=run;
 })();
