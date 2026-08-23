@@ -1,208 +1,284 @@
-/* THỐNG KÊ — HỌC SINH XUẤT SẮC TOÀN DIỆN — FINAL FIX 2026-08-23 */
+/* THỐNG KÊ — HỌC SINH XUẤT SẮC TOÀN DIỆN — SINGLE UI */
 (function () {
-  'use strict';
+  "use strict";
 
-  const PAGE = '#page-statistics';
-  const BTN_ID = 'btnHSXuatSacToanDien';
-  const PANEL_ID = 'hsXuatSacToanDienPanel';
+  const PAGE = "#page-statistics";
+  const BTN_ID = "btnHSXuatSacToanDien";
+  const PANEL_ID = "hsXuatSacToanDienPanel";
 
-  const root = () => document.querySelector(PAGE);
-  const text = el => (el && el.textContent || '').replace(/\s+/g, ' ').trim();
-  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+  const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[c]));
 
-  function students() {
-    const candidates = [window.students, window.classData && window.classData.students, window.appData && window.appData.students];
-    for (const a of candidates) if (Array.isArray(a)) return a;
-    try { if (typeof window.getStudentsSafe === 'function') return window.getStudentsSafe() || []; } catch (e) {}
-    return [];
+  const arr = name => Array.isArray(window[name]) ? window[name] : [];
+  const sid = r => String(r?.studentId ?? r?.studentID ?? r?.idStudent ?? "").trim();
+  const studentId = s => String(s?.id ?? s?.studentId ?? s?.studentCode ?? "").trim();
+  const studentName = s => String(s?.name ?? s?.studentName ?? s?.fullName ?? "").trim() || "Chưa có tên";
+
+  function num(v) {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(String(v).replace(",", ".").replace(/[^0-9.-]/g, ""));
+    return Number.isFinite(n) ? n : null;
   }
 
-  function records() {
-    const names = ['attendanceRecords','attendanceData','violations','violationRecords','rewards','rewardRecords','learningRecords','learningData','progressRecords','comments','commentRecords'];
-    const out = {};
-    names.forEach(k => out[k] = Array.isArray(window[k]) ? window[k] : []);
-    return out;
+  function level(v) {
+    const s = String(v ?? "").toLowerCase().trim();
+    if (/mức?\s*1|^m1$|chưa đạt|chua dat|yếu|yeu/.test(s)) return 1;
+    if (/mức?\s*2|^m2$|đạt|dat|trung bình|trung binh/.test(s)) return 2;
+    if (/mức?\s*3|^m3$|tốt|tot|khá|kha|hoàn thành/.test(s)) return 3;
+    if (/^t$|excellent|xuất sắc|xuat sac/.test(s)) return 4;
+    return null;
   }
 
-  function sid(s) { return String(s && (s.id || s.studentId || s.studentCode || s.code) || '').trim(); }
-  function nameOf(s) { return String(s && (s.name || s.fullName || s.hoTen || s.studentName) || '').trim(); }
-
-  function countFor(arr, s) {
-    const id = sid(s), name = nameOf(s).toLowerCase();
-    return arr.filter(r => String(r && (r.studentId || r.studentCode || r.id || '')).trim() === id || String(r && (r.studentName || r.name || r.hoTen || '')).trim().toLowerCase() === name).length;
-  }
-
-  function learningScore(s) {
-    const r = records();
-    const arr = r.learningRecords.concat(r.learningData);
-    const id = sid(s), name = nameOf(s).toLowerCase();
-    const rs = arr.filter(x => String(x && (x.studentId || x.studentCode || x.id || '')).trim() === id || String(x && (x.studentName || x.name || x.hoTen || '')).trim().toLowerCase() === name);
-    const vals = rs.map(x => Number(x.score ?? x.diem ?? x.average ?? x.avg ?? x.mark)).filter(Number.isFinite);
-    return vals.length ? vals.reduce((a,b) => a+b, 0) / vals.length : 0;
-  }
-
-  function buildRows(limit) {
-    const r = records(), ss = students();
-    return ss.map(s => {
-      const absent = countFor(r.attendanceRecords.concat(r.attendanceData), s);
-      const vio = countFor(r.violations.concat(r.violationRecords), s);
-      const rew = countFor(r.rewards.concat(r.rewardRecords), s);
-      const learn = learningScore(s);
-      const score = (learn / 10) * 60 + Math.min(rew, 10) * 2 - Math.min(vio, 10) * 3 - Math.min(absent, 10) * 1.5;
-      return {s, absent, vio, rew, learn, score};
-    }).sort((a,b) => b.score-a.score || b.learn-a.learn || b.rew-a.rew || a.vio-b.vio || a.absent-b.absent || nameOf(a.s).localeCompare(nameOf(b.s), 'vi')).slice(0, limit);
-  }
-
-  /* XÓA TRIỆT ĐỂ KHUNG THỐNG KÊ VẮNG TRÙNG.
-     Chỉ xóa khung chi tiết bắt đầu bằng "📌 HS vắng";
-     KHÔNG xóa khung "Theo dõi toàn bộ quá trình". */
-  function removeDuplicateAttendanceDetail() {
-    const page = root();
-    if (!page) return;
-
-    const candidates = [...page.querySelectorAll('*')].filter(el => {
-      const t = text(el);
-      return /^📌\s*HS vắng/.test(t) || /^HS vắng/.test(t) || t === '📌 HS vắng';
-    });
-
-    candidates.forEach(head => {
-      let el = head;
-      for (let i = 0; i < 10 && el && el !== page; i++, el = el.parentElement) {
-        const t = text(el);
-        const hasTable = !!el.querySelector('table');
-        const isDetail = hasTable && (
-          t.includes('Chưa có học sinh vắng') ||
-          t.includes('1 học sinh = 1 dòng') ||
-          t.includes('tính toàn bộ lượt đã lưu trên Google Sheets')
-        );
-        if (isDetail) {
-          el.remove();
-          return;
-        }
+  function average(records) {
+    const values = [];
+    records.forEach(r => {
+      const n = num(r?.score ?? r?.diem ?? r?.resultScore ?? r?.average ?? r?.ketQua);
+      if (n !== null) values.push(n <= 10 ? n * 10 : Math.min(n, 100));
+      else {
+        const l = level(r?.level ?? r?.result ?? r?.mucDo);
+        if (l !== null) values.push(l * 25);
       }
     });
-
-    /* Nếu giao diện chỉ còn tiêu đề/tab rời rạc, loại riêng dòng tab vắng. */
-    [...page.querySelectorAll('button')].forEach(b => {
-      if (/^📌\s*HS vắng$/.test(text(b))) b.remove();
-    });
+    return values.length ? values.reduce((a,b) => a+b, 0) / values.length : null;
   }
 
-  function ensureButton() {
-    const page = root();
+  function buildRows() {
+    const students = Array.isArray(window.students) ? window.students : [];
+    const attendance = arr("attendanceRecords");
+    const violations = arr("violationRecords");
+    const rewards = arr("rewardRecords");
+    const learning = arr("learningRecords");
+    const progress = arr("progressRecords");
+    const comments = arr("commentRecords");
+
+    return students.map(s => {
+      const id = studentId(s);
+      const a = attendance.filter(r => sid(r) === id);
+      const v = violations.filter(r => sid(r) === id);
+      const re = rewards.filter(r => sid(r) === id);
+      const l = learning.filter(r => sid(r) === id);
+      const p = progress.filter(r => sid(r) === id);
+      const c = comments.filter(r => sid(r) === id);
+
+      const absent = a.filter(r => /vắng|absent/i.test(String(r?.status ?? ""))).length;
+      const excused = a.filter(r => /có phép|excused/i.test(String(r?.status ?? ""))).length;
+
+      const learningScore = average(l);
+      const progressScore = average(p);
+      const qualityValues = [...c, ...p, ...l].map(r => {
+        const n = num(r?.nangLuc ?? r?.phamChat ?? r?.score ?? r?.diem);
+        if (n !== null) return n <= 10 ? n * 10 : Math.min(n, 100);
+        const lv = level(r?.mucDo ?? r?.level ?? r?.result);
+        return lv === null ? null : lv * 25;
+      }).filter(x => x !== null);
+
+      const qualityScore = qualityValues.length
+        ? qualityValues.reduce((x,y) => x+y, 0) / qualityValues.length
+        : null;
+
+      const attendanceScore = a.length
+        ? Math.max(0, 100 - absent * 100 / a.length)
+        : 100;
+
+      const violationScore = Math.max(0, 100 - v.length * 10);
+      const rewardScore = Math.min(100, re.length * 20);
+
+      const parts = [
+        [learningScore, .40],
+        [qualityScore, .20],
+        [progressScore, .15],
+        [attendanceScore, .10],
+        [violationScore, .10],
+        [rewardScore, .05]
+      ].filter(x => x[0] !== null);
+
+      const weight = parts.reduce((x,y) => x + y[1], 0);
+      const total = weight
+        ? parts.reduce((x,y) => x + y[0] * y[1], 0) / weight
+        : 0;
+
+      return {
+        id,
+        name: studentName(s),
+        learningScore,
+        qualityScore,
+        progressScore,
+        absent,
+        excused,
+        violations: v.length,
+        rewards: re.length,
+        total
+      };
+    }).sort((a,b) =>
+      b.total - a.total ||
+      a.absent - b.absent ||
+      a.violations - b.violations ||
+      b.rewards - a.rewards ||
+      a.name.localeCompare(b.name, "vi")
+    );
+  }
+
+  function score(v) {
+    return v === null ? "—" : `${v.toFixed(1)}%`;
+  }
+
+  function removeOldDuplicatePanels() {
+    const page = document.querySelector(PAGE);
     if (!page) return;
-    let b = document.getElementById(BTN_ID);
-    if (b) return;
 
-    b = document.createElement('button');
-    b.id = BTN_ID;
-    b.type = 'button';
-    b.className = 'button primary';
-    b.innerHTML = '<i class="fa-solid fa-star"></i> HS xuất sắc toàn diện';
-    b.addEventListener('click', showPanel);
+    page.querySelectorAll(
+      "#excellentStatisticsPanel,#thongKeXuatSacPanel,#thongKeXuatSacPanelOld"
+    ).forEach(el => el.remove());
 
-    const header = page.querySelector('.page-header');
-    if (header) {
-      const actions = header.querySelector('.page-actions') || header;
-      actions.appendChild(b);
-    } else {
-      page.insertBefore(b, page.firstChild);
+    const buttons = [...page.querySelectorAll("button")].filter(b =>
+      /HS xuất sắc toàn diện/i.test(b.textContent || "")
+    );
+    buttons.slice(1).forEach(b => b.remove());
+  }
+
+  function renderPanel() {
+    const page = document.querySelector(PAGE);
+    if (!page) return;
+
+    removeOldDuplicatePanels();
+
+    let panel = document.getElementById(PANEL_ID);
+    if (!panel) {
+      panel = document.createElement("section");
+      panel.id = PANEL_ID;
+      panel.className = "dashboard-panel excellent-statistics-panel";
+      page.appendChild(panel);
     }
-  }
 
-  function showPanel() {
-    const page = root();
-    if (!page) return;
+    const rows = buildRows();
+    const currentInput = panel.querySelector("#excellentTopInput");
+    const current = Math.max(1, Math.min(999, Number(currentInput?.value) || 5));
+    const list = rows.slice(0, current);
 
-    const old = document.getElementById(PANEL_ID);
-    if (old) old.remove();
-
-    const p = document.createElement('section');
-    p.id = PANEL_ID;
-    p.className = 'dashboard-panel';
-    p.style.marginTop = '16px';
-    p.innerHTML = `
-      <div class="panel-header">
+    panel.innerHTML = `
+      <div class="panel-header" style="gap:16px;flex-wrap:wrap">
         <div>
-          <h3>🌟 Học sinh xuất sắc toàn diện</h3>
-          <p>Xếp hạng theo học tập, năng lực/phẩm chất, chuyên cần, vi phạm và khen thưởng.</p>
+          <h3 style="margin:0">🏆 Học sinh xuất sắc toàn diện</h3>
+          <p style="margin:5px 0 0;color:#64748b">
+            Xếp hạng theo học tập, năng lực/phẩm chất, tiến bộ, chuyên cần,
+            vi phạm và khen thưởng.
+          </p>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <label for="hsXuatSacPreset" style="font-weight:700">Số lượng</label>
-          <select id="hsXuatSacPreset" class="period-select">
-            <option value="5">Top 5</option>
-            <option value="10">Top 10</option>
-            <option value="15">Top 15</option>
-            <option value="20">Top 20</option>
-            <option value="custom">Tùy chọn</option>
-          </select>
-          <input id="hsXuatSacCustom" class="period-select" type="number" min="1" max="999" step="1" placeholder="Nhập số" style="display:none;width:90px">
-        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:700;white-space:nowrap">
+          <span>Số lượng</span>
+          <input id="excellentTopInput"
+                 class="period-select"
+                 type="number"
+                 min="1"
+                 max="999"
+                 step="1"
+                 value="${current}"
+                 style="width:82px">
+        </label>
       </div>
-      <div class="table-container">
+
+      <div class="table-container" style="margin-top:14px">
         <table class="data-table">
-          <thead><tr><th>Hạng</th><th>Học sinh</th><th>Điểm tổng hợp</th><th>Học tập</th><th>Vắng</th><th>Vi phạm</th><th>Khen thưởng</th></tr></thead>
-          <tbody id="hsXuatSacBody"></tbody>
+          <thead>
+            <tr>
+              <th>Hạng</th>
+              <th>Học sinh</th>
+              <th>Học tập</th>
+              <th>Năng lực / phẩm chất</th>
+              <th>Tiến bộ</th>
+              <th>Vắng</th>
+              <th>Vi phạm</th>
+              <th>Khen thưởng</th>
+              <th>Điểm toàn diện</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${
+              list.length
+              ? list.map((r,i) => `
+                <tr>
+                  <td><strong>${i + 1}</strong></td>
+                  <td><strong>${esc(r.name)}</strong></td>
+                  <td>${score(r.learningScore)}</td>
+                  <td>${score(r.qualityScore)}</td>
+                  <td>${score(r.progressScore)}</td>
+                  <td>${r.absent}${r.excused ? ` <small>(phép ${r.excused})</small>` : ""}</td>
+                  <td>${r.violations}</td>
+                  <td>${r.rewards}</td>
+                  <td><strong>${r.total.toFixed(1)}%</strong></td>
+                </tr>
+              `).join("")
+              : `
+                <tr>
+                  <td colspan="9">
+                    <div class="empty-state">
+                      <strong>Chưa có dữ liệu học sinh</strong>
+                      <p>Hãy đồng bộ dữ liệu lớp trước khi xếp hạng.</p>
+                    </div>
+                  </td>
+                </tr>
+              `
+            }
+          </tbody>
         </table>
-      </div>`;
+      </div>
+    `;
 
-    const anchor = document.getElementById(BTN_ID);
-    const parent = anchor && anchor.parentElement ? anchor.parentElement.parentElement || page : page;
-    parent.appendChild(p);
-
-    const preset = document.getElementById('hsXuatSacPreset');
-    const custom = document.getElementById('hsXuatSacCustom');
-
-    function getLimit() {
-      if (preset.value === 'custom') {
-        const n = Math.floor(Number(custom.value));
-        return Number.isFinite(n) && n > 0 ? Math.min(n, 999) : 5;
-      }
-      return Number(preset.value) || 5;
-    }
-
-    function render() {
-      const rows = buildRows(getLimit());
-      const body = document.getElementById('hsXuatSacBody');
-      if (!body) return;
-      body.innerHTML = rows.length
-        ? rows.map((x,i) => `<tr><td><strong>${i+1}</strong></td><td><strong>${esc(nameOf(x.s) || 'Chưa xác định')}</strong></td><td><strong>${x.score.toFixed(1)}</strong></td><td>${x.learn ? x.learn.toFixed(1) : '—'}</td><td>${x.absent}</td><td>${x.vio}</td><td>${x.rew}</td></tr>`).join('')
-        : '<tr><td colspan="7"><div class="empty-state"><strong>Chưa có dữ liệu học sinh</strong><p>Hệ thống không tự tạo hoặc đoán dữ liệu.</p></div></td></tr>';
-    }
-
-    preset.addEventListener('change', () => {
-      custom.style.display = preset.value === 'custom' ? '' : 'none';
-      if (preset.value === 'custom') custom.focus();
-      render();
+    panel.querySelector("#excellentTopInput")?.addEventListener("change", renderPanel);
+    panel.querySelector("#excellentTopInput")?.addEventListener("keydown", e => {
+      if (e.key === "Enter") renderPanel();
     });
-    custom.addEventListener('input', render);
-    render();
-    p.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  function ensureSingleButton() {
+    const page = document.querySelector(PAGE);
+    if (!page) return;
+
+    removeOldDuplicatePanels();
+
+    let button = document.getElementById(BTN_ID);
+    if (!button) {
+      const header = page.querySelector(".page-header");
+      const actions = header?.querySelector(".page-actions") || header;
+      if (!actions) return;
+
+      button = document.createElement("button");
+      button.id = BTN_ID;
+      button.type = "button";
+      button.className = "button primary";
+      button.innerHTML = '<i class="fa-solid fa-medal"></i> HS xuất sắc toàn diện';
+      actions.appendChild(button);
+    }
+
+    button.onclick = () => {
+      renderPanel();
+      document.getElementById(PANEL_ID)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    };
   }
 
   function init() {
-    removeDuplicateAttendanceDetail();
-    ensureButton();
+    ensureSingleButton();
+    renderPanel();
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, {once:true});
-  else init();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init, { once: true });
+  } else {
+    init();
+  }
 
-  /* Chạy lại sau các module thống kê khác render DOM. */
-  let last = '';
-  const timer = setInterval(() => {
-    const page = root();
-    if (!page) return;
-    const key = page.innerHTML.length + '|' + text(page.querySelector('h1'));
-    if (key !== last) {
-      last = key;
-      init();
-    } else {
-      /* Luôn kiểm tra khung vắng vì module khác có thể chèn lại. */
-      removeDuplicateAttendanceDetail();
-      ensureButton();
+  document.addEventListener("click", e => {
+    if (e.target.closest?.('[data-page="statistics"],[data-page-link="statistics"]')) {
+      setTimeout(init, 50);
     }
-  }, 700);
+  });
 
-  window.addEventListener('hashchange', init);
+  const observer = new MutationObserver(() => {
+    if (document.querySelector(PAGE)) setTimeout(ensureSingleButton, 0);
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 })();
