@@ -1,0 +1,51 @@
+name: Enforce standalone Utilities
+on:
+  push:
+    branches: [master]
+permissions:
+  contents: write
+jobs:
+  enforce:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Normalize main menu Utilities
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          s=re.sub(r'<button[^>]*data-page=["\']utilities["\'][^>]*>.*?</button>', '', s, flags=re.I|re.S)
+          s=re.sub(r'<a[^>]*href=["\']tien-ich\.html["\'][^>]*>.*?</a>', '', s, flags=re.I|re.S)
+          for pat in [
+            r'\s*<script[^>]*src=["\'][^"\']*tien-ich-final\.js[^"\']*["\'][^>]*></script>',
+            r'\s*<script[^>]*src=["\'][^"\']*tien-ich-schema-v4-fix\.js[^"\']*["\'][^>]*></script>'
+          ]:
+            s=re.sub(pat,'',s,flags=re.I)
+          link='<a href="tien-ich.html" class="menu-item" id="lhUtilitiesStandalone"><i class="fa-solid fa-toolbox"></i><span>Tiện ích</span></a>'
+          settings=re.search(r'<button[^>]*data-page=["\']settings["\'][^>]*>.*?</button>',s,flags=re.I|re.S)
+          if settings:
+            s=s[:settings.start()]+link+s[settings.start():]
+          else:
+            nav_end=s.find('</nav>')
+            s=s[:nav_end]+link+s[nav_end:]
+          s=re.sub(r'menu-final-direct\.js\?v=[^"\']+', 'menu-final-direct.js?v=standalone-utilities-20260825', s)
+          p.write_text(s,encoding='utf-8')
+      - name: Validate
+        shell: bash
+        run: |
+          set -e
+          test "$(grep -o 'id="lhUtilitiesStandalone"' index.html | wc -l | tr -d ' ')" = "1"
+          test "$(grep -o 'href="tien-ich.html"' index.html | wc -l | tr -d ' ')" = "1"
+          if grep -qi 'data-page=["'"']utilities["'"']\|tien-ich-final.js\|tien-ich-schema-v4-fix.js' index.html; then exit 1; fi
+          grep -q 'menu-final-direct.js?v=standalone-utilities-20260825' index.html
+      - name: Commit
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add index.html
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Make Utilities a standalone page"
+          git push origin HEAD:master
