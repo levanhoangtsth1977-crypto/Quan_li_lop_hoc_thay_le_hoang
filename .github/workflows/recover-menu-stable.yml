@@ -13,37 +13,80 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Remove conflicting menu controllers
+      - name: Install one stable menu controller
         shell: python
         run: |
           from pathlib import Path
+          import re
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
-          import re
           patterns = [
               r'<script\b[^>]*src=["\'][^"\']*menu-final-direct\.js[^"\']*["\'][^>]*></script>\s*',
               r'<script\b[^>]*src=["\'][^"\']*emergency-menu-router\.js[^"\']*["\'][^>]*></script>\s*',
-              r'<script\b[^>]*src=["\'][^"\']*lucky-wheel-final\.js[^"\']*["\'][^>]*></script>\s*',
               r'<script\b[^>]*src=["\'][^"\']*vong-quay-may-man\.js[^"\']*["\'][^>]*></script>\s*',
               r'<script\b[^>]*src=["\'][^"\']*vong-quay-may-man-fix\.js[^"\']*["\'][^>]*></script>\s*',
           ]
           for pat in patterns:
               s = re.sub(pat, '', s, flags=re.I)
+          s = re.sub(r'<!-- LH STABLE MENU BEGIN -->.*?<!-- LH STABLE MENU END -->\s*', '', s, flags=re.S)
+          inline = r'''<!-- LH STABLE MENU BEGIN -->
+<script>
+(function(){
+  'use strict';
+  if(window.__LH_STABLE_MENU__) return;
+  window.__LH_STABLE_MENU__ = true;
+  const labels={dashboard:'Trang chủ',students:'Học sinh',attendance:'Điểm danh',violations:'Vi phạm',rewards:'Khen thưởng',learning:'Học tập',comments:'Nhận xét',statistics:'Thống kê','student-links':'Link học sinh',ai:'AI giáo viên',materials:'Kho học liệu','lucky-wheel':'Vòng quay may mắn',settings:'Cài đặt'};
+  function closeMobile(){ if(window.innerWidth>900)return; const s=document.getElementById('sidebar'),o=document.getElementById('sidebarOverlay'); if(s)s.classList.remove('open'); if(o)o.classList.remove('active'); }
+  function show(page){
+    const target=document.querySelector('[data-page-section="'+page+'"]');
+    if(!target) return false;
+    document.querySelectorAll('[data-page-section]').forEach(function(el){el.hidden=true;el.classList.remove('active');});
+    target.hidden=false;target.classList.add('active');
+    document.querySelectorAll('.main-menu .menu-item[data-page]').forEach(function(btn){btn.classList.toggle('active',btn.getAttribute('data-page')===page);});
+    const title=document.getElementById('pageTitle'); if(title)title.textContent=labels[page]||page;
+    closeMobile();
+    if(page==='lucky-wheel') window.dispatchEvent(new Event('pagechange'));
+    return true;
+  }
+  function bind(){
+    const menu=document.querySelector('.main-menu');
+    if(menu&&!menu.__LH_STABLE_BOUND__){
+      menu.__LH_STABLE_BOUND__=true;
+      menu.addEventListener('click',function(e){const btn=e.target.closest('.menu-item[data-page]');if(!btn)return;const page=btn.getAttribute('data-page');if(show(page)){e.preventDefault();e.stopPropagation();}},true);
+      menu.addEventListener('touchend',function(e){const btn=e.target.closest('.menu-item[data-page]');if(!btn)return;const page=btn.getAttribute('data-page');if(show(page)){e.preventDefault();e.stopPropagation();}},{passive:false,capture:true});
+    }
+    const toggle=document.getElementById('sidebarToggle');
+    if(toggle&&!toggle.__LH_STABLE__){toggle.__LH_STABLE__=true;toggle.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();const s=document.getElementById('sidebar'),o=document.getElementById('sidebarOverlay');if(!s)return;const open=!s.classList.contains('open');s.classList.toggle('open',open);if(o)o.classList.toggle('active',open);},true);}
+    const close=document.getElementById('sidebarClose');
+    if(close&&!close.__LH_STABLE__){close.__LH_STABLE__=true;close.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();closeMobile();},true);}
+    const overlay=document.getElementById('sidebarOverlay');
+    if(overlay&&!overlay.__LH_STABLE__){overlay.__LH_STABLE__=true;overlay.addEventListener('click',function(e){e.preventDefault();closeMobile();},true);}
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
+  setTimeout(bind,200);setTimeout(bind,800);setTimeout(bind,1500);
+  window.LHStableMenu=show;
+})();
+</script>
+<!-- LH STABLE MENU END -->
+'''
+          s = s.replace('</body>', inline+'</body>', 1)
           p.write_text(s, encoding='utf-8')
-      - name: Verify stable inline controller remains
+      - name: Verify
         shell: bash
         run: |
           set -e
-          grep -q "__LH_INLINE_MENU__" index.html
-          if grep -qi "menu-final-direct.js\|emergency-menu-router.js\|lucky-wheel-final.js\|vong-quay-may-man.js\|vong-quay-may-man-fix.js" index.html; then
-            echo "Conflicting menu/wheel scripts remain" >&2
+          grep -q 'LH STABLE MENU BEGIN' index.html
+          grep -q '__LH_STABLE_MENU__' index.html
+          test "$(grep -o 'LH STABLE MENU BEGIN' index.html | wc -l | tr -d ' ')" = "1"
+          if grep -qi 'menu-final-direct.js\|emergency-menu-router.js\|vong-quay-may-man.js\|vong-quay-may-man-fix.js' index.html; then
+            echo 'Conflicting menu routers remain' >&2
             exit 1
           fi
       - name: Commit
         run: |
           git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git config user.email 41898282+github-actions[bot].com
           git add index.html
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "Recover stable inline menu controller"
+          git commit -m "Install single stable menu controller"
           git push origin HEAD:master
