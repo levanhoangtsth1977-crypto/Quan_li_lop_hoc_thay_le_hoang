@@ -1,0 +1,3 @@
+FINAL EVENT MENU DEPLOY TRIGGER 2026-08-25
+Mục đích: kích hoạt workflow install-events-new-final để đưa events-new-final.js vào index.html.
+Không chứa dữ liệu ứng dụng.
