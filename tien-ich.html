@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Tiện ích — Thầy Lê Hoàng</title>
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f6f8fb;color:#172033}a{text-decoration:none;color:inherit}.wrap{max-width:1200px;margin:0 auto;padding:22px}.head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}.brand{font-weight:800}.brand small{display:block;color:#64748b;font-weight:500;margin-top:4px}.back{padding:9px 14px;border:1px solid #d8dee9;background:#fff;border-radius:10px}.hero{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:22px;box-shadow:0 8px 24px rgba(15,23,42,.06)}h1{margin:0 0 8px;font-size:28px}p{color:#64748b}.actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:20px}.btn{border:0;border-radius:14px;padding:18px;text-align:left;background:#fff;border:1px solid #dbe3ee;cursor:pointer}.btn strong{display:block;font-size:16px}.btn small{display:block;color:#64748b;margin-top:5px}.status{margin-top:14px;padding:12px 14px;border:1px dashed #cbd5e1;background:#f8fafc;border-radius:10px;color:#64748b}.status.ok{background:#f0fdf4;border-color:#86efac;color:#166534}.card{margin-top:16px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px;overflow:auto}table{width:100%;border-collapse:collapse;min-width:720px}th,td{padding:9px;border-bottom:1px solid #edf1f5;text-align:left;font-size:13px}th{background:#f8fafc}.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.group{border:1px solid #dbe3ee;border-radius:12px;padding:10px;background:#f8fafc}.group h3{margin:0 0 8px;text-align:center}.desk{display:grid;grid-template-columns:24px 1fr 1fr;gap:5px;margin:6px 0}.seat{background:#fff;border:1px solid #dbe3ee;border-radius:8px;padding:10px;min-height:48px}.seat b{display:block;font-size:13px}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:12px}.mini{padding:9px 12px;border:1px solid #d8dee9;background:#fff;border-radius:9px;cursor:pointer}@media(max-width:800px){.actions,.grid4{grid-template-columns:1fr}.wrap{padding:12px}.head{align-items:flex-start}.toolbar{flex-direction:column;align-items:stretch}}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f6f8fb;color:#172033}a{text-decoration:none;color:inherit}.wrap{max-width:1200px;margin:0 auto;padding:22px}.head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px}.brand{font-weight:800}.brand small{display:block;color:#64748b;font-weight:500;margin-top:4px}.back{padding:9px 14px;border:1px solid #d8dee9;background:#fff;border-radius:10px}.hero{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:22px;box-shadow:0 8px 24px rgba(15,23,42,.06)}h1{margin:0 0 8px;font-size:28px}p{color:#64748b}.actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:20px}.btn{border:0;border-radius:14px;padding:18px;text-align:left;background:#fff;border:1px solid #dbe3ee;cursor:pointer}.btn strong{display:block;font-size:16px}.btn small{display:block;color:#64748b;margin-top:5px}.status{margin-top:14px;padding:12px 14px;border:1px dashed #cbd5e1;background:#f8fafc;border-radius:10px;color:#64748b}.status.ok{background:#f0fdf4;border-color:#86efac;color:#166534}.card{margin-top:16px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px;overflow:auto}table{width:100%;border-collapse:collapse;min-width:720px}th,td{padding:9px;border-bottom:1px solid #edf1f5;text-align:left;font-size:13px}th{background:#f8fafc}.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.group{border:1px solid #dbe3ee;border-radius:12px;padding:10px;background:#f8fafc}.group h3{margin:0 0 8px;text-align:center}.desk{display:grid;grid-template-columns:24px 1fr 1fr;gap:5px;margin:6px 0}.seat{background:#fff;border:1px solid #dbe3ee;border-radius:8px;padding:9px;min-height:48px}.seat b{display:block;font-size:12px}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:12px}.mini{padding:9px 12px;border:1px solid #d8dee9;background:#fff;border-radius:9px;cursor:pointer}@media(max-width:800px){.actions,.grid4{grid-template-columns:1fr}.wrap{padding:12px}.head{align-items:flex-start}.toolbar{flex-direction:column;align-items:stretch}}
 </style>
 </head>
 <body>
@@ -33,25 +33,31 @@ const clean=v=>String(v??'').trim().replace(/\s+/g,' ');
 const norm=v=>clean(v).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d');
 const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function split(line){let s=line.trim();if(s.startsWith('|'))s=s.slice(1);if(s.endsWith('|'))s=s.slice(0,-1);if(s.includes('\t'))return s.split('\t').map(clean);if(s.includes('|'))return s.split('|').map(clean);if(s.includes(';'))return s.split(';').map(clean);return s.split(',').map(clean)}
-function isHeaderName(v){const n=norm(v);return n==='ho va ten'||n==='ho ten'||n==='ho ten hs'||n==='hoc sinh'||n==='name'}
-function isDividerRow(r){return r.length>0&&r.every(v=>/^:?---+:?$/.test(clean(v))||clean(v)==='')}
+function dividerRow(r){return r.length>0&&r.every(v=>/^:?-{2,}:?$/.test(clean(v)))}
 function parse(text){
  const rows=String(text||'').replace(/^\uFEFF/,'').replace(/\r/g,'').split('\n').map(x=>x.trim()).filter(Boolean).map(split);
  if(!rows.length)throw Error('Tệp không có dữ liệu.');
- const h=rows[0].map(norm);
+ let headerIndex=-1;
+ for(let i=0;i<Math.min(rows.length,5);i++){
+   const h=rows[i].map(norm);
+   if(h.some(x=>x==='ho va ten'||x.includes('ho va ten')||x==='ho ten'||x.includes('hoc sinh')||x==='name')){headerIndex=i;break;}
+ }
+ const h=(headerIndex>=0?rows[headerIndex]:rows[0]).map(norm);
  const find=(arr,def)=>{const i=h.findIndex(x=>arr.some(n=>x===n||x.includes(n)));return i>=0?i:def};
  const nameI=find(['ho va ten','ho ten','hoc sinh','name'],1),genderI=find(['gioi tinh'],2),levelI=find(['xep loai','trinh do','hoc luc','level'],3),noteI=find(['ghi chu','note'],4);
- const start=h.some(x=>x.includes('ho ten')||x.includes('hoc sinh')||x==='name')?1:0;
+ const start=headerIndex>=0?headerIndex+1:0;
  const out=[];
  for(let i=start;i<rows.length;i++){
    const r=rows[i];
-   if(isDividerRow(r))continue;
+   if(dividerRow(r))continue;
    const name=clean(r[nameI]);
-   if(!name||isHeaderName(name))continue;
-   const level=clean(r[levelI]);
-   out.push({stt:out.length+1,name,gender:clean(r[genderI]),level:level||'H',note:clean(r[noteI])});
+   if(!name)continue;
+   const nn=norm(name);
+   if(nn==='ho va ten'||nn==='ho ten'||nn==='hoc sinh'||nn==='name')continue;
+   out.push({stt:out.length+1,name,gender:clean(r[genderI]),level:clean(r[levelI])||'H',note:clean(r[noteI])});
  }
  if(!out.length)throw Error('Không tìm thấy dữ liệu theo đúng mẫu 5 cột.');
+ if(out.length!==42)throw Error('Danh sách phải có đúng 42 học sinh. Hiện đã đọc '+out.length+' học sinh.');
  return out;
 }
 function rank(v){const s=norm(v);if(s==='t'||/tot|gioi|xuat sac/.test(s))return 2;if(s==='h'||/hoan thanh|kha|dat/.test(s))return 1;return 0}
@@ -62,14 +68,14 @@ function renderPreview(){
  $('layout2').onclick=renderLayout;
 }
 function renderLayout(){
- if(!data.length){alert('Hãy tải lên danh sách trước.');return}
+ if(data.length!==42){alert('Danh sách phải có đúng 42 học sinh.');return}
  const cols=[[],[],[],[]];pair(data).forEach((p,i)=>cols[i%4].push(p));
  $('layout').hidden=false;
- $('layout').innerHTML='<div class="toolbar"><b>'+data.length+' học sinh · '+Math.ceil(data.length/2)+' bàn · 4 tổ</b><button class="mini" id="reshuffle">🔀 Xếp lại</button></div><div class="grid4" style="margin-top:12px">'+cols.map((c,i)=>'<div class="group"><h3>Tổ '+(i+1)+'</h3>'+c.map((p,j)=>'<div class="desk"><span style="display:flex;align-items:center;justify-content:center">'+(j+1)+'</span><div class="seat"><b>'+esc(p[0].name)+'</b></div><div class="seat">'+(p[1]?'<b>'+esc(p[1].name)+'</b>':'—')+'</div></div>').join('')+'</div>').join('')+'</div><p style="margin-top:12px;color:#64748b">Xếp loại T/H chỉ được dùng làm căn cứ cân bằng khi xếp chỗ; không hiển thị trên sơ đồ lớp.</p>';
+ $('layout').innerHTML='<div class="toolbar"><b>'+data.length+' học sinh · '+Math.ceil(data.length/2)+' bàn · 4 tổ · 2 HS/bàn</b><button class="mini" id="reshuffle">🔀 Xếp lại</button></div><div class="grid4" style="margin-top:12px">'+cols.map((c,i)=>'<div class="group"><h3>Tổ '+(i+1)+'</h3>'+c.map((p,j)=>'<div class="desk"><span style="display:flex;align-items:center;justify-content:center">'+(j+1)+'</span><div class="seat"><b>'+esc(p[0].name)+'</b></div><div class="seat">'+(p[1]?'<b>'+esc(p[1].name)+'</b>':'—')+'</div></div>').join('')+'</div>').join('')+'</div><p style="margin-top:12px;color:#64748b">Xếp loại T/H chỉ dùng làm căn cứ cân bằng khi xếp chỗ; không hiển thị trên sơ đồ lớp.</p>';
  $('reshuffle').onclick=renderLayout;
 }
 $('uploadBtn').onclick=()=>$('file').click();
-$('file').onchange=async()=>{const f=$('file').files[0];$('file').value='';if(!f)return;try{data=parse(await f.text());$('status').className='status ok';$('status').innerHTML='Đã tải <b>'+data.length+'</b> học sinh từ <b>'+esc(f.name)+'</b> · cột Xếp loại chỉ dùng để xếp.';renderPreview()}catch(e){alert(e.message||'Tệp không hợp lệ')}};
+$('file').onchange=async()=>{const f=$('file').files[0];$('file').value='';if(!f)return;try{data=parse(await f.text());$('status').className='status ok';$('status').innerHTML='Đã tải <b>'+data.length+'</b> học sinh từ <b>'+esc(f.name)+'</b> · mẫu 5 cột hợp lệ.';renderPreview()}catch(e){$('status').className='status';alert(e.message||'Tệp không hợp lệ.')}};
 $('layoutBtn').onclick=renderLayout;
 })();
 </script>
