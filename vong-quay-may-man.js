@@ -73,7 +73,7 @@
     const name=document.getElementById('lhWheelName');
     const sub=document.getElementById('lhWheelSub');
     const btn=document.getElementById('lhWheelSpin');
-    if(!name)return;
+    if(!name||!btn)return;
     btn.disabled=true;
     name.classList.remove('winner-pop');
     let ticks=0;
@@ -84,7 +84,7 @@
       if(ticks>=14){
         clearInterval(timer);
         name.textContent=winner.name;
-        sub.textContent='🎉 Chúc mừng! Học sinh được gọi ngẫu nhiên.';
+        if(sub)sub.textContent='🎉 Chúc mừng! Học sinh được gọi ngẫu nhiên.';
         name.classList.add('winner-pop');
         btn.disabled=false;
         renderCalled();
@@ -112,10 +112,23 @@
 
   function playBeep(){try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;const c=new C();const o=c.createOscillator();const g=c.createGain();o.type='sine';o.frequency.value=880;g.gain.value=.05;o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.18);setTimeout(()=>c.close(),300);}catch(e){}}
 
+  function bindPage(){
+    const sec=document.getElementById(PAGE);
+    if(!sec)return false;
+    const spin=document.getElementById('lhWheelSpin');
+    const reset=document.getElementById('lhWheelReset');
+    const scope=document.getElementById('lhWheelScope');
+    if(spin)spin.onclick=choose;
+    if(reset)reset.onclick=resetRound;
+    if(scope)scope.onchange=()=>{resetRound();renderCalled();};
+    renderCalled();
+    return true;
+  }
+
   function installMenu(){
-    if(document.getElementById(APP))return;
     const nav=document.querySelector('.main-menu');if(!nav)return;
-    nav.querySelectorAll('[data-page="lucky-wheel"]').forEach(x=>x.remove());
+    const existing=nav.querySelector('[data-page="lucky-wheel"]');
+    if(existing){existing.onclick=openPage;return;}
     const divider=document.createElement('div');divider.className='menu-divider lh-wheel-divider';
     const btn=document.createElement('button');btn.type='button';btn.id=APP;btn.className='menu-item';btn.dataset.page='lucky-wheel';
     btn.innerHTML='<i class="fa-solid fa-dharmachakra"></i><span>Vòng quay may mắn</span>';
@@ -132,13 +145,10 @@
       sec=document.createElement('section');sec.id=PAGE;sec.className='page-section active';
       sec.innerHTML=`<div class="page-header"><div><span class="page-eyebrow"><i class="fa-solid fa-dharmachakra"></i> Hoạt động lớp học</span><h1>🎡 Vòng quay may mắn</h1><p>Gọi ngẫu nhiên học sinh để trả lời, phát biểu hoặc tham gia hoạt động. Không thay đổi dữ liệu gốc.</p></div></div><div class="lh-wheel-panel"><div class="lh-wheel-controls"><label>Phạm vi chọn<select id="lhWheelScope"><option value="all">👥 Toàn lớp</option><option value="to1">Tổ 1</option><option value="to2">Tổ 2</option><option value="to3">Tổ 3</option><option value="to4">Tổ 4</option></select></label><button type="button" class="button secondary" id="lhWheelReset"><i class="fa-solid fa-rotate-left"></i> Vòng mới</button></div><div class="lh-wheel-stage"><div class="lh-wheel-circle"><div class="lh-wheel-pointer">▼</div><div class="lh-wheel-center">🎡</div></div><div class="lh-wheel-result"><div class="lh-wheel-caption">HỌC SINH ĐƯỢC CHỌN</div><div class="lh-wheel-name" id="lhWheelName">SẴN SÀNG</div><div class="lh-wheel-sub" id="lhWheelSub">Nhấn “QUAY NGAY” để chọn học sinh</div><button type="button" class="button primary lh-wheel-spin" id="lhWheelSpin">🎯 QUAY NGAY</button><div class="lh-wheel-count" id="lhWheelCount">Đã gọi 0/0 học sinh</div></div></div><div class="lh-wheel-called-wrap"><div class="lh-wheel-called-head"><b>Danh sách đã gọi</b><span>Không lặp trong cùng một vòng</span></div><div id="lhWheelCalled" class="lh-wheel-called"><div class="lh-wheel-empty">Chưa gọi học sinh nào.</div></div></div></div>`;
       document.getElementById('mainContent').appendChild(sec);
-      document.getElementById('lhWheelSpin').onclick=choose;
-      document.getElementById('lhWheelReset').onclick=resetRound;
-      document.getElementById('lhWheelScope').onchange=()=>{resetRound();renderCalled();};
     }
     sec.classList.add('active');
     const title=document.getElementById('pageTitle');if(title)title.textContent='Vòng quay may mắn';
-    renderCalled();
+    bindPage();
   }
 
   function css(){
@@ -147,6 +157,6 @@
     document.head.appendChild(s);
   }
 
-  function start(){css();installMenu();}
+  function start(){css();installMenu();bindPage();}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
