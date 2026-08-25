@@ -1,11 +1,11 @@
-/* EVENT DELETE MASTER 13 — GOOGLE SHEETS VERIFIED DELETE + UI STATE SYNC */
+/* EVENT DELETE MASTER 14 — DEPLOYED GAS COMPATIBLE + GOOGLE SHEETS VERIFIED DELETE + UI STATE SYNC */
 (function(){
 'use strict';
-if(window.__LH_EVENT_DELETE_MASTER_13__)return;
-window.__LH_EVENT_DELETE_MASTER_13__=true;
+if(window.__LH_EVENT_DELETE_MASTER_14__)return;
+window.__LH_EVENT_DELETE_MASTER_14__=true;
 const API='https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
 const S=v=>String(v??'').trim();
-function jsonp(params){return new Promise((resolve,reject)=>{const cb='LHDEL13_'+Date.now()+'_'+Math.random().toString(36).slice(2),s=document.createElement('script');let done=false;const finish=(e,d)=>{if(done)return;done=true;clearTimeout(t);try{delete window[cb]}catch(_){}s.remove();e?reject(e):resolve(d)};window[cb]=d=>finish(null,d);s.onerror=()=>finish(Error('Không truy cập được Google Apps Script'));const t=setTimeout(()=>finish(Error('Google Apps Script không phản hồi')),20000);const q=new URLSearchParams({...params,callback:cb,_:Date.now()});s.src=API+'?'+q;document.head.appendChild(s)})}
+function jsonp(params){return new Promise((resolve,reject)=>{const cb='LHDEL14_'+Date.now()+'_'+Math.random().toString(36).slice(2),s=document.createElement('script');let done=false;const finish=(e,d)=>{if(done)return;done=true;clearTimeout(t);try{delete window[cb]}catch(_){}s.remove();e?reject(e):resolve(d)};window[cb]=d=>finish(null,d);s.onerror=()=>finish(Error('Không truy cập được Google Apps Script'));const t=setTimeout(()=>finish(Error('Google Apps Script không phản hồi')),20000);const q=new URLSearchParams({...params,callback:cb,_:Date.now()});s.src=API+'?'+q;document.head.appendChild(s)})}
 async function getAll(){const r=await jsonp({action:'get_all'});if(!r?.ok)throw Error(r?.error||'Không đọc được Google Sheets');return r}
 function replaceArrayContents(target,source){if(!Array.isArray(target)||!Array.isArray(source))return;target.splice(0,target.length,...source)}
 function syncVerifiedState(sheet,rows){
@@ -34,7 +34,13 @@ function updateVisibleCounts(){
 async function remoteDelete(kind,id){
   const sid=S(id);if(!sid)throw Error('Thiếu ID bản ghi');
   const sheet=kind==='reward'?'KHEN_THUONG':kind==='violation'?'VI_PHAM':'DIEM_DANH';
-  const action=kind==='reward'?'delete_reward':kind==='violation'?'delete_violation':'delete_event';
+  /*
+     QUAN TRỌNG: Web App GAS đang được trang thực tế sử dụng có thể chưa
+     được triển khai lại Code.gs mới. Vì vậy VI_PHAM dùng action delete_event,
+     là action tương thích với cả bản GAS cũ và Code.gs MASTER hiện tại.
+     Không dùng delete_violation ở frontend nữa.
+  */
+  const action=kind==='reward'?'delete_reward':kind==='violation'?'delete_event':'delete_event';
   const r=await jsonp({action,sheet,id:sid,recordId:sid,eventId:sid});
   if(!r?.ok||r.deleted!==true||Number(r.deletedCount||0)<1)throw Error(r?.error||'Google Sheets không xác nhận đã xóa');
   const after=await getAll();
@@ -67,7 +73,7 @@ async function deleteOne(kind,id){
 window.deleteViolation=id=>deleteOne('violation',id);
 window.deleteReward=id=>deleteOne('reward',id);
 window.deleteAttendance=id=>deleteOne('attendance',id);
-window.LH_DELETE_EVENT_MASTER_13={deleteOne,remoteDelete,refresh,syncVerifiedState};
+window.LH_DELETE_EVENT_MASTER_14={deleteOne,remoteDelete,refresh,syncVerifiedState};
 document.addEventListener('click',e=>{
   const b=e.target.closest?.('[data-violation-delete]');
   if(b){e.preventDefault();e.stopImmediatePropagation();deleteOne('violation',b.dataset.violationDelete);return}
