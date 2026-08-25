@@ -25,7 +25,9 @@
             <button type="button" class="menu-item" data-page="statistics"><i class="fa-solid fa-chart-column"></i><span>Thống kê</span></button>
             <button type="button" class="menu-item" data-page="student-links"><i class="fa-solid fa-link"></i><span>Link học sinh</span></button>
             <button type="button" class="menu-item" data-page="ai"><i class="fa-solid fa-robot"></i><span>AI giáo viên</span><span class="menu-label">Mới</span></button>
-            <div class="menu-divider"></div><button type="button" class="menu-item" data-page="settings"><i class="fa-solid fa-gear"></i><span>Cài đặt</span></button>
+            <div class="menu-divider"></div>
+            <div class="menu-divider"></div>
+            <button type="button" class="menu-item" data-page="lucky-wheel" id="lhLuckyWheelStatic"><i class="fa-solid fa-dharmachakra"></i><span>Vòng quay may mắn</span></button><button type="button" class="menu-item" data-page="settings"><i class="fa-solid fa-gear"></i><span>Cài đặt</span></button>
         </nav>
         <div class="teacher-card"><div class="teacher-avatar">LH</div><div class="teacher-info"><strong>Thầy Lê Hoàng</strong><span>Giáo viên chủ nhiệm</span></div><button type="button" id="teacherMenuButton" class="icon-button" aria-label="Menu giáo viên"><i class="fa-solid fa-ellipsis-vertical"></i></button></div>
     </aside>
@@ -44,7 +46,48 @@
             <section class="page-section" id="page-materials" data-page-section="materials"><div class="page-header"><div><span class="page-eyebrow"><i class="fa-solid fa-folder-open"></i> Học liệu</span><h1>Kho học liệu</h1><p>Giữ lại và tích hợp kho học liệu của website hiện tại.</p></div></div><div class="materials-grid"><a class="material-card" href="#" data-material="lesson-plans"><i class="fa-solid fa-file-lines"></i><strong>Giáo án</strong><span>Xem và tải giáo án</span></a><a class="material-card" href="#" data-material="tests"><i class="fa-solid fa-file-circle-check"></i><strong>Đề kiểm tra</strong><span>Xem và tải đề</span></a><a class="material-card" href="#" data-material="worksheets"><i class="fa-solid fa-file-pen"></i><strong>Phiếu học tập</strong><span>Xem và tải phiếu</span></a><a class="material-card" href="#" data-material="slides"><i class="fa-solid fa-display"></i><strong>Bài giảng</strong><span>Slide bài giảng</span></a><a class="material-card" href="#" data-material="documents"><i class="fa-solid fa-folder"></i><strong>Tài liệu</strong><span>Tài liệu tham khảo</span></a><a class="material-card" href="#" data-material="images"><i class="fa-solid fa-images"></i><strong>Thư viện ảnh</strong><span>Hình ảnh học tập</span></a></div></section>
             <section class="page-section" id="page-ai" data-page-section="ai"><div class="page-header"><div><span class="page-eyebrow ai-text"><i class="fa-solid fa-robot"></i> Trợ lý</span><h1>AI giáo viên</h1><p>Hỗ trợ phân tích và xử lý dữ liệu giáo dục.</p></div></div><div class="ai-grid"><button type="button" class="ai-card" data-ai-action="analyze-class"><span class="ai-icon"><i class="fa-solid fa-chart-line"></i></span><strong>Phân tích lớp</strong><span>Phân tích tình hình chung của lớp.</span></button><button type="button" class="ai-card" data-ai-action="student-support"><span class="ai-icon"><i class="fa-solid fa-user-graduate"></i></span><strong>Hỗ trợ học sinh</strong><span>Gợi ý biện pháp hỗ trợ dựa trên dữ liệu.</span></button><button type="button" class="ai-card" data-ai-action="comments"><span class="ai-icon"><i class="fa-solid fa-comment-dots"></i></span><strong>Gợi ý nhận xét</strong><span>Hỗ trợ giáo viên soạn nhận xét.</span></button><button type="button" class="ai-card" data-ai-action="progress"><span class="ai-icon"><i class="fa-solid fa-arrow-trend-up"></i></span><strong>Phân tích tiến bộ</strong><span>Theo dõi xu hướng tiến bộ của học sinh.</span></button></div><div class="ai-disclaimer"><i class="fa-solid fa-circle-info"></i><p>AI chỉ đóng vai trò hỗ trợ. Giáo viên kiểm tra và quyết định nội dung cuối cùng trước khi sử dụng.</p></div></section>
             <section class="page-section" id="page-settings" data-page-section="settings"><div class="page-header"><div><span class="page-eyebrow"><i class="fa-solid fa-gear"></i> Hệ thống</span><h1>Cài đặt</h1><p>Thiết lập năm học, lớp và kết nối dữ liệu.</p></div></div><div class="settings-grid"><div class="settings-card"><div class="settings-card-header"><i class="fa-solid fa-calendar"></i><div><strong>Năm học</strong><span>Quản lý nhiều năm học</span></div></div><button type="button" class="button secondary" data-setting="school-years">Quản lý năm học</button></div><div class="settings-card"><div class="settings-card-header"><i class="fa-solid fa-database"></i><div><strong>Dữ liệu</strong><span>Google Sheets / Apps Script</span></div></div><button type="button" class="button secondary" data-setting="database">Cấu hình dữ liệu</button></div><div class="settings-card"><div class="settings-card-header"><i class="fa-brands fa-google-drive"></i><div><strong>Google Drive</strong><span>Kho lưu trữ tài liệu</span></div></div><button type="button" class="button secondary" data-setting="drive">Cấu hình Drive</button></div><div class="settings-card"><div class="settings-card-header"><i class="fa-solid fa-shield-halved"></i><div><strong>Bảo mật</strong><span>Quyền truy cập và link học sinh</span></div></div><button type="button" class="button secondary" data-setting="security">Cài đặt bảo mật</button></div></div></section>
-        </main>
+        
+  <section class="page-section" id="page-lucky-wheel" data-page-section="lucky-wheel">
+      <div class="page-header">
+          <div>
+              <span class="page-eyebrow"><i class="fa-solid fa-dharmachakra"></i> Hoạt động lớp học</span>
+              <h1>🎡 Vòng quay may mắn</h1>
+              <p>Gọi ngẫu nhiên học sinh để trả lời, phát biểu hoặc tham gia hoạt động. Không thay đổi dữ liệu gốc.</p>
+          </div>
+      </div>
+      <div class="lh-wheel-panel">
+          <div class="lh-wheel-controls">
+              <label>Phạm vi chọn
+                  <select id="lhWheelScope">
+                      <option value="all">👥 Toàn lớp</option>
+                      <option value="to1">Tổ 1</option>
+                      <option value="to2">Tổ 2</option>
+                      <option value="to3">Tổ 3</option>
+                      <option value="to4">Tổ 4</option>
+                  </select>
+              </label>
+              <button type="button" class="button secondary" id="lhWheelReset"><i class="fa-solid fa-rotate-left"></i> Vòng mới</button>
+          </div>
+          <div class="lh-wheel-stage">
+              <div class="lh-wheel-circle">
+                  <div class="lh-wheel-pointer">▼</div>
+                  <div class="lh-wheel-center">🎡</div>
+              </div>
+              <div class="lh-wheel-result">
+                  <div class="lh-wheel-caption">HỌC SINH ĐƯỢC CHỌN</div>
+                  <div class="lh-wheel-name" id="lhWheelName">SẴN SÀNG</div>
+                  <div class="lh-wheel-sub" id="lhWheelSub">Nhấn “QUAY NGAY” để chọn học sinh</div>
+                  <button type="button" class="button primary lh-wheel-spin" id="lhWheelSpin">🎯 QUAY NGAY</button>
+                  <div class="lh-wheel-count" id="lhWheelCount">Đã gọi 0/0 học sinh</div>
+              </div>
+          </div>
+          <div class="lh-wheel-called-wrap">
+              <div class="lh-wheel-called-head"><b>Danh sách đã gọi</b><span>Không lặp trong cùng một vòng</span></div>
+              <div id="lhWheelCalled" class="lh-wheel-called"><div class="lh-wheel-empty">Chưa gọi học sinh nào.</div></div>
+          </div>
+      </div>
+  </section>
+</main>
         <footer class="footer"><span>© <span id="currentYear">2026</span> QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG</span><span>Hệ thống quản lý lớp học</span></footer>
     </div>
 </div>
@@ -69,8 +112,7 @@
 <script src="statistics-excellent.js"></script>
 <script src="thong-ke-xuat-sac-final.js?v=20260823"></script>
 <script src="events-new-final.js?v=20260825"></script>
-    <script src="vong-quay-may-man.js"></script>
 <script src="tien-ich-final.js?v=20260823"></script>
-<script src="vong-quay-may-man.js?v=20260825"></script>
+    <script src="vong-quay-may-man.js?v=20260825"></script>
 </body>
 </html>
