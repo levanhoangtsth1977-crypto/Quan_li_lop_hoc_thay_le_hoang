@@ -1,32 +1,35 @@
-/* EVENT DELETE MASTER 12 — GOOGLE SHEETS VERIFIED DELETE + UI STATE SYNC */
+/* EVENT DELETE MASTER 13 — GOOGLE SHEETS VERIFIED DELETE + UI STATE SYNC */
 (function(){
 'use strict';
-if(window.__LH_EVENT_DELETE_MASTER_12__)return;
-window.__LH_EVENT_DELETE_MASTER_12__=true;
+if(window.__LH_EVENT_DELETE_MASTER_13__)return;
+window.__LH_EVENT_DELETE_MASTER_13__=true;
 const API='https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
 const S=v=>String(v??'').trim();
-function jsonp(params){return new Promise((resolve,reject)=>{const cb='LHDEL12_'+Date.now()+'_'+Math.random().toString(36).slice(2),s=document.createElement('script');let done=false;const finish=(e,d)=>{if(done)return;done=true;clearTimeout(t);try{delete window[cb]}catch(_){}s.remove();e?reject(e):resolve(d)};window[cb]=d=>finish(null,d);s.onerror=()=>finish(Error('Không truy cập được Google Apps Script'));const t=setTimeout(()=>finish(Error('Google Apps Script không phản hồi')),20000);const q=new URLSearchParams({...params,callback:cb,_:Date.now()});s.src=API+'?'+q;document.head.appendChild(s)})}
+function jsonp(params){return new Promise((resolve,reject)=>{const cb='LHDEL13_'+Date.now()+'_'+Math.random().toString(36).slice(2),s=document.createElement('script');let done=false;const finish=(e,d)=>{if(done)return;done=true;clearTimeout(t);try{delete window[cb]}catch(_){}s.remove();e?reject(e):resolve(d)};window[cb]=d=>finish(null,d);s.onerror=()=>finish(Error('Không truy cập được Google Apps Script'));const t=setTimeout(()=>finish(Error('Google Apps Script không phản hồi')),20000);const q=new URLSearchParams({...params,callback:cb,_:Date.now()});s.src=API+'?'+q;document.head.appendChild(s)})}
 async function getAll(){const r=await jsonp({action:'get_all'});if(!r?.ok)throw Error(r?.error||'Không đọc được Google Sheets');return r}
-function replaceArrayContents(target,source){
-  if(!Array.isArray(target)||!Array.isArray(source))return;
-  target.splice(0,target.length,...source);
-}
+function replaceArrayContents(target,source){if(!Array.isArray(target)||!Array.isArray(source))return;target.splice(0,target.length,...source)}
 function syncVerifiedState(sheet,rows){
   if(!Array.isArray(rows))return;
   try{
     if(sheet==='VI_PHAM'){
       if(typeof violationRecords!=='undefined')replaceArrayContents(violationRecords,rows);
       if(window.APP_DATA?.violations&&window.APP_DATA.violations!==violationRecords)replaceArrayContents(window.APP_DATA.violations,rows);
-    }
-    if(sheet==='KHEN_THUONG'){
+    }else if(sheet==='KHEN_THUONG'){
       if(typeof rewardRecords!=='undefined')replaceArrayContents(rewardRecords,rows);
       if(window.APP_DATA?.rewards&&window.APP_DATA.rewards!==rewardRecords)replaceArrayContents(window.APP_DATA.rewards,rows);
-    }
-    if(sheet==='DIEM_DANH'){
+    }else if(sheet==='DIEM_DANH'){
       if(typeof attendanceRecords!=='undefined')replaceArrayContents(attendanceRecords,rows);
       if(window.APP_DATA?.attendance&&window.APP_DATA.attendance!==attendanceRecords)replaceArrayContents(window.APP_DATA.attendance,rows);
     }
   }catch(e){console.warn('[LH DELETE] Không thể đồng bộ state:',e)}
+}
+function updateVisibleCounts(){
+  try{
+    const v=typeof violationRecords!=='undefined'&&Array.isArray(violationRecords)?violationRecords.length:0;
+    const r=typeof rewardRecords!=='undefined'&&Array.isArray(rewardRecords)?rewardRecords.length:0;
+    ['violationBadge','statViolations'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=String(v)});
+    ['rewardBadge','statRewards'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=String(r)});
+  }catch(e){}
 }
 async function remoteDelete(kind,id){
   const sid=S(id);if(!sid)throw Error('Thiếu ID bản ghi');
@@ -42,6 +45,7 @@ function refresh(kind,verifiedRows){
   try{
     const sheet=kind==='reward'?'KHEN_THUONG':kind==='violation'?'VI_PHAM':'DIEM_DANH';
     syncVerifiedState(sheet,verifiedRows);
+    updateVisibleCounts();
     if(typeof window.syncAppDataReferences==='function')window.syncAppDataReferences();
     if(kind==='reward'&&typeof window.renderRewards==='function')window.renderRewards();
     if(kind==='violation'&&typeof window.renderViolations==='function')window.renderViolations();
@@ -63,7 +67,7 @@ async function deleteOne(kind,id){
 window.deleteViolation=id=>deleteOne('violation',id);
 window.deleteReward=id=>deleteOne('reward',id);
 window.deleteAttendance=id=>deleteOne('attendance',id);
-window.LH_DELETE_EVENT_MASTER_12={deleteOne,remoteDelete,refresh,syncVerifiedState};
+window.LH_DELETE_EVENT_MASTER_13={deleteOne,remoteDelete,refresh,syncVerifiedState};
 document.addEventListener('click',e=>{
   const b=e.target.closest?.('[data-violation-delete]');
   if(b){e.preventDefault();e.stopImmediatePropagation();deleteOne('violation',b.dataset.violationDelete);return}
