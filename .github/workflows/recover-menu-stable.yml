@@ -1,4 +1,4 @@
-name: Recover stable menu navigation
+name: Restore core menu and standalone utilities
 
 on:
   push:
@@ -8,134 +8,66 @@ permissions:
   contents: write
 
 jobs:
-  recover:
+  restore:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Clean legacy menu and utilities routers
-        shell: python
+
+      - name: Clean conflicting menu and utilities modules
+        shell: bash
         run: |
+          python - <<'PY'
           from pathlib import Path
           import re
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
+
           patterns = [
               r'<script\b[^>]*src=["\'][^"\']*menu-final-direct\.js[^"\']*["\'][^>]*></script>\s*',
               r'<script\b[^>]*src=["\'][^"\']*menu-special-fix\.js[^"\']*["\'][^>]*></script>\s*',
               r'<script\b[^>]*src=["\'][^"\']*emergency-menu-router\.js[^"\']*["\'][^>]*></script>\s*',
               r'<script\b[^>]*src=["\'][^"\']*tien-ich-final\.js[^"\']*["\'][^>]*></script>\s*',
               r'<script\b[^>]*src=["\'][^"\']*tien-ich-schema-v4-fix\.js[^"\']*["\'][^>]*></script>\s*',
-              r'<script\b[^>]*src=["\'][^"\']*restore-menu[^"\']*["\'][^>]*></script>\s*',
-              r'<script\b[^>]*src=["\'][^"\']*fix-menu[^"\']*["\'][^>]*></script>\s*',
           ]
           for pat in patterns:
               s = re.sub(pat, '', s, flags=re.I)
+
           s = re.sub(r'<!-- LH STABLE MENU BEGIN -->.*?<!-- LH STABLE MENU END -->\s*', '', s, flags=re.S)
-          inline = r'''<!-- LH STABLE MENU BEGIN -->
-<script>
-(function(){
-  'use strict';
-  if(window.__LH_STABLE_MENU__) return;
-  window.__LH_STABLE_MENU__ = true;
-  const labels={dashboard:'Trang chủ',students:'Học sinh',attendance:'Điểm danh',violations:'Vi phạm',rewards:'Khen thưởng',learning:'Học tập',comments:'Nhận xét',statistics:'Thống kê','student-links':'Link học sinh',ai:'AI giáo viên',materials:'Kho học liệu','lucky-wheel':'Vòng quay may mắn',settings:'Cài đặt'};
-  const isUtil=(el)=>{
-    if(!el) return false;
-    const href=(el.getAttribute('href')||'').toLowerCase();
-    const text=(el.textContent||'').replace(/\s+/g,' ').trim().toLowerCase();
-    return href.includes('tien-ich.html') || text==='tiện ích' || text.includes('tiện ích');
-  };
-  function closeMobile(){
-    if(window.innerWidth>900) return;
-    document.getElementById('sidebar')?.classList.remove('open');
-    document.getElementById('sidebarOverlay')?.classList.remove('active');
-  }
-  function ensureUtilities(){
-    const nav=document.querySelector('.main-menu');
-    if(!nav) return;
-    const items=[...nav.querySelectorAll('a,button')].filter(isUtil);
-    let link=items.find(x=>x.id==='lhStandaloneUtilities') || items.find(x=>x.tagName==='A');
-    if(!link){ link=document.createElement('a'); nav.appendChild(link); }
-    link.id='lhStandaloneUtilities';
-    link.className='menu-item';
-    link.href='tien-ich.html';
-    link.innerHTML='<i class="fa-solid fa-toolbox"></i><span>Tiện ích</span>';
-    items.forEach(x=>{ if(x!==link) x.remove(); });
-    link.onclick=null;
-  }
-  function show(page){
-    const target=document.querySelector('[data-page-section="'+page+'"]');
-    if(!target) return false;
-    document.querySelectorAll('[data-page-section]').forEach(el=>{el.hidden=true;el.classList.remove('active');});
-    target.hidden=false; target.classList.add('active');
-    document.querySelectorAll('.main-menu .menu-item[data-page]').forEach(btn=>btn.classList.toggle('active',btn.getAttribute('data-page')===page));
-    const title=document.getElementById('pageTitle'); if(title) title.textContent=labels[page]||page;
-    closeMobile();
-    if(page==='lucky-wheel') window.dispatchEvent(new Event('pagechange'));
-    return true;
-  }
-  function bind(){
-    ensureUtilities();
-    const menu=document.querySelector('.main-menu');
-    if(menu && !menu.__LH_STABLE_BOUND__){
-      menu.__LH_STABLE_BOUND__=true;
-      menu.addEventListener('click',function(e){
-        const util=e.target.closest('#lhStandaloneUtilities'); if(util) return;
-        const btn=e.target.closest('.menu-item[data-page]'); if(!btn) return;
-        const page=btn.getAttribute('data-page');
-        if(show(page)){ e.preventDefault(); e.stopPropagation(); }
-      },true);
-      menu.addEventListener('touchend',function(e){
-        const util=e.target.closest('#lhStandaloneUtilities'); if(util) return;
-        const btn=e.target.closest('.menu-item[data-page]'); if(!btn) return;
-        const page=btn.getAttribute('data-page');
-        if(show(page)){ e.preventDefault(); e.stopPropagation(); }
-      },{capture:true,passive:false});
-    }
-    const toggle=document.getElementById('sidebarToggle');
-    if(toggle && !toggle.__LH_STABLE_TOGGLE__){
-      toggle.__LH_STABLE_TOGGLE__=true;
-      toggle.addEventListener('click',function(e){
-        e.preventDefault(); e.stopPropagation();
-        const s=document.getElementById('sidebar'),o=document.getElementById('sidebarOverlay'); if(!s) return;
-        const open=!s.classList.contains('open'); s.classList.toggle('open',open); o?.classList.toggle('active',open);
-      },true);
-    }
-    const close=document.getElementById('sidebarClose');
-    if(close && !close.__LH_STABLE_CLOSE__){
-      close.__LH_STABLE_CLOSE__=true;
-      close.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();closeMobile();},true);
-    }
-    const overlay=document.getElementById('sidebarOverlay');
-    if(overlay && !overlay.__LH_STABLE_OVERLAY__){
-      overlay.__LH_STABLE_OVERLAY__=true;
-      overlay.addEventListener('click',function(e){e.preventDefault();closeMobile();},true);
-    }
-  }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bind,{once:true}); else bind();
-  setTimeout(bind,300); setTimeout(bind,1000); setTimeout(bind,2000);
-})();
-</script>
-<!-- LH STABLE MENU END -->
-'''
-          s=s.replace('</body>',inline+'</body>',1)
-          p.write_text(s,encoding='utf-8')
+          s = re.sub(r'<a[^>]*id=["\'][^"\']*(?:lhUtilitiesStandalone|lhStandaloneUtilities)[^"\']*["\'][^>]*>.*?</a>\s*', '', s, flags=re.I|re.S)
+          s = re.sub(r'<button[^>]*data-page=["\']utilities["\'][^>]*>.*?</button>\s*', '', s, flags=re.I|re.S)
+
+          link = '''<a class="menu-item" id="lhUtilitiesStandalone" href="tien-ich.html"><i class="fa-solid fa-toolbox"></i><span>Tiện ích</span></a>'''
+          if 'id="lhUtilitiesStandalone"' not in s:
+              marker = '<button type="button" class="menu-item" data-page="settings">'
+              if marker in s:
+                  s = s.replace(marker, link + '\n' + marker, 1)
+              else:
+                  s = s.replace('</nav>', link + '\n</nav>', 1)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+
       - name: Verify
         shell: bash
         run: |
           set -e
-          grep -q 'LH STABLE MENU BEGIN' index.html
-          grep -q '__LH_STABLE_MENU__' index.html
-          test "$(grep -o 'LH STABLE MENU BEGIN' index.html | wc -l | tr -d ' ')" = "1"
-          if grep -qi 'menu-final-direct.js\|menu-special-fix.js\|emergency-menu-router.js\|tien-ich-final.js\|tien-ich-schema-v4-fix.js' index.html; then
-            echo 'Legacy menu/utilities routers remain' >&2
-            exit 1
-          fi
-      - name: Commit
+          test "$(grep -oi 'tien-ich.html' index.html | wc -l | tr -d ' ')" = "1"
+          ! grep -qi 'menu-final-direct.js' index.html
+          ! grep -qi 'menu-special-fix.js' index.html
+          ! grep -qi 'emergency-menu-router.js' index.html
+          ! grep -qi 'tien-ich-final.js' index.html
+          ! grep -qi 'tien-ich-schema-v4-fix.js' index.html
+          grep -q 'id="lhUtilitiesStandalone"' index.html
+
+      - name: Commit normalized index
+        shell: bash
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add index.html
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m "Install single stable menu controller"
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Restore core menu router and standalone utilities"
           git push origin HEAD:master
