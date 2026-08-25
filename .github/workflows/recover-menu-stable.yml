@@ -20,47 +20,31 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import re
-          p = Path('index.html')
-          s = p.read_text(encoding='utf-8')
-          patterns = [
-              r'<script\b[^>]*src=["\'][^"\']*menu-final-direct\.js[^"\']*["\'][^>]*></script>\s*',
-              r'<script\b[^>]*src=["\'][^"\']*menu-special-fix\.js[^"\']*["\'][^>]*></script>\s*',
-              r'<script\b[^>]*src=["\'][^"\']*emergency-menu-router\.js[^"\']*["\'][^>]*></script>\s*',
-              r'<script\b[^>]*src=["\'][^"\']*tien-ich-final\.js[^"\']*["\'][^>]*></script>\s*',
-              r'<script\b[^>]*src=["\'][^"\']*tien-ich-schema-v4-fix\.js[^"\']*["\'][^>]*></script>\s*',
-              r'<script\b[^>]*src=["\'][^"\']*event-sync-multi-v21\.js[^"\']*["\'][^>]*></script>\s*',
-          ]
-          for pat in patterns:
-              s = re.sub(pat, '', s, flags=re.I)
-          s = re.sub(r'<!-- LH STABLE MENU BEGIN -->.*?<!-- LH STABLE MENU END -->\s*', '', s, flags=re.S)
-          s = re.sub(r'<a[^>]*id=["\'][^"\']*(?:lhUtilitiesStandalone|lhStandaloneUtilities)[^"\']*["\'][^>]*>.*?</a>\s*', '', s, flags=re.I|re.S)
-          s = re.sub(r'<button[^>]*data-page=["\']utilities["\'][^>]*>.*?</button>\s*', '', s, flags=re.I|re.S)
-          link = '''<a class="menu-item" id="lhUtilitiesStandalone" href="tien-ich.html"><i class="fa-solid fa-toolbox"></i><span>Tiện ích</span></a>'''
+          p=Path('index.html'); s=p.read_text(encoding='utf-8')
+          patterns=[r'<script\b[^>]*src=["\'][^"\']*menu-final-direct\.js[^"\']*["\'][^>]*></script>\s*',r'<script\b[^>]*src=["\'][^"\']*menu-special-fix\.js[^"\']*["\'][^>]*></script>\s*',r'<script\b[^>]*src=["\'][^"\']*emergency-menu-router\.js[^"\']*["\'][^>]*></script>\s*',r'<script\b[^>]*src=["\'][^"\']*tien-ich-final\.js[^"\']*["\'][^>]*></script>\s*',r'<script\b[^>]*src=["\'][^"\']*tien-ich-schema-v4-fix\.js[^"\']*["\'][^>]*></script>\s*',r'<script\b[^>]*src=["\'][^"\']*event-sync-multi-v21\.js[^"\']*["\'][^>]*></script>\s*']
+          for pat in patterns:s=re.sub(pat,'',s,flags=re.I)
+          s=re.sub(r'<!-- LH STABLE MENU BEGIN -->.*?<!-- LH STABLE MENU END -->\s*','',s,flags=re.S)
+          s=re.sub(r'<a[^>]*id=["\'][^"\']*(?:lhUtilitiesStandalone|lhStandaloneUtilities)[^"\']*["\'][^>]*>.*?</a>\s*','',s,flags=re.I|re.S)
+          s=re.sub(r'<button[^>]*data-page=["\']utilities["\'][^>]*>.*?</button>\s*','',s,flags=re.I|re.S)
+          link='<a class="menu-item" id="lhUtilitiesStandalone" href="tien-ich.html"><i class="fa-solid fa-toolbox"></i><span>Tiện ích</span></a>'
           if 'id="lhUtilitiesStandalone"' not in s:
-              marker = '<button type="button" class="menu-item" data-page="settings">'
-              if marker in s: s = s.replace(marker, link + '\n' + marker, 1)
-              else: s = s.replace('</nav>', link + '\n</nav>', 1)
-          p.write_text(s, encoding='utf-8')
+            marker='<button type="button" class="menu-item" data-page="settings">'
+            s=s.replace(marker,link+'\n'+marker,1) if marker in s else s.replace('</nav>',link+'\n</nav>',1)
+          p.write_text(s,encoding='utf-8')
           PY
 
-      - name: Install one-time dashboard cleanup and V21.1 event sync
+      - name: Install stable cleanup and V21.2 sync
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
           import re
-          p = Path('index.html')
-          s = p.read_text(encoding='utf-8')
-          for file in ['dashboard-legacy-events-cleanup.js','event-sync-multi-v21.js']:
-              pattern = rf'<script\b[^>]*src=["\'][^"\']*{re.escape(file)}[^"\']*["\'][^>]*></script>\s*'
-              s = re.sub(pattern, '', s, flags=re.I)
-          tags = [
-              '<script src="dashboard-legacy-events-cleanup.js?v=1.0"></script>',
-              '<script src="event-sync-multi-v21.js?v=21.1"></script>'
-          ]
-          tag = '\n'.join(tags) + '\n'
-          s = s.replace('</body>', tag + '</body>', 1) if '</body>' in s else s + tag
-          p.write_text(s, encoding='utf-8')
+          p=Path('index.html'); s=p.read_text(encoding='utf-8')
+          for f in ['dashboard-legacy-events-cleanup.js','event-sync-multi-v21.js']:
+            s=re.sub(rf'<script\b[^>]*src=["\'][^"\']*{re.escape(f)}[^"\']*["\'][^>]*></script>\s*','',s,flags=re.I)
+          tags='<script src="dashboard-legacy-events-cleanup.js?v=1.0"></script>\n<script src="event-sync-multi-v21.js?v=21.2"></script>\n'
+          s=s.replace('</body>',tags+'</body>',1) if '</body>' in s else s+tags
+          p.write_text(s,encoding='utf-8')
           PY
 
       - name: Verify
@@ -68,14 +52,13 @@ jobs:
         run: |
           set -e
           test "$(grep -oi 'tien-ich.html' index.html | wc -l | tr -d ' ')" = "1"
+          test "$(grep -oi 'event-sync-multi-v21.js' index.html | wc -l | tr -d ' ')" = "1"
+          test "$(grep -oi 'dashboard-legacy-events-cleanup.js' index.html | wc -l | tr -d ' ')" = "1"
           ! grep -qi 'menu-final-direct.js' index.html
           ! grep -qi 'menu-special-fix.js' index.html
           ! grep -qi 'emergency-menu-router.js' index.html
           ! grep -qi 'tien-ich-final.js' index.html
           ! grep -qi 'tien-ich-schema-v4-fix.js' index.html
-          test "$(grep -oi 'event-sync-multi-v21.js' index.html | wc -l | tr -d ' ')" = "1"
-          test "$(grep -oi 'dashboard-legacy-events-cleanup.js' index.html | wc -l | tr -d ' ')" = "1"
-          grep -q 'id="lhUtilitiesStandalone"' index.html
 
       - name: Commit normalized index
         shell: bash
@@ -84,5 +67,5 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add index.html
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "Install V21.1 event sync and stable dashboard"
+          git commit -m "Install V21.2 event sync"
           git push origin HEAD:master
