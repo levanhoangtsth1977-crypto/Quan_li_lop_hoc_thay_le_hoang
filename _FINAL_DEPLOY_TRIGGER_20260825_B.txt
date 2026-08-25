@@ -1,0 +1,2 @@
+FINAL_DEPLOY_TRIGGER_20260825_B
+Kích hoạt triển khai cuối cho events-new-final.js.
