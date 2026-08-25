@@ -1,4 +1,4 @@
-/* QUẢN LÝ LỚP HỌC — SINGLE MENU ROUTER */
+/* QUẢN LÝ LỚP HỌC — SINGLE MENU ROUTER — STANDALONE UTILITIES DEPLOY */
 (function(){
 'use strict';
 if(window.__LH_SINGLE_MENU_ROUTER__)return;
@@ -9,10 +9,10 @@ function setActive(page){document.querySelectorAll('.main-menu .menu-item[data-p
 function show(page){const target=document.querySelector('[data-page-section="'+page+'"]');if(!target)return false;document.querySelectorAll('[data-page-section]').forEach(el=>{el.hidden=true;el.classList.remove('active')});target.hidden=false;target.classList.add('active');setActive(page);if(page==='lucky-wheel')window.dispatchEvent(new Event('pagechange'));return true;}
 function ensureUtilitiesLink(){
  const nav=document.querySelector('.main-menu');if(!nav)return;
- nav.querySelectorAll('[data-page="utilities"],#lhUtilitiesDynamic,.lh-utilities-divider').forEach(el=>el.remove());
- let link=nav.querySelector('a[href="tien-ich.html"]');
- if(!link){link=document.createElement('a');link.href='tien-ich.html';link.className='menu-item';link.id='lhUtilitiesStandalone';link.innerHTML='<i class="fa-solid fa-toolbox"></i><span>Tiện ích</span>';const settings=nav.querySelector('[data-page="settings"]');if(settings){nav.insertBefore(link,settings)}else nav.appendChild(link);}
- link.addEventListener('click',()=>closeMobile(),{capture:true});
+ nav.querySelectorAll('[data-page="utilities"],#lhUtilitiesDynamic,#lhUtilitiesFinal,#lhUtilitiesMenu,.lh-utilities-divider').forEach(el=>el.remove());
+ let link=nav.querySelector('#lhUtilitiesStandalone');
+ if(!link){link=document.createElement('a');link.href='tien-ich.html';link.className='menu-item';link.id='lhUtilitiesStandalone';link.innerHTML='<i class="fa-solid fa-toolbox"></i><span>Tiện ích</span>';const settings=nav.querySelector('[data-page="settings"]');if(settings)nav.insertBefore(link,settings);else nav.appendChild(link);}
+ link.onclick=function(){closeMobile();};
 }
 function bind(){
  ensureUtilitiesLink();
