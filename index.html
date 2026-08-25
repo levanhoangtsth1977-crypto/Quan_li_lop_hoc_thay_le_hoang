@@ -62,52 +62,17 @@
 <script src="student-sync-dedupe.js?v=1.0.0"></script>
 <script src="google-api-bridge.js?v=2.9.1"></script>
 <script src="menu-runtime-fix.js"></script>
+<script src="google-api-bridge.js"></script>
 <script src="data-sync-vietnamese-fix.js?v=1.0.0"></script>
-<script src="google-sheets-menu-bridge.js"></script>
-<script src="google-sheets-records-bridge.js"></script>
+    <script src="google-sheets-menu-bridge.js"></script>
+    <script src="google-sheets-records-bridge.js"></script>
 <script src="google-sheets-auto-sync.js?v=1.0"></script>
 <script src="google-sheets-bulk-reconcile.js?v=2.0"></script>
 <script src="statistics-excellent.js"></script>
 <script src="tien-ich-final.js?v=20260823"></script>
 <script src="thong-ke-xuat-sac-final.js?v=20260823"></script>
 <script src="events-fixed-static.js?v=20260825"></script>
-<script src="menu-final-direct.js?v=20260825-final3"></script>
-<script>
-(function(){
-'use strict';
-var labels={dashboard:'Trang chủ',students:'Học sinh',attendance:'Điểm danh',violations:'Vi phạm',rewards:'Khen thưởng',learning:'Học tập',comments:'Nhận xét',statistics:'Thống kê','student-links':'Link học sinh',ai:'AI giáo viên','lucky-wheel':'Vòng quay may mắn',settings:'Cài đặt',materials:'Kho học liệu'};
-function show(page){
- var target=document.querySelector('[data-page-section="'+page+'"]');
- if(!target)return false;
- document.querySelectorAll('[data-page-section]').forEach(function(s){s.hidden=true;s.classList.remove('active');});
- target.hidden=false;target.classList.add('active');
- document.querySelectorAll('.main-menu .menu-item[data-page]').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-page')===page);});
- var title=document.getElementById('pageTitle');if(title)title.textContent=labels[page]||page;
- if(window.innerWidth<=900){var sidebar=document.getElementById('sidebar');var overlay=document.getElementById('sidebarOverlay');if(sidebar)sidebar.classList.remove('open');if(overlay)overlay.classList.remove('active');}
- try{if(window.LopHocApp&&typeof window.LopHocApp.navigateToPage==='function')window.LopHocApp.navigateToPage(page);}catch(e){}
- if(page==='lucky-wheel')window.dispatchEvent(new Event('pagechange'));
- return true;
-}
-function bind(){
- document.querySelectorAll('.main-menu .menu-item[data-page]').forEach(function(btn){
-   if(btn.__LH_INLINE_MENU__)return;
-   btn.__LH_INLINE_MENU__=true;
-   btn.addEventListener('click',function(e){e.preventDefault();e.stopImmediatePropagation();show(btn.getAttribute('data-page'));},true);
-   btn.addEventListener('touchend',function(e){e.preventDefault();show(btn.getAttribute('data-page'));},{passive:false});
- });
- var toggle=document.getElementById('sidebarToggle');
- if(toggle&&!toggle.__LH_INLINE_TOGGLE__){toggle.__LH_INLINE_TOGGLE__=true;toggle.addEventListener('click',function(e){e.preventDefault();e.stopImmediatePropagation();var s=document.getElementById('sidebar');var o=document.getElementById('sidebarOverlay');if(s){var open=!s.classList.contains('open');s.classList.toggle('open',open);if(o)o.classList.toggle('active',open);}},true);}
- var close=document.getElementById('sidebarClose');
- if(close&&!close.__LH_INLINE_CLOSE__){close.__LH_INLINE_CLOSE__=true;close.addEventListener('click',function(e){e.preventDefault();e.stopImmediatePropagation();var s=document.getElementById('sidebar');var o=document.getElementById('sidebarOverlay');if(s)s.classList.remove('open');if(o)o.classList.remove('active');},true);}
- var overlay=document.getElementById('sidebarOverlay');
- if(overlay&&!overlay.__LH_INLINE_OVERLAY__){overlay.__LH_INLINE_OVERLAY__=true;overlay.style.pointerEvents='none';overlay.addEventListener('click',function(e){e.preventDefault();var s=document.getElementById('sidebar');if(s)s.classList.remove('open');overlay.classList.remove('active');},true);}
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
-setTimeout(bind,200);setTimeout(bind,800);setTimeout(bind,1500);
-window.LHInlineMenu=show;
-})();
-</script>
-<script src="lucky-wheel-final.js?v=20260825-final2"></script>
-<script src="emergency-menu-router.js?v=20260825-v2"></script>
+<script src="vong-quay-may-man.js?v=20260825"></script>
+<script src="vong-quay-may-man-fix.js?v=20260825"></script>
 </body>
 </html>
