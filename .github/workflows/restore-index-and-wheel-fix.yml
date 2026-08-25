@@ -1,0 +1,34 @@
+name: Restore Index and Install Lucky Wheel Fix
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  restore:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore index from last good commit and add wheel fix
+        shell: bash
+        run: |
+          git checkout acdd61a990145409c452bf501e5d854b1e2c684d -- index.html
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          s=re.sub(r'<script\s+src=["\']vong-quay-may-man-fix\.js(?:\?[^"\']*)?["\']\s*></script>\s*','',s,flags=re.I)
+          tag='<script src="vong-quay-may-man-fix.js?v=20260825"></script>'
+          if '</body>' not in s:
+              raise SystemExit('index.html missing </body>')
+          s=s.replace('</body>',tag+'\n</body>',1)
+          p.write_text(s,encoding='utf-8')
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add index.html
+          git commit -m 'Restore index and install lucky wheel fix'
+          git push origin HEAD:master
