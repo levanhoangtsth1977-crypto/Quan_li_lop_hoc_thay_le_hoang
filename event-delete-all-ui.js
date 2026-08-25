@@ -21,3 +21,16 @@ document.addEventListener('click',e=>{const b=e.target.closest?.('button,[role="
 function install(){cleanDuplicates();['violations','rewards'].forEach(type=>{const p=document.getElementById('page-'+type);if(!p)return;const sheet=type==='violations'?'VI_PHAM':'KHEN_THUONG';const existing=[...p.querySelectorAll('button,[role="button"],a')].filter(isAll);if(existing.length)return;const host=p.querySelector('.page-actions')||p.querySelector('.page-header');if(!host)return;const b=document.createElement('button');b.type='button';b.className='button danger';b.dataset.lhDeleteAllSheet=sheet;b.dataset.lhDeleteAllFinal='2';b.innerHTML='<i class="fa-solid fa-trash-can"></i> Xóa tất cả';host.appendChild(b)})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();new MutationObserver(install).observe(document.documentElement,{childList:true,subtree:true});[100,300,700,1500,3000].forEach(x=>setTimeout(install,x));window.LE_HOANG_DELETE_ALL_EVENTS=run;
 })();
+
+/* Load the master single-delete/statistics/menu guard after the existing delete-all module. */
+(function(){
+'use strict';
+if(window.__LH_MASTER_UI_FINAL_LOADER__)return;
+window.__LH_MASTER_UI_FINAL_LOADER__=true;
+const s=document.createElement('script');
+s.src='./master-ui-final-fix.js?v=20260825-01';
+s.async=false;
+s.onload=()=>console.log('[LH] master-ui-final-fix loaded');
+s.onerror=()=>console.error('[LH] master-ui-final-fix failed to load');
+document.head.appendChild(s);
+})();
