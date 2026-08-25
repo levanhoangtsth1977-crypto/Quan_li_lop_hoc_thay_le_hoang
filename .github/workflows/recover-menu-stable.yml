@@ -29,6 +29,7 @@ jobs:
               r'<script\b[^>]*src=["\'][^"\']*emergency-menu-router\.js[^"\']*["\'][^>]*></script>\s*',
               r'<script\b[^>]*src=["\'][^"\']*tien-ich-final\.js[^"\']*["\'][^>]*></script>\s*',
               r'<script\b[^>]*src=["\'][^"\']*tien-ich-schema-v4-fix\.js[^"\']*["\'][^>]*></script>\s*',
+              r'<script\b[^>]*src=["\'][^"\']*event-sync-multi-v21\.js[^"\']*["\'][^>]*></script>\s*',
           ]
           for pat in patterns:
               s = re.sub(pat, '', s, flags=re.I)
@@ -56,9 +57,14 @@ jobs:
           import re
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
-          pattern = r'<script\b[^>]*src=["\'][^"\']*dashboard-legacy-events-cleanup\.js[^"\']*["\'][^>]*></script>\s*'
-          s = re.sub(pattern, '', s, flags=re.I)
-          tag = '<script src="dashboard-legacy-events-cleanup.js"></script>\n'
+          for file in ['dashboard-legacy-events-cleanup.js','event-sync-multi-v21.js']:
+              pattern = rf'<script\b[^>]*src=["\'][^"\']*{re.escape(file)}[^"\']*["\'][^>]*></script>\s*'
+              s = re.sub(pattern, '', s, flags=re.I)
+          tags = [
+              '<script src="dashboard-legacy-events-cleanup.js?v=1.0"></script>',
+              '<script src="event-sync-multi-v21.js?v=21.0"></script>'
+          ]
+          tag = '\n'.join(tags) + '\n'
           if '</body>' in s:
               s = s.replace('</body>', tag + '</body>', 1)
           else:
@@ -76,6 +82,7 @@ jobs:
           ! grep -qi 'emergency-menu-router.js' index.html
           ! grep -qi 'tien-ich-final.js' index.html
           ! grep -qi 'tien-ich-schema-v4-fix.js' index.html
+          test "$(grep -oi 'event-sync-multi-v21.js' index.html | wc -l | tr -d ' ')" = "1"
           test "$(grep -oi 'dashboard-legacy-events-cleanup.js' index.html | wc -l | tr -d ' ')" = "1"
           grep -q 'id="lhUtilitiesStandalone"' index.html
 
@@ -88,5 +95,5 @@ jobs:
           if git diff --cached --quiet; then
             exit 0
           fi
-          git commit -m "Clean legacy dashboard violation and reward data"
+          git commit -m "Install V21 event sync and stable dashboard"
           git push origin HEAD:master
