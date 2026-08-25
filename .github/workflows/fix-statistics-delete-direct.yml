@@ -1,0 +1,34 @@
+name: Fix statistics delete direct
+on:
+  push:
+    branches: [master]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch statistics delete handler
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('event-summary-by-student-fix.js')
+          s=p.read_text(encoding='utf-8')
+          new=r'''async function deleteAttendance(studentId){const sid=S(studentId);if(!sid){window.showToast&&window.showToast('Không xác định được học sinh để xóa.','error');return}const rows=cache.DIEM_DANH.filter(r=>S(r.studentId)===sid&&ABSENT_STATUSES.includes(N(r.status)));if(!rows.length){await loadServer();window.showToast&&window.showToast('Không có dữ liệu vắng của học sinh này trên Google Sheets.','info');return}if(!confirm(`Xóa toàn bộ ${rows.length} lượt vắng của ${studentName(sid)} khỏi Google Sheets?`))return;try{const r=await jsonp({action:'delete_attendance',studentId:sid});if(!r?.ok||r.deleted!==true)throw new Error(r?.error||'Google Sheets không thực hiện xóa.');await loadServer();window.dispatchEvent(new CustomEvent('google-sheet-events-deleted',{detail:{sheet:'DIEM_DANH',studentId:sid,deleted:Number(r.deletedCount||0)}}));window.dispatchEvent(new Event('google-sheets-refresh'));window.showToast&&window.showToast(`Đã xóa ${Number(r.deletedCount||0)} lượt vắng của ${studentName(sid)} trên Google Sheets.`,'success')}catch(e){console.error('[THỐNG KÊ XÓA]',e);await loadServer();window.showToast&&window.showToast('Không thể xóa trên Google Sheets — '+e.message,'error')}}'''
+          s2=re.sub(r'async function deleteAttendance\(studentId\)\{.*?\n\}\nasync function deleteOne',new+'\nasync function deleteOne',s,count=1,flags=re.S)
+          if s2==s:
+              raise SystemExit('Không tìm thấy hàm deleteAttendance để vá')
+          p.write_text(s2,encoding='utf-8')
+          
+          q=Path('.github/workflows/inject-event-summary-fix.yml')
+          w=q.read_text(encoding='utf-8')
+          w=w.replace('event-summary-by-student-fix.js?v=7.0','event-summary-by-student-fix.js?v=7.2')
+          q.write_text(w,encoding='utf-8')
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add event-summary-by-student-fix.js .github/workflows/inject-event-summary-fix.yml
+          if ! git diff --cached --quiet; then git commit -m "fix: statistics delete direct Google Sheets"; git push; fi
