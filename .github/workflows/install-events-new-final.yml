@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Replace old event modules and inject new final module
+      - name: Replace every obsolete event/removal module and inject new final module
         shell: bash
         run: |
           python3 - <<'PY'
@@ -19,19 +19,36 @@ jobs:
           import re
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
-          for pat in [
+          old_patterns=[
             r'<script[^>]+src=["\'][^"\']*violations-menu-fix[^"\']*["\'][^>]*></script>\s*',
             r'<script[^>]+src=["\'][^"\']*event-delete[^"\']*["\'][^>]*></script>\s*',
             r'<script[^>]+src=["\'][^"\']*event-summary-by-student-fix[^"\']*["\'][^>]*></script>\s*',
-            r'<script[^>]+src=["\'][^"\']*(reward|rewards|khen-thuong)[^"\']*["\'][^>]*></script>\s*'
-          ]:
+            r'<script[^>]+src=["\'][^"\']*remove-violation-reward-menus[^"\']*["\'][^>]*></script>\s*',
+            r'<script[^>]+src=["\'][^"\']*(?:reward|rewards|khen-thuong)[^"\']*["\'][^>]*></script>\s*',
+            r'<script[^>]+src=["\']events-new-final\.js(?:\?[^"\']*)?["\'][^>]*></script>\s*'
+          ]
+          for pat in old_patterns:
               s=re.sub(pat,'',s,flags=re.I)
           tag='<script src="events-new-final.js?v=20260825"></script>'
-          s=re.sub(r'<script[^>]+src=["\']events-new-final\.js(?:\?[^"\']*)?["\'][^>]*></script>\s*','',s,flags=re.I)
-          s=s.replace('</body>',tag+'\n</body>',1)
+          if tag not in s:
+              s=s.replace('</body>',tag+'\n</body>',1)
           p.write_text(s,encoding='utf-8')
           PY
+      - name: Verify final event module is installed exactly once
+        shell: bash
+        run: |
+          set -e
+          test "$(grep -o 'events-new-final.js?v=20260825' index.html | wc -l | tr -d ' ')" = "1"
+          test "$(grep -o 'remove-violation-reward-menus.js' index.html | wc -l | tr -d ' ')" = "0"
+          test "$(grep -o 'violations-menu-fix.js' index.html | wc -l | tr -d ' ')" = "0"
+      - name: Commit final event deployment
+        run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add index.html
-          if git diff --cached --quiet; then echo 'No index change needed.'; else git commit -m 'Install new Vi Pham and Khen Thuong menus'; git push origin HEAD:master; fi
+          if git diff --cached --quiet; then
+            echo 'No index change needed.'
+          else
+            git commit -m 'Install final Vi Pham and Khen Thuong module'
+            git push origin HEAD:master
+          fi
