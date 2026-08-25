@@ -1,146 +1,86 @@
-/* TIỆN ÍCH — SCHEMA V4 FIX
-   Mẫu chuẩn: STT | Họ và tên | Giới tính | Xếp loại | Ghi chú
-   Hỗ trợ Markdown table, TSV, CSV, pipe, semicolon.
-   T/H được hiểu lần lượt là Tốt / Hoàn thành và dùng để cân bằng sơ đồ.
-   Chỉ hoạt động trong menu Tiện ích; không ghi dữ liệu Google Sheets.
+/* TIỆN ÍCH SCHEMA V4 — SAFE ROUTER
+   Mẫu: STT | Họ và tên | Giới tính | Xếp loại | Ghi chú
+   T/H dùng để cân bằng xếp tổ. Không ghi dữ liệu Google Sheets.
 */
 (function(){
-  'use strict';
-  if(window.__LH_UTIL_SCHEMA_V4__) return;
-  window.__LH_UTIL_SCHEMA_V4__=true;
+'use strict';
+if(window.__LH_UTIL_SAFE_V4__) return;
+window.__LH_UTIL_SAFE_V4__=true;
 
-  const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const clean=v=>String(v??'').trim().replace(/\s+/g,' ');
-  const norm=v=>clean(v).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d');
+const LABELS={dashboard:'Trang chủ',students:'Học sinh',attendance:'Điểm danh',violations:'Vi phạm',rewards:'Khen thưởng',learning:'Học tập',comments:'Nhận xét',statistics:'Thống kê','student-links':'Link học sinh',ai:'AI giáo viên','lucky-wheel':'Vòng quay may mắn',settings:'Cài đặt',utilities:'Tiện ích'};
+const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const norm=v=>String(v??'').trim().replace(/\s+/g,' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d');
 
-  function split(line){
-    let s=String(line??'').trim();
-    if(!s) return [];
-    if(s.startsWith('|')) s=s.slice(1);
-    if(s.endsWith('|')) s=s.slice(0,-1);
-    if(s.includes('\t')) return s.split('\t').map(clean);
-    if(s.includes('|')) return s.split('|').map(clean);
-    if(s.includes(';')) return s.split(';').map(clean);
-    const out=[]; let cur=''; let quoted=false;
-    for(let i=0;i<s.length;i++){
-      const c=s[i];
-      if(c==='"'){
-        if(quoted && s[i+1]==='"'){cur+='"';i++;}
-        else quoted=!quoted;
-      } else if(c===',' && !quoted){out.push(clean(cur));cur='';}
-      else cur+=c;
-    }
-    out.push(clean(cur));
-    return out;
+function closeMobile(){if(innerWidth>900)return;document.getElementById('sidebar')?.classList.remove('open');document.getElementById('sidebarOverlay')?.classList.remove('active');}
+function show(page){
+  if(page==='utilities') return openUtilities();
+  const t=document.querySelector('[data-page-section="'+page+'"]');
+  if(!t) return false;
+  document.querySelectorAll('[data-page-section]').forEach(x=>{x.hidden=true;x.classList.remove('active');});
+  t.hidden=false;t.classList.add('active');
+  document.querySelectorAll('.main-menu .menu-item[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+  const title=document.getElementById('pageTitle');if(title)title.textContent=LABELS[page]||page;
+  closeMobile();
+  if(page==='lucky-wheel')window.dispatchEvent(new Event('pagechange'));
+  return true;
+}
+function splitLine(line){
+  let s=String(line??'').trim();
+  if(s.startsWith('|'))s=s.slice(1);if(s.endsWith('|'))s=s.slice(0,-1);
+  if(s.includes('\t'))return s.split('\t').map(x=>x.trim());
+  if(s.includes('|'))return s.split('|').map(x=>x.trim());
+  if(s.includes(';'))return s.split(';').map(x=>x.trim());
+  const out=[];let cur='',q=false;
+  for(let i=0;i<s.length;i++){const c=s[i];if(c==='"'){q=!q;}else if(c===','&&!q){out.push(cur.trim());cur='';}else cur+=c;}out.push(cur.trim());return out;
+}
+function parse(text){
+  const rows=String(text||'').replace(/^\uFEFF/,'').replace(/\r/g,'').split('\n').filter(x=>x.trim()).map(splitLine);
+  if(!rows.length)throw Error('Tệp không có dữ liệu.');
+  const h=rows[0].map(norm);
+  const find=(names,def)=>{const i=h.findIndex(x=>names.some(n=>x===n||x.includes(n)));return i>=0?i:def;};
+  const ni=find(['ho va ten','ho ten','hoc sinh','name'],1),gi=find(['gioi tinh'],2),li=find(['xep loai','trinh do','hoc luc','level'],3),oi=find(['ghi chu','note'],4);
+  const start=h.some(x=>x.includes('ho ten')||x.includes('hoc sinh')||x==='name')?1:0;
+  const out=[];
+  for(let i=start;i<rows.length;i++){
+    const r=rows[i],name=String(r[ni]||'').trim();
+    if(!name||/^---/.test(name))continue;
+    out.push({name,gender:String(r[gi]||'').trim(),level:String(r[li]||'').trim()||'H',note:String(r[oi]||'').trim()});
   }
-
-  function isDividerRow(r){
-    return r.length>0 && r.every(v=>/^:?-{2,}:?$/.test(clean(v)));
+  if(!out.length)throw Error('Không tìm thấy học sinh theo mẫu 5 cột.');
+  return out;
+}
+function rank(v){const s=norm(v);return s==='t'||/tot|gioi|xuat sac/.test(s)?2:s==='h'||/hoan thanh|kha|dat/.test(s)?1:1;}
+function makeUtilities(){
+  let sec=document.getElementById('page-utilities-final');
+  if(!sec){
+    sec=document.createElement('section');sec.id='page-utilities-final';sec.dataset.pageSection='utilities';sec.className='page-section';
+    sec.innerHTML='<div class="page-header"><div><span class="page-eyebrow"><i class="fa-solid fa-toolbox"></i> Công cụ giáo viên</span><h1>Tiện ích</h1><p>Chỉ dùng để tải danh sách trình độ và xếp sơ đồ lớp/xếp tổ; không sửa dữ liệu gốc.</p></div></div><div class="quick-actions"><button type="button" class="quick-action" id="lhSafeUpload"><span class="quick-action-icon">📤</span><span><strong>Tải lên</strong><small>STT · Họ và tên · Giới tính · Xếp loại · Ghi chú</small></span></button><button type="button" class="quick-action" id="lhSafeLayout"><span class="quick-action-icon">📐</span><span><strong>Tạo sơ đồ lớp học</strong><small>4 tổ · 2 HS/bàn · cân bằng T/H</small></span></button></div><div id="lhSafeStatus" style="margin:12px 0;padding:10px;border:1px dashed #cbd5e1;border-radius:10px">Chưa tải danh sách.</div><div id="lhSafePreview"></div><div id="lhSafeLayout" style="margin-top:14px"></div>';
+    document.getElementById('mainContent')?.appendChild(sec);
   }
+  return sec;
+}
+function openUtilities(){
+  const sec=makeUtilities();
+  document.querySelectorAll('[data-page-section]').forEach(x=>{x.hidden=true;x.classList.remove('active');});
+  sec.hidden=false;sec.classList.add('active');
+  document.querySelectorAll('.main-menu .menu-item[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page==='utilities'));
+  const title=document.getElementById('pageTitle');if(title)title.textContent='Tiện ích';closeMobile();
+  let input=document.getElementById('lhSafeFile');
+  if(!input){input=document.createElement('input');input.type='file';input.id='lhSafeFile';input.accept='.csv,.tsv,.txt';input.hidden=true;document.body.appendChild(input);}
+  const up=document.getElementById('lhSafeUpload');if(up&&!up.__safe){up.__safe=true;up.onclick=()=>input.click();}
+  if(!input.__safe){input.__safe=true;input.onchange=async()=>{const f=input.files?.[0];input.value='';if(!f)return;try{window.__LH_SAFE_UTIL_DATA__=parse(await f.text());const a=window.__LH_SAFE_UTIL_DATA__;document.getElementById('lhSafeStatus').innerHTML='Đã tải <b>'+a.length+'</b> học sinh · mẫu 5 cột';document.getElementById('lhSafePreview').innerHTML='<div style="overflow:auto;margin-top:12px"><table class="data-table"><thead><tr><th>STT</th><th>Họ và tên</th><th>Giới tính</th><th>Xếp loại</th><th>Ghi chú</th></tr></thead><tbody>'+a.map((s,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(s.name)+'</td><td>'+esc(s.gender)+'</td><td>'+esc(s.level)+'</td><td>'+esc(s.note)+'</td></tr>').join('')+'</tbody></table></div>';}catch(e){alert(e.message||'Tệp không hợp lệ.');}};}
+  const lay=document.getElementById('lhSafeLayout');if(lay&&!lay.__safe){lay.__safe=true;lay.onclick=()=>{const a=window.__LH_SAFE_UTIL_DATA__||[];if(!a.length){alert('Hãy tải lên danh sách trước.');return;}const w=a.slice().sort(()=>Math.random()-.5),pairs=[];while(w.length){const first=w.shift();let bi=0,bd=99;w.forEach((s,i)=>{const d=Math.abs(rank(first.level)-rank(s.level));if(d<bd){bd=d;bi=i;}});pairs.push([first,w.length?w.splice(bi,1)[0]:null]);}const cols=[[],[],[],[]];pairs.forEach((p,i)=>cols[i%4].push(p));document.getElementById('lhSafeLayout').innerHTML='<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">'+cols.map((c,i)=>'<div style="padding:10px;border:1px solid #e2e8f0;border-radius:12px;background:#f8fafc"><b>Tổ '+(i+1)+'</b>'+c.map((p,j)=>'<div style="margin-top:6px;padding:7px;background:#fff;border-radius:8px">'+(j+1)+'. '+esc(p[0].name)+' · '+esc(p[0].level)+(p[1]?' / '+esc(p[1].name)+' · '+esc(p[1].level):'')+'</div>').join('')+'</div>').join('')+'</div>';};}
+  return true;
+}
 
-  function findHeader(rows){
-    for(let i=0;i<Math.min(rows.length,5);i++){
-      const h=rows[i].map(norm);
-      const name=h.findIndex(x=>x==='ho va ten'||x==='ho ten'||x.includes('ho va ten')||x.includes('ho ten')||x.includes('hoc sinh'));
-      const level=h.findIndex(x=>x==='xep loai'||x.includes('xep loai')||x.includes('trinh do')||x==='level');
-      if(name>=0) return {row:i,name,level};
-    }
-    return {row:-1,name:1,level:3};
-  }
-
-  function parse(text){
-    const rows=String(text||'').replace(/^\uFEFF/,'').replace(/\r/g,'').split('\n').map(split).filter(r=>r.length && r.some(Boolean));
-    if(!rows.length) throw new Error('Tệp không có dữ liệu.');
-    const h=findHeader(rows);
-    const data=[];
-    for(let i=0;i<rows.length;i++){
-      if(i===h.row || isDividerRow(rows[i])) continue;
-      const r=rows[i];
-      const name=clean(r[h.name]||'');
-      if(!name) continue;
-      const lv=clean(r[h.level]||'');
-      const stt=clean(r[0]||'');
-      if(/^\d+$/.test(stt) && !name) continue;
-      data.push({
-        id:`UPLOAD-${String(data.length+1).padStart(3,'0')}`,
-        studentCode:`UPLOAD-${String(data.length+1).padStart(3,'0')}`,
-        name,
-        gender:clean(r[2]||''),
-        xepLoai:lv || 'H',
-        note:clean(r[4]||''),
-        source:'utilities-schema-v4'
-      });
-    }
-    if(!data.length) throw new Error('Không tìm thấy dữ liệu theo mẫu: STT | Họ và tên | Giới tính | Xếp loại | Ghi chú.');
-    return data;
-  }
-
-  function rank(v){
-    const s=norm(v);
-    if(s==='t'||s.startsWith('t ')) return 2;
-    if(s==='h'||s.startsWith('h ')) return 1;
-    if(/tot|gioi|xuat sac/.test(s)) return 2;
-    if(/hoan thanh|dat|kha/.test(s)) return 1;
-    return 1;
-  }
-
-  function levelLabel(v){
-    const s=norm(v);
-    if(s==='t') return 'T';
-    if(s==='h') return 'H';
-    return clean(v)||'H';
-  }
-
-  function shuffle(a){
-    const x=a.slice();
-    for(let i=x.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[x[i],x[j]]=[x[j],x[i]];}
-    return x;
-  }
-
-  function buildLayout(list){
-    const work=shuffle(list);
-    const pairs=[];
-    while(work.length){
-      const first=work.shift();
-      let best=-1,bestDiff=Infinity;
-      for(let i=0;i<work.length;i++){
-        const d=Math.abs(rank(first.xepLoai)-rank(work[i].xepLoai));
-        if(d<bestDiff){bestDiff=d;best=i;if(d===0)break;}
-      }
-      pairs.push([first,best>=0?work.splice(best,1)[0]:null]);
-    }
-    const cols=Array.from({length:4},()=>[]);
-    pairs.forEach((p,i)=>cols[i%4].push(p));
-    return `<div class="lh-layout-toolbar"><span><b>${list.length}</b> học sinh · <b>${pairs.length}</b> bàn · <b>4</b> tổ · <b>2 HS/bàn</b></span><button class="button secondary" id="lhSchemaShuffle" type="button"><i class="fa-solid fa-shuffle"></i> Xếp lại</button></div><div class="lh-classroom lh-four-columns">${cols.map((col,c)=>`<div class="lh-column"><div class="lh-group-title">Tổ ${c+1} <small>(${col.length} bàn)</small></div>${col.map((p,i)=>`<div class="lh-desk"><span class="lh-row">${i+1}</span><div class="lh-seat">${p[0]?`<b>${esc(p[0].name)}</b><small>Xếp loại: ${esc(levelLabel(p[0].xepLoai))}</small>`:'—'}</div><div class="lh-seat">${p[1]?`<b>${esc(p[1].name)}</b><small>Xếp loại: ${esc(levelLabel(p[1].xepLoai))}</small>`:'—'}</div></div>`).join('')}</div>`).join('')}</div><p class="lh-note">Dữ liệu tải lên chỉ dùng để xếp sơ đồ lớp/xếp tổ. Không ghi, không sửa, không xóa dữ liệu gốc.</p>`;
-  }
-
-  function install(){
-    const btn=document.getElementById('lhLevelUpload');
-    if(!btn || btn.__LH_SCHEMA_V4__) return;
-    btn.__LH_SCHEMA_V4__=true;
-    const fresh=btn.cloneNode(true); btn.replaceWith(fresh);
-    const input=document.createElement('input');
-    input.type='file'; input.accept='.csv,.tsv,.txt'; input.style.display='none';
-    input.id='lhSchemaV4File'; document.body.appendChild(input);
-    let uploaded=[];
-    fresh.onclick=()=>input.click();
-    input.onchange=async()=>{
-      const file=input.files&&input.files[0]; input.value=''; if(!file)return;
-      try{
-        uploaded=parse(await file.text());
-        window.__LH_UTIL_SCHEMA_V4_DATA__=uploaded;
-        const status=document.getElementById('lhUploadStatus');
-        if(status){status.innerHTML=`Đã tải lên <b>${uploaded.length}</b> học sinh · Mẫu 5 cột · Xếp loại T/H`;status.classList.add('ready');}
-        const root=document.getElementById('lhUtilityWorkspace');
-        if(root) root.innerHTML=`<div class="lh-upload-preview"><div class="lh-preview-head"><b>Danh sách đã đọc</b><span>${uploaded.length}/42 học sinh</span></div><div class="lh-preview-table"><table><thead><tr><th>STT</th><th>Họ và tên</th><th>Giới tính</th><th>Xếp loại</th><th>Ghi chú</th></tr></thead><tbody>${uploaded.map((s,i)=>`<tr><td>${i+1}</td><td>${esc(s.name)}</td><td>${esc(s.gender)}</td><td><b>${esc(levelLabel(s.xepLoai))}</b></td><td>${esc(s.note)}</td></tr>`).join('')}</tbody></table></div><div class="lh-preview-actions"><button class="button primary" id="lhSchemaCreateLayout" type="button"><i class="fa-solid fa-diagram-project"></i> Tạo sơ đồ lớp học</button></div></div>`;
-        const create=document.getElementById('lhSchemaCreateLayout');
-        if(create) create.onclick=()=>{if(root){root.innerHTML=buildLayout(uploaded);const sh=document.getElementById('lhSchemaShuffle');if(sh)sh.onclick=()=>{root.innerHTML=buildLayout(uploaded);const b=document.getElementById('lhSchemaShuffle');if(b)b.onclick=()=>{root.innerHTML=buildLayout(uploaded);};};}};
-      }catch(err){alert(err?.message||'Không thể đọc tệp.');}
-    };
-  }
-
-  function watch(){install();[250,700,1500].forEach(ms=>setTimeout(install,ms));}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',watch,{once:true}); else watch();
-  const mo=new MutationObserver(()=>install());
-  if(document.body)mo.observe(document.body,{subtree:true,childList:true});
+// CAPTURE AT WINDOW: runs before document-level legacy handlers.
+function safeMenuEvent(e){
+  const btn=e.target.closest?.('.main-menu .menu-item[data-page]');
+  if(!btn)return;
+  const page=btn.getAttribute('data-page');
+  if(show(page)){e.preventDefault();e.stopImmediatePropagation();}
+}
+window.addEventListener('click',safeMenuEvent,true);
+window.addEventListener('touchend',safeMenuEvent,{capture:true,passive:false});
+window.addEventListener('DOMContentLoaded',()=>{const nav=document.querySelector('.main-menu');if(nav&&!nav.querySelector('[data-page="utilities"]')){const b=document.createElement('button');b.type='button';b.className='menu-item';b.dataset.page='utilities';b.innerHTML='<i class="fa-solid fa-toolbox"></i><span>Tiện ích</span>';const s=nav.querySelector('[data-page="settings"]');if(s)nav.insertBefore(b,s);else nav.appendChild(b);}}, {once:true});
 })();
