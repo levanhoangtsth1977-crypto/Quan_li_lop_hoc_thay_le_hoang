@@ -48,6 +48,24 @@ jobs:
           p.write_text(s, encoding='utf-8')
           PY
 
+      - name: Install one-time dashboard legacy cleanup
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          pattern = r'<script\b[^>]*src=["\'][^"\']*dashboard-legacy-events-cleanup\.js[^"\']*["\'][^>]*></script>\s*'
+          s = re.sub(pattern, '', s, flags=re.I)
+          tag = '<script src="dashboard-legacy-events-cleanup.js"></script>\n'
+          if '</body>' in s:
+              s = s.replace('</body>', tag + '</body>', 1)
+          else:
+              s += tag
+          p.write_text(s, encoding='utf-8')
+          PY
+
       - name: Verify
         shell: bash
         run: |
@@ -58,6 +76,7 @@ jobs:
           ! grep -qi 'emergency-menu-router.js' index.html
           ! grep -qi 'tien-ich-final.js' index.html
           ! grep -qi 'tien-ich-schema-v4-fix.js' index.html
+          test "$(grep -oi 'dashboard-legacy-events-cleanup.js' index.html | wc -l | tr -d ' ')" = "1"
           grep -q 'id="lhUtilitiesStandalone"' index.html
 
       - name: Commit normalized index
@@ -69,5 +88,5 @@ jobs:
           if git diff --cached --quiet; then
             exit 0
           fi
-          git commit -m "Restore core menu router and standalone utilities"
+          git commit -m "Clean legacy dashboard violation and reward data"
           git push origin HEAD:master
