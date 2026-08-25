@@ -13,80 +13,40 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Restore index from last known good full HTML and inject static pages
+      - name: Restore known-good index and install stable pages
         shell: bash
         run: |
+          set -e
           git checkout 7ef6e13737b7fb481e992c63082624709e870087 -- index.html
           python3 - <<'PY'
           from pathlib import Path
           import re
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
-
-          # Remove duplicate/old injected scripts so the page starts from one clean baseline.
-          names=[
-            'events-new-final.js','vong-quay-may-man.js','vong-quay-may-man-fix.js',
-            'remove-violation-reward-menus.js'
-          ]
-          for name in names:
-            s=re.sub(r'<script\\s+src=["\\'][^"\\']*'+re.escape(name)+r'(?:\\?[^"\\']*)?["\\']\\s*></script>\\s*','',s,flags=re.I)
-
-          lucky_menu='''<button type="button" class="menu-item" data-page="lucky-wheel" id="lhLuckyWheelStatic"><i class="fa-solid fa-dharmachakra"></i><span>Vòng quay may mắn</span></button>'''
-          if 'data-page="lucky-wheel"' not in s:
-            marker='<button type="button" class="menu-item" data-page="settings">'
-            s=s.replace(marker,lucky_menu+'\\n            '+marker,1)
-
-          static_sections='''
-<section class="page-section" id="page-violations-new" data-page-section="violations-new"></section>
-<section class="page-section" id="page-rewards-new" data-page-section="rewards-new"></section>
-<section class="page-section" id="page-lucky-wheel" data-page-section="lucky-wheel">
-  <div class="page-header"><div><span class="page-eyebrow"><i class="fa-solid fa-dharmachakra"></i> Hoạt động lớp học</span><h1>🎡 Vòng quay may mắn</h1><p>Gọi ngẫu nhiên học sinh. Không thay đổi dữ liệu gốc.</p></div></div>
-  <div class="lh-wheel-panel">
-    <div class="lh-wheel-controls"><label>Phạm vi chọn<select id="lhWheelScope"><option value="all">👥 Toàn lớp</option><option value="to1">Tổ 1</option><option value="to2">Tổ 2</option><option value="to3">Tổ 3</option><option value="to4">Tổ 4</option></select></label><button type="button" class="button secondary" id="lhWheelReset"><i class="fa-solid fa-rotate-left"></i> Vòng mới</button></div>
-    <div class="lh-wheel-stage"><div class="lh-wheel-circle"><div class="lh-wheel-pointer">▼</div><div class="lh-wheel-center">🎡</div></div><div class="lh-wheel-result"><div class="lh-wheel-caption">HỌC SINH ĐƯỢC CHỌN</div><div class="lh-wheel-name" id="lhWheelName">SẴN SÀNG</div><div class="lh-wheel-sub" id="lhWheelSub">Nhấn “QUAY NGAY” để chọn học sinh</div><button type="button" class="button primary lh-wheel-spin" id="lhWheelSpin">🎯 QUAY NGAY</button><div class="lh-wheel-count" id="lhWheelCount">Đã gọi 0/0 học sinh</div></div></div>
-    <div class="lh-wheel-called-wrap"><div class="lh-wheel-called-head"><b>Danh sách đã gọi</b><span>Không lặp trong cùng một vòng</span></div><div id="lhWheelCalled" class="lh-wheel-called"><div class="lh-wheel-empty">Chưa gọi học sinh nào.</div></div></div>
-  </div>
-</section>
-'''
-          if 'id="page-violations-new"' not in s:
-            s=s.replace('</main>',static_sections+'\\n</main>',1)
-
-          tags='''<script src="events-new-final.js?v=20260825"></script>
-<script src="vong-quay-may-man.js?v=20260825"></script>
-<script src="vong-quay-may-man-fix.js?v=20260825"></script>
-'''
-          s=s.replace('</body>',tags+'</body>',1)
+          for name in ['events-new-final.js','events-fixed-static.js','vong-quay-may-man.js','vong-quay-may-man-fix.js','remove-violation-reward-menus.js']:
+              s=re.sub(r'<script\s+src=["\'][^"\']*'+re.escape(name)+r'(?:\?[^"\']*)?["\']\s*></script>\s*','',s,flags=re.I)
+          menu='<button type="button" class="menu-item" data-page="lucky-wheel" id="lhLuckyWheelStatic"><i class="fa-solid fa-dharmachakra"></i><span>Vòng quay may mắn</span></button>'
+          if 'id="lhLuckyWheelStatic"' not in s:
+              s=s.replace('<button type="button" class="menu-item" data-page="settings">',menu+'\n            <button type="button" class="menu-item" data-page="settings">',1)
+          lucky='''<section class="page-section" id="page-lucky-wheel" data-page-section="lucky-wheel"><div class="page-header"><div><span class="page-eyebrow"><i class="fa-solid fa-dharmachakra"></i> Hoạt động lớp học</span><h1>🎡 Vòng quay may mắn</h1><p>Gọi ngẫu nhiên học sinh. Không thay đổi dữ liệu gốc.</p></div></div><div class="lh-wheel-panel"><div class="lh-wheel-controls"><label>Phạm vi chọn<select id="lhWheelScope"><option value="all">👥 Toàn lớp</option><option value="to1">Tổ 1</option><option value="to2">Tổ 2</option><option value="to3">Tổ 3</option><option value="to4">Tổ 4</option></select></label><button type="button" class="button secondary" id="lhWheelReset">Vòng mới</button></div><div class="lh-wheel-stage"><div class="lh-wheel-circle"><div class="lh-wheel-pointer">▼</div><div class="lh-wheel-center">🎡</div></div><div class="lh-wheel-result"><div class="lh-wheel-caption">HỌC SINH ĐƯỢC CHỌN</div><div class="lh-wheel-name" id="lhWheelName">SẴN SÀNG</div><div class="lh-wheel-sub" id="lhWheelSub">Nhấn “QUAY NGAY” để chọn học sinh</div><button type="button" class="button primary lh-wheel-spin" id="lhWheelSpin">🎯 QUAY NGAY</button><div class="lh-wheel-count" id="lhWheelCount">Đã gọi 0/0 học sinh</div></div></div><div class="lh-wheel-called-wrap"><div class="lh-wheel-called-head"><b>Danh sách đã gọi</b><span>Không lặp trong cùng một vòng</span></div><div id="lhWheelCalled" class="lh-wheel-called"><div class="lh-wheel-empty">Chưa gọi học sinh nào.</div></div></div></div></section>'''
+          if 'id="page-lucky-wheel"' not in s:
+              s=s.replace('<section class="page-section" id="page-learning"',lucky+'\n            <section class="page-section" id="page-learning"',1)
+          tags=['<script src="events-fixed-static.js?v=20260825"></script>','<script src="vong-quay-may-man.js?v=20260825"></script>','<script src="vong-quay-may-man-fix.js?v=20260825"></script>']
+          for tag in tags:
+              src=tag.split('src="',1)[1].split('"',1)[0]
+              s=re.sub(r'<script[^>]+src=["\']'+re.escape(src)+r'["\'][^>]*></script>\s*','',s,flags=re.I)
+              s=s.replace('</body>',tag+'\n</body>',1)
           p.write_text(s,encoding='utf-8')
           PY
-      - name: Harden events module so static pages are never deleted
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('events-new-final.js')
-          s=p.read_text(encoding='utf-8')
-          old="['violations','rewards'].forEach(k=>{const p=document.getElementById(pageId(k));if(p)p.remove()});"
-          s=s.replace(old,"/* static event pages intentionally preserved */")
-          p.write_text(s,encoding='utf-8')
-          PY
-      - name: Validate HTML and JS integration
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          s=Path('index.html').read_text(encoding='utf-8')
-          required=['id="page-violations-new"','id="page-rewards-new"','id="page-lucky-wheel"','events-new-final.js','vong-quay-may-man.js','vong-quay-may-man-fix.js']
-          missing=[x for x in required if x not in s]
-          if missing: raise SystemExit('Missing: '+', '.join(missing))
-          print('HTML integration OK')
-          e=Path('events-new-final.js').read_text(encoding='utf-8')
-          if "pageId(k));if(p)p.remove()" in e: raise SystemExit('events module still removes static pages')
-          print('Events module preservation OK')
-          PY
-      - name: Commit repaired deployment
-        run: |
+          grep -q 'id="page-violations"' index.html
+          grep -q 'id="page-rewards"' index.html
+          grep -q 'id="page-lucky-wheel"' index.html
+          grep -q 'events-fixed-static.js' index.html
+          grep -q 'vong-quay-may-man.js?v=20260825' index.html
+          grep -q 'vong-quay-may-man-fix.js?v=20260825' index.html
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add index.html events-new-final.js
-          git commit -m "Repair Vi Pham Khen Thuong Lucky Wheel HTML pages"
+          git add index.html
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Restore stable static event and lucky wheel pages'
           git push origin HEAD:master
