@@ -10,28 +10,87 @@ permissions:
 
 jobs:
   install:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Inject lucky wheel script
+      - name: Install lucky wheel HTML and script
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
+
           p = Path('index.html')
           text = p.read_text(encoding='utf-8')
-          tag = '<script src="vong-quay-may-man.js"></script>'
-          if tag not in text:
-              marker = '<script src="script.js"></script>'
-              if marker in text:
-                  text = text.replace(marker, marker + '\n    ' + tag, 1)
-              elif '</body>' in text:
-                  text = text.replace('</body>', '    ' + tag + '\n</body>', 1)
+
+          menu = '''<button type="button" class="menu-item" data-page="lucky-wheel" id="lhLuckyWheelStatic"><i class="fa-solid fa-dharmachakra"></i><span>Vòng quay may mắn</span></button>'''
+          if 'data-page="lucky-wheel"' not in text:
+              settings_pat = r'(\s*<button[^>]+data-page=["\']settings["\'][^>]*>.*?</button>)'
+              m = re.search(settings_pat, text, flags=re.I|re.S)
+              if m:
+                  text = text[:m.start()] + '\n            <div class="menu-divider"></div>\n            ' + menu + text[m.start():]
               else:
-                  text += '\n' + tag + '\n'
-              p.write_text(text, encoding='utf-8')
+                  nav_end = text.find('</nav>')
+                  if nav_end >= 0:
+                      text = text[:nav_end] + '\n            ' + menu + '\n' + text[nav_end:]
+
+          page = '''
+            <section class="page-section" id="page-lucky-wheel" data-page-section="lucky-wheel">
+                <div class="page-header">
+                    <div>
+                        <span class="page-eyebrow"><i class="fa-solid fa-dharmachakra"></i> Hoạt động lớp học</span>
+                        <h1>🎡 Vòng quay may mắn</h1>
+                        <p>Gọi ngẫu nhiên học sinh để trả lời, phát biểu hoặc tham gia hoạt động. Không thay đổi dữ liệu gốc.</p>
+                    </div>
+                </div>
+                <div class="lh-wheel-panel">
+                    <div class="lh-wheel-controls">
+                        <label>Phạm vi chọn
+                            <select id="lhWheelScope">
+                                <option value="all">👥 Toàn lớp</option>
+                                <option value="to1">Tổ 1</option>
+                                <option value="to2">Tổ 2</option>
+                                <option value="to3">Tổ 3</option>
+                                <option value="to4">Tổ 4</option>
+                            </select>
+                        </label>
+                        <button type="button" class="button secondary" id="lhWheelReset"><i class="fa-solid fa-rotate-left"></i> Vòng mới</button>
+                    </div>
+                    <div class="lh-wheel-stage">
+                        <div class="lh-wheel-circle">
+                            <div class="lh-wheel-pointer">▼</div>
+                            <div class="lh-wheel-center">🎡</div>
+                        </div>
+                        <div class="lh-wheel-result">
+                            <div class="lh-wheel-caption">HỌC SINH ĐƯỢC CHỌN</div>
+                            <div class="lh-wheel-name" id="lhWheelName">SẴN SÀNG</div>
+                            <div class="lh-wheel-sub" id="lhWheelSub">Nhấn “QUAY NGAY” để chọn học sinh</div>
+                            <button type="button" class="button primary lh-wheel-spin" id="lhWheelSpin">🎯 QUAY NGAY</button>
+                            <div class="lh-wheel-count" id="lhWheelCount">Đã gọi 0/0 học sinh</div>
+                        </div>
+                    </div>
+                    <div class="lh-wheel-called-wrap">
+                        <div class="lh-wheel-called-head"><b>Danh sách đã gọi</b><span>Không lặp trong cùng một vòng</span></div>
+                        <div id="lhWheelCalled" class="lh-wheel-called"><div class="lh-wheel-empty">Chưa gọi học sinh nào.</div></div>
+                    </div>
+                </div>
+            </section>'''
+
+          if 'id="page-lucky-wheel"' not in text:
+              marker = '</main>'
+              if marker in text:
+                  text = text.replace(marker, page + '\n' + marker, 1)
+              else:
+                  raise SystemExit('Không tìm thấy </main> để chèn page-lucky-wheel')
+
+          # Chỉ giữ một script vòng quay chuẩn ở cuối body.
+          text = re.sub(r'\s*<script\s+src=["\']vong-quay-may-man\.js(?:\?[^"\']*)?["\']\s*></script>\s*', '\n', text, flags=re.I)
+          text = text.replace('</body>', '    <script src="vong-quay-may-man.js?v=20260825"></script>\n</body>', 1)
+
+          p.write_text(text, encoding='utf-8')
           PY
 
       - name: Commit changes
@@ -40,8 +99,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
           if git diff --cached --quiet; then
-            echo "Lucky wheel already installed"
+            echo "Lucky wheel HTML already installed"
           else
-            git commit -m "Tích hợp menu Vòng quay may mắn"
-            git push
+            git commit -m "Fix lucky wheel HTML page and menu"
+            git push origin HEAD:master
           fi
