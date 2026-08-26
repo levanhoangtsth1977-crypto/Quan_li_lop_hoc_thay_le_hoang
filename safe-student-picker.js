@@ -77,7 +77,14 @@ function ensure(id){
  syncLabel();
 }
 function install(){IDS.forEach(ensure);}
-function start(){install();window.addEventListener('google-sheets-data-ready',install);const mo=new MutationObserver(()=>install());mo.observe(document.body,{childList:true,subtree:true});}
+function styleProfileLayout(){
+ if(document.getElementById('lhProfileLowerPanelFix'))return;
+ const s=document.createElement('style');
+ s.id='lhProfileLowerPanelFix';
+ s.textContent='#page-student-profiles .profile-layout{display:block!important}#page-student-profiles .profile-list-panel{display:none!important}#page-student-profiles #lhProfileSearch{display:none!important}#page-student-profiles .profile-detail{width:100%;box-sizing:border-box}';
+ document.head.appendChild(s);
+}
+function start(){install();styleProfileLayout();window.addEventListener('google-sheets-data-ready',install);const mo=new MutationObserver(()=>{install();styleProfileLayout()});mo.observe(document.body,{childList:true,subtree:true});}
 function repairProfileMenu(){
  const run=()=>{
    const nav=document.querySelector('.main-menu');
