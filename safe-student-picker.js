@@ -95,11 +95,20 @@ function styleProfileLayout(){
  s.textContent='#page-student-profiles .profile-layout{display:block!important}#page-student-profiles .profile-list-panel{display:none!important}#page-student-profiles #lhProfileSearch{display:none!important}#page-student-profiles .profile-detail{width:100%;box-sizing:border-box}';
  document.head.appendChild(s);
 }
+function loadProfileRepair(){
+ if(document.getElementById('lhStudentProfileRepairScript'))return;
+ const script=document.createElement('script');
+ script.id='lhStudentProfileRepairScript';
+ script.src='student-profile-repair.js?v=1.0.0';
+ script.async=false;
+ document.body.appendChild(script);
+}
 function start(){
  install();
  styleProfileLayout();
- window.addEventListener('google-sheets-data-ready',()=>{install();styleProfileLayout()});
- const mo=new MutationObserver(()=>{install();styleProfileLayout()});
+ loadProfileRepair();
+ window.addEventListener('google-sheets-data-ready',()=>{install();styleProfileLayout();loadProfileRepair()});
+ const mo=new MutationObserver(()=>{install();styleProfileLayout();if(document.getElementById('mainContent'))loadProfileRepair()});
  mo.observe(document.body,{childList:true,subtree:true});
 }
 function repairProfileMenu(){
