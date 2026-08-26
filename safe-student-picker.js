@@ -99,14 +99,17 @@ function loadProfileRepair(){
  if(document.getElementById('lhStudentProfileRepairScript'))return;
  const script=document.createElement('script');
  script.id='lhStudentProfileRepairScript';
- script.src='student-profile-repair.js?v=1.0.0';
+ script.src='student-profile-repair.js?v=20260826-1627';
  script.async=false;
  document.body.appendChild(script);
+ script.addEventListener('error',()=>{delete script.id});
 }
 function start(){
  install();
  styleProfileLayout();
  loadProfileRepair();
+ setTimeout(loadProfileRepair,500);
+ setTimeout(loadProfileRepair,1500);
  window.addEventListener('google-sheets-data-ready',()=>{install();styleProfileLayout();loadProfileRepair()});
  const mo=new MutationObserver(()=>{install();styleProfileLayout();if(document.getElementById('mainContent'))loadProfileRepair()});
  mo.observe(document.body,{childList:true,subtree:true});
