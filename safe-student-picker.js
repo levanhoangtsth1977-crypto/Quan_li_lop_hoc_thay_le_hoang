@@ -78,5 +78,19 @@ function ensure(id){
 }
 function install(){IDS.forEach(ensure);}
 function start(){install();window.addEventListener('google-sheets-data-ready',install);const mo=new MutationObserver(()=>install());mo.observe(document.body,{childList:true,subtree:true});}
+function repairProfileMenu(){
+ const run=()=>{
+   const nav=document.querySelector('.main-menu');
+   if(!nav)return;
+   if(document.getElementById('lhStudentProfileMenu'))return;
+   const script=document.createElement('script');
+   script.src='student-profile-menu.js?repair='+Date.now();
+   script.async=false;
+   document.body.appendChild(script);
+ };
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
+}
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start,{once:true}); else start();
+repairProfileMenu();
+window.addEventListener('google-sheets-data-ready',repairProfileMenu);
 })();
