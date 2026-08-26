@@ -3,7 +3,7 @@
 'use strict';
 if(window.__LH_SAFE_STUDENT_PICKER__) return;
 window.__LH_SAFE_STUDENT_PICKER__=true;
-const IDS=['attendanceStudent','violationStudent','rewardStudent'];
+const IDS=['attendanceStudent','violationStudent','rewardStudent','profileStudent'];
 const clean=v=>String(v??'').trim().replace(/\s+/g,' ');
 const states=new WeakMap();
 function roster(){
@@ -38,7 +38,8 @@ function ensure(id){
  function syncLabel(){
    const v=clean(sel.value);
    const opt=Array.from(sel.options).find(o=>clean(o.value)===v);
-   label.textContent=opt?.textContent||'Chọn học sinh';
+   const student=roster().find(st=>clean(st?.id)===v);
+   label.textContent=opt?.textContent||student?.name||'Chọn học sinh';
    arrow.textContent=panel.hidden?'▾':'▴';
  }
  function render(){
