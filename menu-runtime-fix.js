@@ -34,3 +34,18 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load,{once:true});else load();
   window.addEventListener('google-sheets-data-ready',load,{once:false});
 })();
+
+/* REWARD DELETE REPAIR LOADER — isolated from other record modules */
+(function(){'use strict';
+  const load=()=>{
+    if(document.querySelector('script[data-lh-reward-delete-fix]'))return;
+    const s=document.createElement('script');
+    s.src='reward-delete-fix.js?v=20260826.1';
+    s.async=false;
+    s.dataset.lhRewardDeleteFix='1';
+    document.head.appendChild(s);
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load,{once:true});else load();
+  setTimeout(load,500);
+  setTimeout(load,1500);
+})();
