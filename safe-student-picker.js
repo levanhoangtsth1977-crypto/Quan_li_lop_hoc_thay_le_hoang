@@ -3,7 +3,7 @@
 'use strict';
 if(window.__LH_SAFE_STUDENT_PICKER__) return;
 window.__LH_SAFE_STUDENT_PICKER__=true;
-const IDS=['attendanceStudent','violationStudent','rewardStudent','profileStudent'];
+const IDS=['attendanceStudent','violationStudent','rewardStudent'];
 const clean=v=>String(v??'').trim().replace(/\s+/g,' ');
 const states=new WeakMap();
 function roster(){
