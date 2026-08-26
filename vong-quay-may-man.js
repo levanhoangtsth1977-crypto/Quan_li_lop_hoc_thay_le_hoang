@@ -1,28 +1,18 @@
-/* VÒNG QUAY MAY MẮN — FINAL
- * Một module duy nhất: dữ liệu + chọn ngẫu nhiên + quay thật + nhạc nền.
- * Không ghi/sửa/xóa Google Sheets.
- */
-(function(){'use strict';
-if(window.__LH_LUCKY_WHEEL_FINAL__)return;window.__LH_LUCKY_WHEEL_FINAL__=true;
-const PAGE='page-lucky-wheel';let calledIds=[];let audioCtx=null,musicTimer=null,roundRunning=false;
-const clean=v=>String(v??'').trim().replace(/\s+/g,' ');const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-function getStudents(){const candidates=['students','allStudents','hocSinh','HOC_SINH'];for(const k of candidates){if(Array.isArray(window[k])){const a=window[k].filter(s=>s&&s.id&&clean(s.name));if(a.length)return a;}}try{if(typeof window.getStudentsSafe==='function'){const a=window.getStudentsSafe();if(Array.isArray(a))return a.filter(s=>s&&s.id&&clean(s.name));}}catch(e){}return []}
-function students(){return getStudents().map((s,i)=>({id:String(s.id),name:clean(s.name),group:clean(s.to||s.tTo||s.group||s.nhom||s.team||''),index:i+1}))}
-function scopePool(list,scope){if(/^to[1-4]$/.test(scope)){const n=scope.slice(2);const f=list.filter(s=>new RegExp('^(?:t[oô]\\s*)?'+n+'$','i').test(s.group));return f.length?f:list}return list}
-function ensureAudio(){try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;if(!audioCtx)audioCtx=new C();if(audioCtx.state==='suspended')audioCtx.resume();return audioCtx}catch(e){return null}}
-function tone(freq,duration=.14,volume=.025,when=0,type='sine'){const c=ensureAudio();if(!c)return;try{const o=c.createOscillator(),g=c.createGain(),t=c.currentTime+when;o.type=type;o.frequency.setValueAtTime(freq,t);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(Math.max(volume,.0002),t+.015);g.gain.exponentialRampToValueAtTime(.0001,t+duration);o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+duration+.03)}catch(e){}}
-function startMusic(){ensureAudio();stopMusic();const notes=[523.25,659.25,783.99,659.25,587.33,698.46,880,698.46];let i=0;const tick=()=>{if(!musicTimer)return;tone(notes[i%notes.length],.16,.022,0,'triangle');tone(notes[(i+2)%notes.length]/2,.20,.009,.015,'sine');i++};musicTimer=setInterval(tick,185);tick()}
-function stopMusic(){if(musicTimer){clearInterval(musicTimer);musicTimer=null}}
-function playWin(){tone(1046.5,.18,.045,0,'sine');tone(1318.5,.25,.04,.12,'sine');tone(1568,.32,.035,.25,'sine')}
-function renderCalled(){const list=students(),out=document.getElementById('lhWheelCalled'),count=document.getElementById('lhWheelCount');if(count)count.textContent=`Đã gọi ${calledIds.length}/${list.length} học sinh`;if(!out)return;out.innerHTML=calledIds.map((id,i)=>{const s=list.find(x=>x.id===id);return s?`<div class="lh-wheel-called-item"><span>${i+1}</span><b>${esc(s.name)}</b></div>`:''}).join('')||'<div class="lh-wheel-empty">Chưa gọi học sinh nào.</div>'}
-function showName(text){const n=document.getElementById('lhWheelName');if(n)n.textContent=text}
-function spinVisual(done){const wheel=document.querySelector('#page-lucky-wheel .lh-wheel-circle');if(!wheel){done?.();return}const current=Number(wheel.dataset.rotation||0),extra=(6+Math.floor(Math.random()*3))*360+Math.floor(Math.random()*360),target=current+extra;wheel.style.transition='transform 4.2s cubic-bezier(.12,.72,.16,1)';wheel.style.transform=`rotate(${target}deg)`;wheel.dataset.rotation=String(target);setTimeout(()=>done?.(),4200)}
-function choose(){if(roundRunning)return;const list=students();if(!list.length){alert('Chưa có dữ liệu học sinh để quay.');return}const scope=document.getElementById('lhWheelScope')?.value||'all',pool=scopePool(list,scope);if(!pool.length){alert('Phạm vi chọn hiện không có học sinh.');return}let available=pool.filter(s=>!calledIds.includes(s.id));if(!available.length){calledIds=[];available=pool.slice()}const winner=available[Math.floor(Math.random()*available.length)];calledIds.push(winner.id);roundRunning=true;const btn=document.getElementById('lhWheelSpin'),sub=document.getElementById('lhWheelSub'),name=document.getElementById('lhWheelName');if(btn)btn.disabled=true;if(sub)sub.textContent='🎡 Đang quay...';if(name)name.classList.remove('winner-pop');ensureAudio();startMusic();let ticks=0;const fakeTimer=setInterval(()=>{const fake=pool[Math.floor(Math.random()*pool.length)];showName(fake.name);if(++ticks>=18)clearInterval(fakeTimer)},105);spinVisual(()=>{clearInterval(fakeTimer);stopMusic();showName(winner.name);if(name)name.classList.add('winner-pop');if(sub)sub.textContent='🎉 Chúc mừng! Học sinh được gọi ngẫu nhiên.';playWin();renderCalled();roundRunning=false;if(btn)btn.disabled=false})}
-function resetRound(){if(roundRunning)return;calledIds=[];const wheel=document.querySelector('#page-lucky-wheel .lh-wheel-circle');if(wheel){wheel.style.transition='transform .35s ease';wheel.style.transform='rotate(0deg)';wheel.dataset.rotation='0'}const n=document.getElementById('lhWheelName'),s=document.getElementById('lhWheelSub');if(n)n.textContent='SẴN SÀNG';if(s)s.textContent='Nhấn “QUAY NGAY” để chọn học sinh';renderCalled()}
-function bindPage(){const spin=document.getElementById('lhWheelSpin'),reset=document.getElementById('lhWheelReset'),scope=document.getElementById('lhWheelScope');if(spin&&spin.dataset.finalBound!=='1'){spin.dataset.finalBound='1';spin.onclick=choose}if(reset&&reset.dataset.finalBound!=='1'){reset.dataset.finalBound='1';reset.onclick=resetRound}if(scope&&scope.dataset.finalBound!=='1'){scope.dataset.finalBound='1';scope.onchange=resetRound}renderCalled()}
-function openPage(){document.querySelectorAll('.page-section').forEach(s=>s.classList.remove('active'));const sec=document.getElementById(PAGE);if(!sec)return;sec.classList.add('active');const title=document.getElementById('pageTitle');if(title)title.textContent='Vòng quay may mắn';bindPage()}
-function installMenu(){const nav=document.querySelector('.main-menu');if(!nav)return;const btn=nav.querySelector('[data-page="lucky-wheel"]');if(btn)btn.onclick=openPage}
-function css(){if(document.getElementById('lhWheelFinalStyle'))return;const s=document.createElement('style');s.id='lhWheelFinalStyle';s.textContent='.lh-wheel-circle{transform-origin:center center;will-change:transform}.lh-wheel-name.winner-pop{animation:lhWinnerFinal .7s ease}@keyframes lhWinnerFinal{0%{transform:scale(.7);opacity:.2}65%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}';document.head.appendChild(s)}
-function start(){css();installMenu();bindPage();window.addEventListener('pagechange',bindPage)}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+/* VÒNG QUAY MAY MẮN — ĐÃ GỠ KHỎI HỆ THỐNG */
+(function(){
+'use strict';
+if(window.__LH_LUCKY_WHEEL_REMOVED__)return;
+window.__LH_LUCKY_WHEEL_REMOVED__=true;
+function removeLuckyWheel(){
+  try{
+    document.querySelectorAll('[data-page="lucky-wheel"],#lhLuckyWheelStatic').forEach(el=>el.remove());
+    const page=document.getElementById('page-lucky-wheel');
+    if(page)page.remove();
+    document.querySelectorAll('script[src*="vong-quay-may-man"],script[src*="lucky-wheel"]').forEach(el=>el.remove());
+    const title=document.getElementById('pageTitle');
+    if(title && /Vòng quay may mắn/i.test(title.textContent)) title.textContent='Trang chủ';
+  }catch(e){console.warn('[LH] Không thể gỡ Vòng quay may mắn:',e)}
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',removeLuckyWheel,{once:true});else removeLuckyWheel();
+new MutationObserver(removeLuckyWheel).observe(document.body,{childList:true,subtree:true});
 })();
