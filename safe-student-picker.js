@@ -6,7 +6,17 @@ window.__LH_SAFE_STUDENT_PICKER__=true;
 const IDS=['attendanceStudent','violationStudent','rewardStudent'];
 const clean=v=>String(v??'').trim().replace(/\s+/g,' ');
 const states=new WeakMap();
+function normalizeRosterIds(){
+ const src=Array.isArray(window.GOOGLE_SHEETS_STUDENTS)?window.GOOGLE_SHEETS_STUDENTS:(Array.isArray(window.students)?window.students:[]);
+ if(!src.length)return;
+ src.forEach((st,i)=>{
+   if(!st||!clean(st.name))return;
+   if(!clean(st.id)&&!clean(st.studentCode)) st.id='LH5C-'+String(Number(st.stt)||i+1).padStart(3,'0');
+   else if(!clean(st.id)&&clean(st.studentCode)) st.id=clean(st.studentCode);
+ });
+}
 function roster(){
+ normalizeRosterIds();
  const a=Array.isArray(window.GOOGLE_SHEETS_STUDENTS)?window.GOOGLE_SHEETS_STUDENTS:[];
  if(a.length) return a;
  return Array.isArray(window.students)?window.students:[];
@@ -43,6 +53,7 @@ function ensure(id){
    arrow.textContent=panel.hidden?'▾':'▴';
  }
  function render(){
+   normalizeRosterIds();
    const current=clean(sel.value);
    panel.replaceChildren();
    roster().forEach(st=>{
@@ -76,7 +87,7 @@ function ensure(id){
  states.get(sel).refresh=()=>{render();syncLabel();};
  syncLabel();
 }
-function install(){IDS.forEach(ensure);}
+function install(){normalizeRosterIds();IDS.forEach(ensure);}
 function styleProfileLayout(){
  if(document.getElementById('lhProfileLowerPanelFix'))return;
  const s=document.createElement('style');
@@ -84,9 +95,16 @@ function styleProfileLayout(){
  s.textContent='#page-student-profiles .profile-layout{display:block!important}#page-student-profiles .profile-list-panel{display:none!important}#page-student-profiles #lhProfileSearch{display:none!important}#page-student-profiles .profile-detail{width:100%;box-sizing:border-box}';
  document.head.appendChild(s);
 }
-function start(){install();styleProfileLayout();window.addEventListener('google-sheets-data-ready',install);const mo=new MutationObserver(()=>{install();styleProfileLayout()});mo.observe(document.body,{childList:true,subtree:true});}
+function start(){
+ install();
+ styleProfileLayout();
+ window.addEventListener('google-sheets-data-ready',()=>{install();styleProfileLayout()});
+ const mo=new MutationObserver(()=>{install();styleProfileLayout()});
+ mo.observe(document.body,{childList:true,subtree:true});
+}
 function repairProfileMenu(){
  const run=()=>{
+   normalizeRosterIds();
    const nav=document.querySelector('.main-menu');
    if(!nav)return;
    if(document.getElementById('lhStudentProfileMenu'))return;
@@ -97,7 +115,7 @@ function repairProfileMenu(){
  };
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
 }
-if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start,{once:true}); else start();
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 repairProfileMenu();
 window.addEventListener('google-sheets-data-ready',repairProfileMenu);
 })();
