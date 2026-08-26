@@ -1,105 +1,115 @@
-/* LEARNING STUDENT PICKER FIX 1.0
-   - Chỉ sửa ô Học sinh trong form Ghi nhận kết quả học tập.
-   - Không thay đổi các trường khác.
-   - Nguồn học sinh: Data Engine -> GOOGLE_SHEET_DATA -> window.students.
+/* LEARNING STUDENT PICKER FIX 2.0
+   - Chỉ sửa ô Học sinh trong các form Học tập/Nhận xét.
+   - Đọc danh sách trực tiếp từ Data Engine hiện hành.
+   - Hỗ trợ nhiều schema tên học sinh.
+   - Không thay đổi môn, mức đạt, nhận xét, nội dung hoặc ghi chú.
 */
 (function(){
 'use strict';
-if(window.__LH_LEARNING_STUDENT_PICKER_FIX_10__) return;
-window.__LH_LEARNING_STUDENT_PICKER_FIX_10__=true;
+if(window.__LH_LEARNING_STUDENT_PICKER_FIX_20__)return;
+window.__LH_LEARNING_STUDENT_PICKER_FIX_20__=true;
 
 const text=v=>String(v??'').trim();
 const norm=v=>text(v).replace(/\s+/g,' ').toLocaleLowerCase('vi');
+const NAME_KEYS=['name','studentName','fullName','full_name','hoTen','ho_ten','hoten','displayName','student_full_name','Họ và tên','Họ tên','HỌ VÀ TÊN'];
+const ID_KEYS=['id','studentId','studentID','studentCode','code','maHocSinh','ma_hoc_sinh','Mã học sinh','Mã HS'];
 
 function getStudents(){
   const sources=[];
   try{
-    if(typeof window.getStudentsSafe==='function') sources.push(window.getStudentsSafe());
+    if(typeof window.loadClassData==='function') window.loadClassData();
   }catch(e){}
+  try{
+    if(typeof window.syncAppDataReferences==='function') window.syncAppDataReferences();
+  }catch(e){}
+  try{if(typeof window.getStudentsSafe==='function') sources.push(window.getStudentsSafe())}catch(e){}
   if(Array.isArray(window.students)) sources.push(window.students);
   const sheet=window.GOOGLE_SHEET_DATA?.tabs?.HOC_SINH;
   if(Array.isArray(sheet)) sources.push(sheet);
-  for(const a of sources){
-    if(Array.isArray(a) && a.length) return a.filter(Boolean).map((s,i)=>({
-      id:text(s.id||s.studentId||s.studentCode||s.code)||`LH5C-${String(i+1).padStart(3,'0')}`,
-      name:text(s.name||s.studentName||s.hoTen||s['Họ và tên'])||`Học sinh ${i+1}`
-    })).filter(x=>x.name);
+  for(const arr of sources){
+    if(!Array.isArray(arr)||!arr.length)continue;
+    const out=[];
+    const seen=new Set();
+    arr.forEach((s,i)=>{
+      if(!s||typeof s!=='object')return;
+      let name='';
+      for(const k of NAME_KEYS){if(text(s[k])){name=text(s[k]);break}}
+      if(!name){
+        const values=Object.values(s).filter(v=>typeof v==='string').map(text).filter(Boolean);
+        name=values.find(v=>v.length>3 && !/^\d{1,4}$/.test(v) && !/^HS\d+$/i.test(v))||'';
+      }
+      if(!name)return;
+      let id='';
+      for(const k of ID_KEYS){if(text(s[k])){id=text(s[k]);break}}
+      id=id||`LH5C-${String(i+1).padStart(3,'0')}`;
+      const key=id+'|'+norm(name);
+      if(seen.has(key))return;
+      seen.add(key);out.push({id,name});
+    });
+    if(out.length)return out;
   }
   return [];
 }
 
 function isStudentSelect(sel){
-  if(!(sel instanceof HTMLSelectElement)) return false;
-  const opts=[...sel.options].map(o=>norm(o.textContent));
-  return opts.some(x=>x.includes('chọn học sinh')) || opts.some(x=>x==='học sinh');
-}
-
-function labelFor(sel){
-  if(sel.id){const l=document.querySelector(`label[for="${CSS.escape(sel.id)}"]`);if(l)return norm(l.textContent)}
-  const parent=sel.closest('div,section,form');
-  if(parent){
-    const labels=[...parent.querySelectorAll('label')].map(x=>norm(x.textContent));
-    if(labels.some(x=>x==='học sinh' || x.includes('học sinh'))) return 'học sinh';
-  }
-  const prev=sel.previousElementSibling;
-  if(prev && norm(prev.textContent).includes('học sinh')) return 'học sinh';
-  return '';
+  if(!(sel instanceof HTMLSelectElement))return false;
+  const hay=[sel.id,sel.name,sel.getAttribute('aria-label'),sel.getAttribute('data-field'),sel.getAttribute('data-student-field'),sel.options?.[0]?.textContent].map(norm).join(' ');
+  if(hay.includes('học sinh')||hay.includes('student'))return true;
+  return [...sel.options].some(o=>norm(o.textContent).includes('chọn học sinh'));
 }
 
 function findSelects(){
   return [...document.querySelectorAll('select')].filter(sel=>{
-    const exact=labelFor(sel);
-    return isStudentSelect(sel) || exact==='học sinh' || exact.includes('học sinh');
+    if(isStudentSelect(sel))return true;
+    const parent=sel.closest('.modal,form,.form-grid,.form-group,.page-section,section,div');
+    if(!parent)return false;
+    const labelText=norm(parent.innerText||parent.textContent);
+    const hasStudent=labelText.includes('học sinh');
+    const hasOther=labelText.includes('môn học')||labelText.includes('mức đạt')||labelText.includes('mức đánh giá');
+    return hasStudent&&!hasOther;
   });
 }
 
 function fill(sel,students){
   const current=text(sel.value);
-  const placeholder=[...sel.options].find(o=>norm(o.textContent).includes('chọn học sinh'));
-  const placeholderValue=placeholder ? placeholder.value : '';
-  const fragment=document.createDocumentFragment();
-  const ph=document.createElement('option');
-  ph.value=placeholderValue;
-  ph.textContent='Chọn học sinh';
-  fragment.appendChild(ph);
-  for(const s of students){
-    const o=document.createElement('option');
-    o.value=s.id;
-    o.textContent=s.name;
-    fragment.appendChild(o);
-  }
-  sel.replaceChildren(fragment);
-  if(current && students.some(s=>s.id===current)) sel.value=current; else sel.value=placeholderValue;
-  sel.dispatchEvent(new Event('change',{bubbles:true}));
+  const old=[...sel.options].find(o=>norm(o.textContent).includes('chọn học sinh'));
+  const placeholderValue=old?old.value:'';
+  const frag=document.createDocumentFragment();
+  const ph=document.createElement('option');ph.value=placeholderValue;ph.textContent='Chọn học sinh';frag.appendChild(ph);
+  students.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.name;frag.appendChild(o)});
+  sel.replaceChildren(frag);
+  if(current&&students.some(s=>s.id===current))sel.value=current;else sel.value=placeholderValue;
+  sel.dataset.lhStudentPickerReady='1';
 }
 
 function apply(){
   const students=getStudents();
-  if(!students.length) return false;
+  if(students.length<1)return false;
   const sels=findSelects();
-  if(!sels.length) return false;
-  sels.forEach(sel=>fill(sel,students));
+  if(!sels.length)return false;
+  sels.forEach(s=>fill(s,students));
   return true;
 }
 
 function retry(){
   apply();
-  setTimeout(apply,300);
-  setTimeout(apply,800);
-  setTimeout(apply,1500);
+  [250,600,1200,2000].forEach(ms=>setTimeout(apply,ms));
 }
 
-window.addEventListener('google-sheets-data-ready',retry);
-window.addEventListener('data-changed',retry);
-window.addEventListener('records-updated',retry);
-window.addEventListener('DOMContentLoaded',retry,{once:true});
-window.addEventListener('load',retry,{once:true});
+['google-sheets-data-ready','data-changed','records-updated','students-updated'].forEach(ev=>window.addEventListener(ev,retry));
+['DOMContentLoaded','load'].forEach(ev=>window.addEventListener(ev,retry,{once:true}));
 
-const obs=new MutationObserver(()=>{ if(findSelects().some(s=>[...s.options].length<=1)) apply(); });
+let obs=null;
 function start(){
-  try{obs.observe(document.body,{childList:true,subtree:true});}catch(e){}
+  try{
+    obs=new MutationObserver(()=>{
+      const needs=findSelects().some(s=>s.options.length<=1);
+      if(needs)retry();
+    });
+    obs.observe(document.body,{childList:true,subtree:true});
+  }catch(e){}
   retry();
-  setInterval(apply,3000);
+  setInterval(apply,2000);
 }
-if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start,{once:true}); else start();
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
