@@ -1,30 +1,36 @@
 /* ============================================================
-   HOME + AI LIVE SYNC 1.0
-   - Đồng bộ Trang chủ và AI giáo viên với dữ liệu hiện hành.
-   - Không thay đổi dữ liệu gốc / Google Sheets.
-   - Không thay thế renderer đang hoạt động; chỉ bổ sung lớp đồng bộ.
+   HOME + AI LIVE SYNC 1.1
+   - Đồng bộ Trang chủ và AI giáo viên với nguồn dữ liệu hiện hành.
+   - Ưu tiên Google Sheets state hiện tại, sau đó mới dùng API/cache.
+   - Không thay đổi dữ liệu gốc / cấu trúc Google Sheets.
    ============================================================ */
 (function(){
 'use strict';
-if(window.__LH_HOME_AI_LIVE_SYNC_10__) return;
-window.__LH_HOME_AI_LIVE_SYNC_10__=true;
+if(window.__LH_HOME_AI_LIVE_SYNC_11__) return;
+window.__LH_HOME_AI_LIVE_SYNC_11__=true;
 
 const text=v=>String(v??'').trim();
-const arr=v=>Array.isArray(v)?v:[];
+
+function sheetRecords(tab){
+  const x=window.GOOGLE_SHEET_DATA?.tabs?.[tab];
+  return Array.isArray(x)?x.slice():null;
+}
 
 function liveRecords(kind){
-  const getter=kind==='violation'?'getViolationRecords':kind==='reward'?'getRewardRecords':null;
-  if(getter && typeof window[getter]==='function'){
+  const tab=kind==='violation'?'VI_PHAM':'KHEN_THUONG';
+  const sheet=sheetRecords(tab);
+  if(sheet) return sheet;
+
+  const getter=kind==='violation'?'getViolationRecords':'getRewardRecords';
+  if(typeof window[getter]==='function'){
     try{
       const x=window[getter]();
       if(Array.isArray(x)) return x.slice();
     }catch(e){}
   }
+
   const local=kind==='violation'?window.violationRecords:window.rewardRecords;
-  if(Array.isArray(local)) return local.slice();
-  const tab=kind==='violation'?'VI_PHAM':'KHEN_THUONG';
-  const sheet=window.GOOGLE_SHEET_DATA?.tabs?.[tab];
-  return Array.isArray(sheet)?sheet.slice():[];
+  return Array.isArray(local)?local.slice():[];
 }
 
 function liveCounts(){
@@ -50,42 +56,42 @@ function syncDashboardCounts(){
 
 function ensureStatisticsFresh(){
   if(typeof window.getClassStatistics!=='function') return;
-  if(window.__LH_ORIGINAL_GET_CLASS_STATISTICS__===undefined){
+  if(!window.__LH_ORIGINAL_GET_CLASS_STATISTICS__)
     window.__LH_ORIGINAL_GET_CLASS_STATISTICS__=window.getClassStatistics;
-  }
   const original=window.__LH_ORIGINAL_GET_CLASS_STATISTICS__;
-  window.getClassStatistics=function(){
+  if(window.getClassStatistics.__lhLiveWrapped) return;
+  const wrapped=function(){
     let base={};
     try{base=original()?original()||{}:{};}catch(e){}
     const c=liveCounts();
     return Object.assign({},base,{totalViolations:c.violations,totalRewards:c.rewards});
   };
+  wrapped.__lhLiveWrapped=true;
+  window.getClassStatistics=wrapped;
 }
 
 function patchDashboardRenderer(){
   const fn=window.renderDashboard;
   if(typeof fn!=='function') return;
-  if(!window.__LH_ORIGINAL_RENDER_DASHBOARD__){
+  if(!window.__LH_ORIGINAL_RENDER_DASHBOARD__)
     window.__LH_ORIGINAL_RENDER_DASHBOARD__=fn;
-  }
+  if(window.renderDashboard.__lhLiveWrapped) return;
   const original=window.__LH_ORIGINAL_RENDER_DASHBOARD__;
-  if(window.renderDashboard.__lhWrapped) return;
   const wrapped=function(){
     try{original();}catch(e){console.warn('[LIVE SYNC] renderDashboard',e);}
     syncDashboardCounts();
   };
-  wrapped.__lhWrapped=true;
+  wrapped.__lhLiveWrapped=true;
   window.renderDashboard=wrapped;
 }
 
 function patchAIAnalysis(){
   const fn=window.buildClassAIAnalysis;
   if(typeof fn!=='function') return;
-  if(!window.__LH_ORIGINAL_BUILD_CLASS_AI_ANALYSIS__){
+  if(!window.__LH_ORIGINAL_BUILD_CLASS_AI_ANALYSIS__)
     window.__LH_ORIGINAL_BUILD_CLASS_AI_ANALYSIS__=fn;
-  }
+  if(window.buildClassAIAnalysis.__lhLiveWrapped) return;
   const original=window.__LH_ORIGINAL_BUILD_CLASS_AI_ANALYSIS__;
-  if(window.buildClassAIAnalysis.__lhWrapped) return;
   const wrapped=function(){
     let out='';
     try{out=String(original()??'');}catch(e){out='';}
@@ -96,20 +102,15 @@ function patchAIAnalysis(){
       if(!/Vi phạm:\s*\d+/i.test(out)) out+=`\nVi phạm: ${c.violations}`;
       if(!/Khen thưởng:\s*\d+/i.test(out)) out+=`\nKhen thưởng: ${c.rewards}`;
     }else{
-      out=[
-        'PHÂN TÍCH LỚP',
-        '',
-        `Vi phạm: ${c.violations}`,
-        `Khen thưởng: ${c.rewards}`
-      ].join('\n');
+      out=['PHÂN TÍCH LỚP','',`Vi phạm: ${c.violations}`,`Khen thưởng: ${c.rewards}`].join('\n');
     }
     return out;
   };
-  wrapped.__lhWrapped=true;
+  wrapped.__lhLiveWrapped=true;
   window.buildClassAIAnalysis=wrapped;
 }
 
-function refreshAll(){
+function refresh(){
   ensureStatisticsFresh();
   patchDashboardRenderer();
   patchAIAnalysis();
@@ -117,42 +118,23 @@ function refreshAll(){
 }
 
 let last='';
-function fingerprint(){
-  const c=liveCounts();
-  return `${c.violations}|${c.rewards}`;
-}
-
+function fingerprint(){const c=liveCounts();return `${c.violations}|${c.rewards}`;}
 function watch(){
-  refreshAll();
+  refresh();
   const now=fingerprint();
   if(now!==last){
     last=now;
-    try{
-      if(typeof window.renderDashboard==='function') window.renderDashboard();
-    }catch(e){}
+    try{if(typeof window.renderDashboard==='function')window.renderDashboard();}catch(e){}
     syncDashboardCounts();
   }
 }
 
-['google-sheets-data-ready','storage','data-changed','records-updated','violation-updated','reward-updated'].forEach(ev=>{
-  window.addEventListener(ev,()=>setTimeout(watch,50));
-});
+['google-sheets-data-ready','storage','data-changed','records-updated','violation-updated','reward-updated'].forEach(ev=>window.addEventListener(ev,()=>setTimeout(watch,50)));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(watch,50)});
 
-document.addEventListener('visibilitychange',()=>{
-  if(!document.hidden) setTimeout(watch,50);
-});
-
-if(document.readyState==='loading'){
-  document.addEventListener('DOMContentLoaded',()=>{
-    setTimeout(watch,100);
-    setTimeout(watch,900);
-    setTimeout(watch,1800);
-  },{once:true});
-}else{
-  setTimeout(watch,100);
-  setTimeout(watch,900);
-  setTimeout(watch,1800);
-}
+if(document.readyState==='loading')
+  document.addEventListener('DOMContentLoaded',()=>{setTimeout(watch,100);setTimeout(watch,900);setTimeout(watch,1800)},{once:true});
+else{setTimeout(watch,100);setTimeout(watch,900);setTimeout(watch,1800);}
 
 setInterval(watch,1000);
 })();
