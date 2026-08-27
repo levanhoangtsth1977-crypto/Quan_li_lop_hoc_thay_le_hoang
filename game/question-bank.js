@@ -1,14 +1,15 @@
-/* TRIỆU PHÚ HỌC ĐƯỜNG — QUESTION BANK 4.3 SAFE
+/* TRIỆU PHÚ HỌC ĐƯỜNG — QUESTION BANK 5.0 PAGINATED
    Nguồn duy nhất: Google Sheets / BO_CAU_HOI.
-   Game lọc theo Môn + Chủ đề/Chương.
-   Không dùng Học kỳ hoặc Trạng thái để loại câu hỏi.
+   Đọc toàn bộ ngân hàng theo từng lô, không phụ thuộc kích thước một response GViz.
+   Game lọc theo Môn + Chủ đề/Chương. Không dùng Học kỳ hoặc Trạng thái để loại câu hỏi.
 */
 (function(){'use strict';
 var SHEET_ID='1n8ES33AkncKR6FzK0VODMgzDbycoyA_GsPIRuj7LEDM',SHEET_NAME='BO_CAU_HOI';
 var BASE='https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/gviz/tq';
+var CHUNK=400,MAX_CHUNKS=100;
 var questions=Array.isArray(window.GAME_QUESTIONS)?window.GAME_QUESTIONS:[];
 var ready=false,loading=false,timer=null,script=null,pendingStart=false;
-window.QuestionBank={ready:false,count:0,error:null,url:BASE};
+window.QuestionBank={ready:false,count:0,rawRows:0,rejectedRows:0,duplicates:0,chunks:0,error:null,url:BASE};
 function clean(v){return v==null?'':String(v).replace(/^\uFEFF/,'').trim()}
 function norm(v){return clean(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/Đ/g,'D').replace(/đ/g,'d').replace(/[\s_\-&/.:]+/g,'').toUpperCase()}
 function subject(v,id){var s=norm(v),r=String(id==null?'':id).toUpperCase();if(/^(TOAN|MATH|MATHEMATICS)$/.test(s)||r.indexOf('TOAN')>=0)return'math';if(/^(TV|TIENGVIET|VIETNAMESE)$/.test(s)||r.indexOf('TIENGVIET')>=0||/^TV[-_]/.test(r))return'vietnamese';if(/^(KH|KHOAHOC|KHOAHOC5|SCIENCE|NATURALSCIENCE)$/.test(s)||r.indexOf('KHOA_HOC')>=0||r.indexOf('KHOA-HOC')>=0||r.indexOf('KHOAHOC')>=0)return'science';if(/^(LSDL|LSDIALI|LSDIALI5|LICHSUDIALI|LICHSUVADIALI|HISTORY|HISTORYGEOGRAPHY|HISTORYANDGEOGRAPHY)$/.test(s)||r.indexOf('LS-DL')>=0||r.indexOf('LS_DL')>=0||r.indexOf('LSDIALI')>=0||r.indexOf('LICHSUDIALI')>=0)return'history';return s.toLowerCase()}
@@ -17,24 +18,13 @@ function chapter(v,id){var s=clean(v);return s||chapterFromId(id)||''}
 function num(v,d){var n=Number(String(v==null?'':v).replace(',','.'));return Number.isFinite(n)?n:d}
 function answerIndex(v){var s=norm(v);if(s==='A'||s==='1')return 0;if(s==='B'||s==='2')return 1;if(s==='C'||s==='3')return 2;if(s==='D'||s==='4')return 3;var n=Number(s);return Number.isFinite(n)&&n>=0&&n<=3?n:0}
 function valueFromCell(c,i){var cell=i>=0?c[i]:null;return cell?clean(cell.v!=null?cell.v:cell.f):''}
-function parse(data){
- if(!data||!data.table)throw new Error('Google Sheets không trả về bảng BO_CAU_HOI');
- var rows=data.table.rows||[];
- var list=rows.map(function(r,ri){var c=r.c||[];
-   /* BO_CAU_HOI chuẩn 18 cột: STT,ID,Mon,HocKy,Chuong,Bo,MucDo,NhomKT,CauHoi,A,B,C,D,DapAn,GiaiThich,Diem,ThoiGian,TrangThai */
-   var id=valueFromCell(c,1),mon=valueFromCell(c,2),hocKy=valueFromCell(c,3),chuong=valueFromCell(c,4),bo=valueFromCell(c,5),muc=valueFromCell(c,6),nhom=valueFromCell(c,7),question=valueFromCell(c,8),A=valueFromCell(c,9),B=valueFromCell(c,10),C=valueFromCell(c,11),D=valueFromCell(c,12),answer=valueFromCell(c,13),explain=valueFromCell(c,14),points=valueFromCell(c,15),time=valueFromCell(c,16),status=valueFromCell(c,17);
-   if(!id||!question||!A||!B||!C||!D)return null;
-   var ch=chapter(chuong,id);
-   return{id:id,subject:subject(mon,id),Mon:mon,semester:hocKy,chapter:ch,Chuong:ch,topic:ch,topicName:ch,set:bo,level:muc||'M1',group:nhom,question:question,options:[A,B,C,D],correctAnswer:answerIndex(answer),explanation:explain,points:num(points,1),time:num(time,30),status:status||'ACTIVE',stt:valueFromCell(c,0),_row:ri+2};
- }).filter(Boolean);
- if(!list.length)throw new Error('BO_CAU_HOI không có dòng câu hỏi hợp lệ.');
- return list;
-}
+function parseRows(data,offset){if(!data||!data.table)throw new Error('Google Sheets không trả về bảng BO_CAU_HOI');var rows=data.table.rows||[],list=[],rejected=0;rows.forEach(function(r,ri){var c=r.c||[];var id=valueFromCell(c,1),mon=valueFromCell(c,2),hocKy=valueFromCell(c,3),chuong=valueFromCell(c,4),bo=valueFromCell(c,5),muc=valueFromCell(c,6),nhom=valueFromCell(c,7),question=valueFromCell(c,8),A=valueFromCell(c,9),B=valueFromCell(c,10),C=valueFromCell(c,11),D=valueFromCell(c,12),answer=valueFromCell(c,13),explain=valueFromCell(c,14),points=valueFromCell(c,15),time=valueFromCell(c,16),status=valueFromCell(c,17);if(!id||!question||!A||!B||!C||!D){rejected++;return;}var ch=chapter(chuong,id);list.push({id:id,subject:subject(mon,id),Mon:mon,semester:hocKy,chapter:ch,Chuong:ch,topic:ch,topicName:ch,set:bo,level:muc||'M1',group:nhom,question:question,options:[A,B,C,D],correctAnswer:answerIndex(answer),explanation:explain,points:num(points,1),time:num(time,30),status:status||'ACTIVE',stt:valueFromCell(c,0),_row:offset+ri+2});});return{rows:rows.length,list:list,rejected:rejected}}
 function setStatus(t,ok){var e=document.getElementById('questionBankStatus');if(e){e.textContent=t;e.dataset.state=ok?'ok':'loading'}}
-function finish(list){loading=false;ready=true;window.QuestionBank.ready=true;window.QuestionBank.count=list.length;window.QuestionBank.error=null;questions.splice(0,questions.length);Array.prototype.push.apply(questions,list);setStatus('☁️ BO_CAU_HOI: '+list.length+' câu • đã kết nối Môn/Chủ đề',true);if(typeof window.initQuestionFilters==='function')window.initQuestionFilters();try{window.dispatchEvent(new Event('questionBankReady'))}catch(e){}if(pendingStart){pendingStart=false;setTimeout(function(){var b=document.querySelector('[data-action="start"]');if(b)b.click()},0)}}
+function finish(all,rejected,rawRows,chunks){var seen={},unique=[],dupes=0;all.forEach(function(q){if(seen[q.id]){dupes++;return;}seen[q.id]=1;unique.push(q)});loading=false;ready=true;window.QuestionBank.ready=true;window.QuestionBank.count=unique.length;window.QuestionBank.rawRows=rawRows;window.QuestionBank.rejectedRows=rejected;window.QuestionBank.duplicates=dupes;window.QuestionBank.chunks=chunks;window.QuestionBank.error=null;questions.splice(0,questions.length);Array.prototype.push.apply(questions,unique);setStatus('☁️ BO_CAU_HOI: '+unique.length+' câu • đã tải đủ '+rawRows+' dòng • Môn/Chủ đề sẵn sàng',true);if(typeof window.initQuestionFilters==='function')window.initQuestionFilters();try{window.dispatchEvent(new CustomEvent('questionBankReady',{detail:{count:unique.length,rawRows:rawRows,rejectedRows:rejected,duplicates:dupes,chunks:chunks}}));}catch(e){}if(pendingStart){pendingStart=false;setTimeout(function(){var b=document.querySelector('[data-action="start"]');if(b)b.click();},0);}}
 function fail(e){loading=false;ready=false;window.QuestionBank.ready=false;pendingStart=false;window.QuestionBank.error=e;setStatus('❌ '+(e&&e.message?e.message:'Không tải được BO_CAU_HOI'),false)}
-function load(){if(loading||ready)return;loading=true;setStatus('☁️ Đang tải BO_CAU_HOI…',false);var cb='__LH_GS_'+Date.now();window[cb]=function(data){clearTimeout(timer);try{finish(parse(data))}catch(e){fail(e)}delete window[cb];if(script&&script.parentNode)script.parentNode.removeChild(script)};script=document.createElement('script');script.src=BASE+'?sheet='+encodeURIComponent(SHEET_NAME)+'&headers=1&tqx='+encodeURIComponent('out:json;responseHandler:'+cb)+'&range=A:R&t='+Date.now();script.async=true;script.onerror=function(){clearTimeout(timer);fail(new Error('Không truy cập được Google Sheets / BO_CAU_HOI.'))};document.head.appendChild(script);timer=setTimeout(function(){if(loading)fail(new Error('Google Sheets phản hồi quá chậm (>15 giây)'))},15000)}
+function cleanup(){if(script&&script.parentNode)script.parentNode.removeChild(script);script=null;clearTimeout(timer);}
+function load(){if(loading||ready)return;loading=true;ready=false;window.QuestionBank.ready=false;window.QuestionBank.error=null;window.QuestionBank.rawRows=0;window.QuestionBank.rejectedRows=0;window.QuestionBank.duplicates=0;window.QuestionBank.chunks=0;setStatus('☁️ Đang tải toàn bộ BO_CAU_HOI…',false);cleanup();var all=[],offset=0,chunks=0,rejected=0,rawRows=0;function next(){if(chunks>=MAX_CHUNKS){cleanup();fail(new Error('Ngân hàng vượt giới hạn '+(MAX_CHUNKS*CHUNK)+' dòng.'));return;}var cb='__LH_GS_CHUNK_'+Date.now()+'_'+chunks;window[cb]=function(data){clearTimeout(timer);try{var parsed=parseRows(data,offset);all=all.concat(parsed.list);rejected+=parsed.rejected;rawRows+=parsed.rows;chunks++;setStatus('☁️ Đang tải BO_CAU_HOI… '+rawRows+' dòng',false);var n=parsed.rows;if(n<CHUNK){delete window[cb];cleanup();finish(all,rejected,rawRows,chunks);return;}offset+=CHUNK;delete window[cb];cleanup();setTimeout(next,0);}catch(e){delete window[cb];cleanup();fail(e);}};script=document.createElement('script');var tq='select * where B is not null limit '+CHUNK+' offset '+offset;script.src=BASE+'?sheet='+encodeURIComponent(SHEET_NAME)+'&headers=1&tq='+encodeURIComponent(tq)+'&tqx='+encodeURIComponent('out:json;responseHandler:'+cb)+'&t='+Date.now();script.async=true;script.onerror=function(){delete window[cb];cleanup();fail(new Error('Không truy cập được Google Sheets / BO_CAU_HOI ở lô '+(chunks+1)+'.'))};document.head.appendChild(script);timer=setTimeout(function(){if(loading){delete window[cb];cleanup();fail(new Error('Google Sheets phản hồi quá chậm ở lô '+(chunks+1)+'.'));}},20000);}next();}
 window.QuestionBank.load=load;
-document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-action="start"]');if(b&&!window.QuestionBank.ready){pendingStart=true;e.preventDefault();e.stopImmediatePropagation();load()}},true);
+document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-action="start"]');if(b&&!window.QuestionBank.ready){pendingStart=true;e.preventDefault();e.stopImmediatePropagation();load();}},true);
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load);else load();
 })();
