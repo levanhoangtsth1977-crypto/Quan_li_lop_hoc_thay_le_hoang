@@ -1,5 +1,5 @@
-/* MENU RUNTIME FIX 8.3 — statistics + isolated loaders */
-(function(){'use strict';if(window.__MENU_RUNTIME_FIX_830__)return;window.__MENU_RUNTIME_FIX_830__=true;
+/* MENU RUNTIME FIX 8.4 — statistics + isolated loaders + class-name sync */
+(function(){'use strict';if(window.__MENU_RUNTIME_FIX_840__)return;window.__MENU_RUNTIME_FIX_840__=true;
 const $=s=>document.querySelector(s),text=v=>String(v??'').trim(),tabKey={DIEM_DANH:'attendanceRecords',VI_PHAM:'violationRecords',KHEN_THUONG:'rewardRecords'};
 function sid(r){return text(r&&typeof r==='object'?(r.studentId||r.id||r.studentCode||r.code):r)}
 function students(){return Array.isArray(window.students)?window.students:((window.GOOGLE_SHEET_DATA&&Array.isArray(window.GOOGLE_SHEET_DATA.tabs?.HOC_SINH))?window.GOOGLE_SHEET_DATA.tabs.HOC_SINH:[])}
@@ -15,3 +15,17 @@ function install(){document.addEventListener('click',e=>{const tab=e.target.clos
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();})();
 (function(){'use strict';function load(src,attr){if(document.querySelector('script['+attr+']'))return;const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(attr,'1');document.head.appendChild(s)}
 const loadAll=()=>{load('student-profile-repair.js?v=20260826.2','data-lh-profile-repair');load('reward-delete-fix.js?v=20260826.1','data-lh-reward-delete-fix');load('menu-badge-sync-fix.js?v=20260826.1','data-lh-menu-badge-sync');load('home-data-sync-fix.js?v=20260826.1','data-lh-home-data-sync');load('learning-smas-import.js?v=20260826.1','data-lh-learning-smas-import');load('learning-student-picker-fix.js?v=20260826.2','data-lh-learning-student-picker-fix');load('excellent-student-engine.js?v=20260826.1','data-lh-excellent-student-engine');load('home-ai-live-sync.js?v=20260826.5','data-lh-home-ai-live-sync')};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadAll,{once:true});else loadAll();setTimeout(loadAll,700);setTimeout(loadAll,1700);window.addEventListener('google-sheets-data-ready',loadAll)})();
+(function(){'use strict';
+function syncClassName(){
+  var value='5A3',label='Lớp 5A3';
+  var sel=document.getElementById('classSelect');
+  if(sel){
+    var opt=sel.options&&sel.options[0];
+    if(opt){opt.value=value;opt.textContent=label;}
+    sel.value=value;
+  }
+  ['heroClass'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=label});
+  document.title='Quản lý lớp học Thầy Lê Hoàng — Lớp 5A3';
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',syncClassName,{once:true});else syncClassName();
+})();
