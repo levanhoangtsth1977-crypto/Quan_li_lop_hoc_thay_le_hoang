@@ -1,14 +1,17 @@
-/* Compatibility loader: the authoritative attendance fix is attendance-status-final-v2.js. */
-(function(){
-'use strict';
-function load(){
-  if(window.__LH_ATTENDANCE_STATUS_FINAL_V2__)return;
-  if(document.querySelector('script[data-lh-att-final-loader]'))return;
-  var s=document.createElement('script');
-  s.src='attendance-status-final-v2.js?v=2.0.0&fresh='+Date.now();
-  s.async=false;
-  s.setAttribute('data-lh-att-final-loader','1');
-  document.head.appendChild(s);
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load,{once:true});else load();
+/* ATTENDANCE STATUS AUTHORITATIVE 3.0
+   Một ô Trạng thái duy nhất: Có mặt / Có phép / Không phép.
+   Không render lại bảng khi mở/chọn trạng thái.
+   Chặn event router ngoài không được can thiệp vào select trạng thái.
+*/
+(function(){'use strict';
+if(window.__LH_ATTENDANCE_STATUS_30__)return;window.__LH_ATTENDANCE_STATUS_30__=true;
+const OPTIONS=[['present','Có mặt'],['excused','Có phép'],['absent','Không phép']];
+function validSelect(s){return s&&s.matches('#attendanceTableBody select.attendance-status')&&s.options.length===3&&Array.from(s.options).every((o,i)=>o.value===OPTIONS[i][0]&&o.textContent.trim()===OPTIONS[i][1])}
+function make(id,current){const s=document.createElement('select');s.className='attendance-status';s.dataset.studentId=id||'';s.setAttribute('aria-label','Trạng thái');OPTIONS.forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;if(v===current)o.selected=true;s.appendChild(o)});return s}
+function repair(){const body=document.getElementById('attendanceTableBody');if(!body)return;Array.from(body.rows).forEach(row=>{const cell=row.cells&&row.cells[2];if(!cell)return;const old=cell.querySelector('select.attendance-status'),bad=Array.from(cell.querySelectorAll('select')).find(s=>!s.classList.contains('attendance-status'));if(validSelect(old)&&!bad){bind(old);return}const current=old&&OPTIONS.some(x=>x[0]===old.value)?old.value:'present',id=old?.dataset?.studentId||cell.querySelector('[data-student-id]')?.dataset.studentId||'';cell.replaceChildren(make(id,current));bind(cell.querySelector('select.attendance-status'))})}
+function bind(select){if(!select||select.dataset.lhBound==='1')return;select.dataset.lhBound='1';const stop=e=>{e.stopPropagation();e.stopImmediatePropagation();window.__LH_ATT_STATUS_INTERACTION__=Date.now()+1200};['pointerdown','mousedown','touchstart','click'].forEach(type=>select.addEventListener(type,stop,true));select.addEventListener('change',e=>{e.stopPropagation();e.stopImmediatePropagation();if(typeof window.updateAttendanceSummary==='function'){try{window.updateAttendanceSummary()}catch(_){} }},true)}
+function css(){if(document.getElementById('lhAttendance30'))return;const s=document.createElement('style');s.id='lhAttendance30';s.textContent='#page-attendance .attendance-table{position:relative;overflow:visible}#page-attendance .attendance-table td:nth-child(3){position:relative;z-index:1000;min-width:150px;overflow:visible}#page-attendance select.attendance-status{position:relative;z-index:1001;width:100%;min-width:150px;pointer-events:auto;touch-action:manipulation}';document.head.appendChild(s)}
+function guardDocument(){if(document.__lhAttGuard)return;document.__lhAttGuard=true;document.addEventListener('click',e=>{if(e.target&&e.target.closest('#attendanceTableBody select.attendance-status')){e.stopPropagation();e.stopImmediatePropagation();}},true);document.addEventListener('pointerdown',e=>{if(e.target&&e.target.closest('#attendanceTableBody select.attendance-status')){e.stopPropagation();}},true);document.addEventListener('change',e=>{if(e.target&&e.target.matches('#attendanceTableBody select.attendance-status')){e.stopPropagation();e.stopImmediatePropagation();if(typeof window.updateAttendanceSummary==='function'){try{window.updateAttendanceSummary()}catch(_){} } }},true)}
+function start(){css();guardDocument();repair();const body=document.getElementById('attendanceTableBody');if(body){const obs=new MutationObserver(()=>{if(window.__LH_ATT_REPAIR_LOCK__)return;window.__LH_ATT_REPAIR_LOCK__=true;try{repair()}finally{window.__LH_ATT_REPAIR_LOCK__=false}});obs.observe(body,{childList:true,subtree:true});window.__LH_ATT_STATUS_OBSERVER__=obs}window.LHAttendanceStatusFinal={repair,guard:guardDocument}}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
