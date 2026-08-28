@@ -1,7 +1,16 @@
-/* TRIỆU PHÚ HỌC ĐƯỜNG — FINAL UI ROUTER 1.0
-   Chạy sau game.js. Không thay dữ liệu câu hỏi; chỉ điều khiển ô Môn/Chủ đề.
+/* TRIỆU PHÚ HỌC ĐƯỜNG — FINAL UI ROUTER 1.1
+   Môn -> Chủ đề/Chương là luồng chọn duy nhất.
+   Khi đổi Chủ đề/Chương, chốt đúng pool của Môn + Cxx; game.js sẽ đọc pool này khi bấm Bắt đầu.
 */
-(function(){'use strict';if(window.__LH_FINAL_GAME_UI_10__)return;window.__LH_FINAL_GAME_UI_10__=true;
-function render(){try{if(window.LHFinalQuestionBank&&typeof window.LHFinalQuestionBank.build==='function'){window.LHFinalQuestionBank.build();return true}if(window.LHGameDataNormalizer&&typeof window.LHGameDataNormalizer.render==='function'){window.LHGameDataNormalizer.render();return true}}catch(e){}return false}
-function boot(){render();var s=document.getElementById('subject'),m=document.getElementById('gameMode');document.addEventListener('change',function(e){if(e.target===s||e.target===m)setTimeout(render,0)},true);window.addEventListener('questionBankReady',function(){setTimeout(render,0)});window.addEventListener('gamePoolReady',function(){setTimeout(render,0)});}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();})();
+(function(){'use strict';
+if(window.__LH_FINAL_GAME_UI_11__)return;window.__LH_FINAL_GAME_UI_11__=true;
+function all(){return Array.isArray(window.LH_ALL_GAME_QUESTIONS)?window.LH_ALL_GAME_QUESTIONS:[]}
+function norm(v){return String(v==null?'':v).normalize('NFC').replace(/[\uFEFF]/g,'').trim().replace(/\s+/g,' ')}
+function subjectKey(v){var s=norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d').replace(/[\s_\-&/]+/g,'').toUpperCase();if(s==='TOAN'||s==='MATH'||s==='MATHEMATICS')return'math';if(s==='TV'||s==='TIENGVIET'||s==='VIETNAMESE')return'vietnamese';if(s==='KH'||s==='KHOAHOC'||s==='SCIENCE')return'science';if(s==='LSDL'||s==='LSDIALI'||s==='LICHSUDIALI'||s==='LICHSUVADIALI'||s==='HISTORY'||s==='HISTORYGEOGRAPHY'||s==='HISTORYANDGEOGRAPHY')return'history';return s.toLowerCase()}
+function topicCode(q){if(q&&q.topicCode)return String(q.topicCode).toUpperCase();var id=norm(q&&q.id).toUpperCase(),m=id.match(/(?:^|[-_])C(\d{1,2})(?:[-_]|$)/);return m?'C'+String(Number(m[1])).padStart(2,'0'):''}
+function setPool(){var s=document.getElementById('subject'),c=document.getElementById('chapter'),m=document.getElementById('gameMode');if(!s||!c||!Array.isArray(window.LH_ALL_GAME_QUESTIONS))return;var mode=m?m.value:'bySubject';if(mode==='mixed'){window.GAME_QUESTIONS=all().slice();c.disabled=true;return}var sk=subjectKey(s.value),code=c.selectedOptions&&c.selectedOptions[0]?c.selectedOptions[0].dataset.topicCode:'';if(!code){window.GAME_QUESTIONS=all().filter(function(q){return subjectKey(q.subject||q.Mon)===sk});return}window.GAME_QUESTIONS=all().filter(function(q){return subjectKey(q.subject||q.Mon)===sk&&topicCode(q)===String(code).toUpperCase()})}
+function render(){try{if(window.LHFinalQuestionBank&&typeof window.LHFinalQuestionBank.build==='function'){window.LHFinalQuestionBank.build();setPool();return true}}catch(e){}return false}
+function bind(){var s=document.getElementById('subject'),c=document.getElementById('chapter'),m=document.getElementById('gameMode');if(!s||!c)return;if(!s.__lhBound){s.addEventListener('change',function(){setTimeout(function(){render();bind()},0)});s.__lhBound=true}if(m&&!m.__lhBound){m.addEventListener('change',function(){setTimeout(function(){render();bind()},0)});m.__lhBound=true}if(!c.__lhBound){c.addEventListener('change',function(){setPool();try{window.dispatchEvent(new CustomEvent('chapterPoolChanged',{detail:{subject:subjectKey(s.value),topicCode:c.selectedOptions&&c.selectedOptions[0]?c.selectedOptions[0].dataset.topicCode||'':'',count:Array.isArray(window.GAME_QUESTIONS)?window.GAME_QUESTIONS.length:0}}))}catch(e){}},true);c.__lhBound=true}}
+function boot(){render();bind();window.addEventListener('questionBankReady',function(){setTimeout(function(){render();bind()},0)});setTimeout(bind,250);setTimeout(bind,1000)}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+})();
