@@ -1,99 +1,15 @@
-/* ============================================================
-   ĐIỂM DANH — STATUS FINAL FIX 1.0
-   Mục tiêu: bảo vệ cột Trạng thái khỏi mọi module ghi nhầm
-   danh sách học sinh vào select trạng thái.
-   Không thay đổi Data Engine hay logic lưu điểm danh.
-   ============================================================ */
+/* ATTENDANCE STATUS FINAL GUARD 1.1 */
 (function(){
 'use strict';
-if(window.__LH_ATTENDANCE_STATUS_FINAL_FIX__) return;
-window.__LH_ATTENDANCE_STATUS_FINAL_FIX__=true;
-
-var STATUS=[
-  {value:'present',label:'Có mặt'},
-  {value:'excused',label:'Có phép'},
-  {value:'absent',label:'Không phép'}
-];
-
-function text(v){return String(v==null?'':v).trim().replace(/\s+/g,' ')}
-
-function validStatusValue(v){
-  return STATUS.some(function(x){return x.value===String(v)});
-}
-
-function makeSelect(oldValue,studentId){
-  var select=document.createElement('select');
-  select.className='attendance-status';
-  if(studentId!=null) select.dataset.studentId=String(studentId);
-  STATUS.forEach(function(item){
-    var o=document.createElement('option');
-    o.value=item.value;
-    o.textContent=item.label;
-    if(String(oldValue||'present')===item.value)o.selected=true;
-    select.appendChild(o);
-  });
-  select.addEventListener('change',function(){
-    if(typeof window.updateAttendanceSummary==='function'){
-      try{window.updateAttendanceSummary();}catch(e){}
-    }
-  });
-  return select;
-}
-
-function repairRow(row){
-  if(!row || !row.cells || row.cells.length<3) return false;
-  var cell=row.cells[2];
-  if(!cell) return false;
-  var select=cell.querySelector('select.attendance-status');
-  if(select){
-    var values=Array.prototype.map.call(select.options,function(o){return String(o.value)});
-    var ok=values.length===3 && values.every(validStatusValue);
-    if(ok) return false;
-    var old=validStatusValue(select.value)?select.value:'present';
-    var sid=select.dataset.studentId || '';
-    cell.replaceChildren(makeSelect(old,sid));
-    return true;
-  }
-  var anySelect=cell.querySelector('select');
-  if(anySelect){
-    var old2=validStatusValue(anySelect.value)?anySelect.value:'present';
-    var sid2=anySelect.dataset.studentId || '';
-    cell.replaceChildren(makeSelect(old2,sid2));
-    return true;
-  }
-  var existing=text(cell.textContent).toLowerCase();
-  var guessed=existing.indexOf('có phép')>=0?'excused':(existing.indexOf('không phép')>=0?'absent':'present');
-  cell.replaceChildren(makeSelect(guessed,''));
-  return true;
-}
-
-function repairTable(){
-  var tbody=document.getElementById('attendanceTableBody');
-  if(!tbody)return;
-  Array.prototype.forEach.call(tbody.querySelectorAll('tr'),repairRow);
-}
-
-function install(){
-  repairTable();
-  var tbody=document.getElementById('attendanceTableBody');
-  if(tbody){
-    var observer=new MutationObserver(function(){
-      clearTimeout(install._raf);
-      install._raf=setTimeout(repairTable,0);
-    });
-    observer.observe(tbody,{childList:true,subtree:true});
-  }
-  var button=document.getElementById('saveAttendance');
-  if(button){button.addEventListener('click',function(){setTimeout(repairTable,0);},false);}
-}
-
-function boot(){
-  install();
-  setTimeout(install,50);
-  setTimeout(install,250);
-  setTimeout(install,1000);
-}
-
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
-else boot();
+if(window.__LH_ATTENDANCE_STATUS_GUARD_11__)return;
+window.__LH_ATTENDANCE_STATUS_GUARD_11__=true;
+var S=[['present','Có mặt'],['excused','Có phép'],['absent','Không phép']];
+var norm=function(v){return String(v==null?'':v).trim().replace(/\s+/g,' ')};
+var ok=function(v){return S.some(function(x){return x[0]===String(v)})};
+function getStudents(){try{if(typeof window.getStudentsSafe==='function'){var a=window.getStudentsSafe();if(Array.isArray(a))return a}}catch(e){}return Array.isArray(window.students)?window.students:[]}
+function idOf(row){var x=row.querySelector('[data-student-id]');if(x&&x.dataset.studentId)return String(x.dataset.studentId);var name=row.cells[1]?norm(row.cells[1].textContent):'';var a=getStudents();var s=a.find(function(v){return norm(v.name)===name});return s?String(s.id||''):''}
+function make(v,id){var s=document.createElement('select');s.className='attendance-status';if(id)s.dataset.studentId=id;S.forEach(function(x){var o=document.createElement('option');o.value=x[0];o.textContent=x[1];o.selected=x[0]===v;s.appendChild(o)});return s}
+function repair(){var tb=document.getElementById('attendanceTableBody');if(!tb)return;Array.from(tb.querySelectorAll('tr')).forEach(function(r){if(!r.cells||r.cells.length<3)return;var c=r.cells[2],q=c.querySelector('select'),id=(q&&q.dataset.studentId)||idOf(r),v=(q&&ok(q.value))?q.value:'present',bad=!q||!q.options||q.options.length!==3||!Array.from(q.options).every(function(o){return ok(o.value)})||!id;if(bad)c.replaceChildren(make(v,id))});if(typeof window.updateAttendanceSummary==='function'){try{window.updateAttendanceSummary()}catch(e){}}}
+function boot(){repair();var tb=document.getElementById('attendanceTableBody');if(tb&&!tb.dataset.lhStatusGuard){tb.dataset.lhStatusGuard='1';new MutationObserver(function(){clearTimeout(window.__lhStatusTimer);window.__lhStatusTimer=setTimeout(repair,0)}).observe(tb,{childList:true,subtree:true})}[0,100,300,700,1500,3000].forEach(function(ms){setTimeout(repair,ms)})}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
