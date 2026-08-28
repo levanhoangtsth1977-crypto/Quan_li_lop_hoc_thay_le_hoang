@@ -1,17 +1,254 @@
-/* ATTENDANCE STATUS AUTHORITATIVE 3.0
-   Một ô Trạng thái duy nhất: Có mặt / Có phép / Không phép.
-   Không render lại bảng khi mở/chọn trạng thái.
-   Chặn event router ngoài không được can thiệp vào select trạng thái.
-*/
-(function(){'use strict';
-if(window.__LH_ATTENDANCE_STATUS_30__)return;window.__LH_ATTENDANCE_STATUS_30__=true;
-const OPTIONS=[['present','Có mặt'],['excused','Có phép'],['absent','Không phép']];
-function validSelect(s){return s&&s.matches('#attendanceTableBody select.attendance-status')&&s.options.length===3&&Array.from(s.options).every((o,i)=>o.value===OPTIONS[i][0]&&o.textContent.trim()===OPTIONS[i][1])}
-function make(id,current){const s=document.createElement('select');s.className='attendance-status';s.dataset.studentId=id||'';s.setAttribute('aria-label','Trạng thái');OPTIONS.forEach(([v,t])=>{const o=document.createElement('option');o.value=v;o.textContent=t;if(v===current)o.selected=true;s.appendChild(o)});return s}
-function repair(){const body=document.getElementById('attendanceTableBody');if(!body)return;Array.from(body.rows).forEach(row=>{const cell=row.cells&&row.cells[2];if(!cell)return;const old=cell.querySelector('select.attendance-status'),bad=Array.from(cell.querySelectorAll('select')).find(s=>!s.classList.contains('attendance-status'));if(validSelect(old)&&!bad){bind(old);return}const current=old&&OPTIONS.some(x=>x[0]===old.value)?old.value:'present',id=old?.dataset?.studentId||cell.querySelector('[data-student-id]')?.dataset.studentId||'';cell.replaceChildren(make(id,current));bind(cell.querySelector('select.attendance-status'))})}
-function bind(select){if(!select||select.dataset.lhBound==='1')return;select.dataset.lhBound='1';const stop=e=>{e.stopPropagation();e.stopImmediatePropagation();window.__LH_ATT_STATUS_INTERACTION__=Date.now()+1200};['pointerdown','mousedown','touchstart','click'].forEach(type=>select.addEventListener(type,stop,true));select.addEventListener('change',e=>{e.stopPropagation();e.stopImmediatePropagation();if(typeof window.updateAttendanceSummary==='function'){try{window.updateAttendanceSummary()}catch(_){} }},true)}
-function css(){if(document.getElementById('lhAttendance30'))return;const s=document.createElement('style');s.id='lhAttendance30';s.textContent='#page-attendance .attendance-table{position:relative;overflow:visible}#page-attendance .attendance-table td:nth-child(3){position:relative;z-index:1000;min-width:150px;overflow:visible}#page-attendance select.attendance-status{position:relative;z-index:1001;width:100%;min-width:150px;pointer-events:auto;touch-action:manipulation}';document.head.appendChild(s)}
-function guardDocument(){if(document.__lhAttGuard)return;document.__lhAttGuard=true;document.addEventListener('click',e=>{if(e.target&&e.target.closest('#attendanceTableBody select.attendance-status')){e.stopPropagation();e.stopImmediatePropagation();}},true);document.addEventListener('pointerdown',e=>{if(e.target&&e.target.closest('#attendanceTableBody select.attendance-status')){e.stopPropagation();}},true);document.addEventListener('change',e=>{if(e.target&&e.target.matches('#attendanceTableBody select.attendance-status')){e.stopPropagation();e.stopImmediatePropagation();if(typeof window.updateAttendanceSummary==='function'){try{window.updateAttendanceSummary()}catch(_){} } }},true)}
-function start(){css();guardDocument();repair();const body=document.getElementById('attendanceTableBody');if(body){const obs=new MutationObserver(()=>{if(window.__LH_ATT_REPAIR_LOCK__)return;window.__LH_ATT_REPAIR_LOCK__=true;try{repair()}finally{window.__LH_ATT_REPAIR_LOCK__=false}});obs.observe(body,{childList:true,subtree:true});window.__LH_ATT_STATUS_OBSERVER__=obs}window.LHAttendanceStatusFinal={repair,guard:guardDocument}}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+/* ============================================================
+   ATTENDANCE STATUS FINAL 4.0
+   Điểm danh là module lõi của website quản lý lớp học.
+   Mục tiêu:
+   - Dùng chính Data Engine của toàn hệ thống.
+   - Giữ nguyên 42 học sinh và luồng menu hiện tại.
+   - Một renderer duy nhất cho bảng Điểm danh.
+   - Không dùng MutationObserver để thay DOM liên tục.
+   - Không cho các router cũ render lại bảng khi chọn Trạng thái.
+   - Không tác động tới các menu khác và không tác động game.
+   ============================================================ */
+(function(){
+  'use strict';
+  if(window.__LH_ATTENDANCE_FINAL_40__) return;
+  window.__LH_ATTENDANCE_FINAL_40__ = true;
+
+  const STATUS = [
+    ['present','Có mặt'],
+    ['excused','Có phép'],
+    ['absent','Không phép']
+  ];
+
+  const text = v => String(v == null ? '' : v).trim();
+  const esc = v => text(v)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#039;');
+
+  function students(){
+    try {
+      if(typeof window.getStudentsSafe === 'function'){
+        const a = window.getStudentsSafe();
+        if(Array.isArray(a)) return a.slice();
+      }
+    } catch(e) { console.error('[ATTENDANCE 4.0] students',e); }
+    if(Array.isArray(window.students)) return window.students.slice();
+    if(Array.isArray(window.classData && window.classData.students)) return window.classData.students.slice();
+    if(Array.isArray(window.appData && window.appData.students)) return window.appData.students.slice();
+    return [];
+  }
+
+  function attendanceRecords(){
+    try {
+      if(typeof window.getAttendanceRecords === 'function'){
+        const a = window.getAttendanceRecords();
+        return Array.isArray(a) ? a : [];
+      }
+    } catch(e) { console.error('[ATTENDANCE 4.0] records',e); }
+    return [];
+  }
+
+  function today(){
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+
+  function getDate(){
+    const el = document.getElementById('attendanceDate');
+    if(el && el.value) return el.value;
+    return today();
+  }
+
+  function statusLabel(value){
+    const x = STATUS.find(s => s[0] === value);
+    return x ? x[1] : 'Có mặt';
+  }
+
+  function updateSummary(){
+    let p=0,e=0,a=0;
+    document.querySelectorAll('#attendanceTableBody select.attendance-status').forEach(s=>{
+      if(s.value==='present') p++;
+      else if(s.value==='excused') e++;
+      else if(s.value==='absent') a++;
+    });
+    const set=(id,n)=>{const el=document.getElementById(id);if(el)el.textContent=String(n)};
+    set('attendancePresentCount',p);
+    set('attendanceExcusedCount',e);
+    set('attendanceAbsentCount',a);
+    set('attendancePresent',p);
+    set('attendanceExcused',e);
+    set('attendanceAbsent',a);
+  }
+
+  function makeStatusSelect(studentId,current){
+    const sel = document.createElement('select');
+    sel.className = 'attendance-status';
+    sel.dataset.studentId = text(studentId);
+    sel.setAttribute('aria-label','Trạng thái');
+    STATUS.forEach(([value,label])=>{
+      const o=document.createElement('option');
+      o.value=value;
+      o.textContent=label;
+      if(value===current) o.selected=true;
+      sel.appendChild(o);
+    });
+    return sel;
+  }
+
+  function render(){
+    const page=document.getElementById('page-attendance');
+    const body=document.getElementById('attendanceTableBody');
+    if(!page || !body) return false;
+
+    const date=getDate();
+    const list=students();
+    const records=attendanceRecords();
+
+    if(!document.getElementById('attendanceDate').value){
+      document.getElementById('attendanceDate').value=date;
+    }
+
+    const fragment=document.createDocumentFragment();
+
+    list.forEach((student,index)=>{
+      const id=text(student.id || student.studentId || student.studentCode);
+      const rec=records.find(r=>
+        text(r.studentId)===id && text(r.date).slice(0,10)===date
+      );
+      const value=STATUS.some(s=>s[0]===text(rec && rec.status))
+        ? text(rec.status) : 'present';
+
+      const tr=document.createElement('tr');
+
+      const tdNo=document.createElement('td');
+      tdNo.textContent=String(index+1);
+
+      const tdName=document.createElement('td');
+      const strong=document.createElement('strong');
+      strong.textContent=text(student.name || student.studentName || id);
+      tdName.appendChild(strong);
+
+      const tdStatus=document.createElement('td');
+      tdStatus.appendChild(makeStatusSelect(id,value));
+
+      const tdNote=document.createElement('td');
+      const input=document.createElement('input');
+      input.type='text';
+      input.className='attendance-note';
+      input.dataset.studentId=id;
+      input.value=text(rec && rec.note);
+      input.placeholder='Ghi chú';
+      tdNote.appendChild(input);
+
+      tr.append(tdNo,tdName,tdStatus,tdNote);
+      fragment.appendChild(tr);
+    });
+
+    body.replaceChildren(fragment);
+    updateSummary();
+    return true;
+  }
+
+  function css(){
+    if(document.getElementById('lhAttendance40Css')) return;
+    const s=document.createElement('style');
+    s.id='lhAttendance40Css';
+    s.textContent=`
+      #page-attendance .attendance-table{position:relative;z-index:1}
+      #page-attendance .attendance-table td:nth-child(3){position:relative;z-index:2;min-width:155px}
+      #page-attendance .attendance-status{display:block;width:100%;min-width:145px;position:relative;z-index:3;pointer-events:auto}
+      #page-attendance .attendance-note{width:100%;position:relative;z-index:1}
+    `;
+    document.head.appendChild(s);
+  }
+
+  function save(){
+    const date=getDate();
+    const nodes=Array.from(document.querySelectorAll('#attendanceTableBody select.attendance-status'));
+    if(!nodes.length){
+      if(typeof window.showToast==='function') window.showToast('Chưa có danh sách học sinh để điểm danh.','warning');
+      return;
+    }
+    let saved=0;
+    nodes.forEach(sel=>{
+      const id=text(sel.dataset.studentId);
+      const note=document.querySelector('#attendanceTableBody .attendance-note[data-student-id="'+CSS.escape(id)+'"]');
+      try{
+        if(typeof window.saveAttendanceRecord==='function'){
+          const result=window.saveAttendanceRecord(id,date,sel.value,note ? note.value : '');
+          if(result===true || (result && result.success!==false)) saved++;
+        }
+      }catch(e){ console.error('[ATTENDANCE 4.0] save',e); }
+    });
+    render();
+    if(typeof window.showToast==='function') window.showToast('Đã lưu điểm danh '+saved+' học sinh.','success');
+  }
+
+  function navigateAttendance(){
+    const original=window.navigateToPage;
+    if(typeof original==='function'){
+      try{ original('attendance'); }catch(e){ console.error('[ATTENDANCE 4.0] navigate',e); }
+    }else{
+      document.querySelectorAll('.page-section').forEach(x=>x.classList.remove('active'));
+      const page=document.getElementById('page-attendance');
+      if(page) page.classList.add('active');
+      const title=document.getElementById('pageTitle');
+      if(title) title.textContent='Điểm danh';
+    }
+    requestAnimationFrame(()=>render());
+  }
+
+  function installGuards(){
+    /* Chặn router cũ chỉ ở các tương tác Điểm danh, không chặn menu khác. */
+    document.addEventListener('click',event=>{
+      const target=event.target && event.target.closest ? event.target.closest('#saveAttendance') : null;
+      if(target){
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        save();
+        return;
+      }
+
+      const menu=event.target && event.target.closest ? event.target.closest('.menu-item[data-page="attendance"]') : null;
+      const quick=event.target && event.target.closest ? event.target.closest('[data-action="attendance"]') : null;
+      if(menu || quick){
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        navigateAttendance();
+      }
+    },true);
+
+    document.addEventListener('change',event=>{
+      const target=event.target;
+      if(target && target.matches && target.matches('#attendanceDate')){
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        render();
+        return;
+      }
+      if(target && target.matches && target.matches('#attendanceTableBody select.attendance-status')){
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        updateSummary();
+      }
+    },true);
+
+    document.addEventListener('DOMContentLoaded',()=>{
+      css();
+      setTimeout(render,80);
+    },{once:true});
+
+    window.addEventListener('lhAttendanceRendered',()=>render());
+
+    const originalRender=window.renderAttendance;
+    window.renderAttendance=render;
+    if(window.LopHocApp) window.LopHocApp.renderAttendance=render;
+    window.LHAttendanceFinal={render,save,updateSummary};
+  }
+
+  css();
+  installGuards();
 })();
