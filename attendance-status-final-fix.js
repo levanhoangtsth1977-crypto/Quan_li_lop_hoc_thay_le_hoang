@@ -1,15 +1,17 @@
-/* ATTENDANCE STATUS FINAL GUARD 1.1 */
-(function(){
-'use strict';
-if(window.__LH_ATTENDANCE_STATUS_GUARD_11__)return;
-window.__LH_ATTENDANCE_STATUS_GUARD_11__=true;
-var S=[['present','Có mặt'],['excused','Có phép'],['absent','Không phép']];
-var norm=function(v){return String(v==null?'':v).trim().replace(/\s+/g,' ')};
-var ok=function(v){return S.some(function(x){return x[0]===String(v)})};
-function getStudents(){try{if(typeof window.getStudentsSafe==='function'){var a=window.getStudentsSafe();if(Array.isArray(a))return a}}catch(e){}return Array.isArray(window.students)?window.students:[]}
-function idOf(row){var x=row.querySelector('[data-student-id]');if(x&&x.dataset.studentId)return String(x.dataset.studentId);var name=row.cells[1]?norm(row.cells[1].textContent):'';var a=getStudents();var s=a.find(function(v){return norm(v.name)===name});return s?String(s.id||''):''}
-function make(v,id){var s=document.createElement('select');s.className='attendance-status';if(id)s.dataset.studentId=id;S.forEach(function(x){var o=document.createElement('option');o.value=x[0];o.textContent=x[1];o.selected=x[0]===v;s.appendChild(o)});return s}
-function repair(){var tb=document.getElementById('attendanceTableBody');if(!tb)return;Array.from(tb.querySelectorAll('tr')).forEach(function(r){if(!r.cells||r.cells.length<3)return;var c=r.cells[2],q=c.querySelector('select'),id=(q&&q.dataset.studentId)||idOf(r),v=(q&&ok(q.value))?q.value:'present',bad=!q||!q.options||q.options.length!==3||!Array.from(q.options).every(function(o){return ok(o.value)})||!id;if(bad)c.replaceChildren(make(v,id))});if(typeof window.updateAttendanceSummary==='function'){try{window.updateAttendanceSummary()}catch(e){}}}
-function boot(){repair();var tb=document.getElementById('attendanceTableBody');if(tb&&!tb.dataset.lhStatusGuard){tb.dataset.lhStatusGuard='1';new MutationObserver(function(){clearTimeout(window.__lhStatusTimer);window.__lhStatusTimer=setTimeout(repair,0)}).observe(tb,{childList:true,subtree:true})}[0,100,300,700,1500,3000].forEach(function(ms){setTimeout(repair,ms)})}
+/* ĐIỂM DANH — STATUS FINAL FIX 1.2
+   Chỉ sửa cột Trạng thái nếu nó thực sự sai.
+   Không dùng MutationObserver liên tục, không tạo observer trùng.
+*/
+(function(){'use strict';
+if(window.__LH_ATTENDANCE_STATUS_FINAL_FIX_12__)return;window.__LH_ATTENDANCE_STATUS_FINAL_FIX_12__=true;
+var STATUS=[['present','Có mặt'],['excused','Có phép'],['absent','Không phép']];
+function text(v){return String(v==null?'':v).trim().replace(/\s+/g,' ')}
+function valid(v){return STATUS.some(function(x){return x[0]===String(v)})}
+function students(){try{if(typeof window.getStudentsSafe==='function'){var a=window.getStudentsSafe();if(Array.isArray(a))return a}}catch(e){}return Array.isArray(window.students)?window.students:[]}
+function sid(row){var el=row.querySelector('[data-student-id]');if(el&&el.dataset.studentId)return String(el.dataset.studentId);var name=row.cells&&row.cells[1]?text(row.cells[1].textContent):'';var s=students().find(function(x){return text(x.name)===name});return s?String(s.id||s.studentId||''):''}
+function make(value,id){var s=document.createElement('select');s.className='attendance-status';if(id)s.dataset.studentId=id;STATUS.forEach(function(x){var o=document.createElement('option');o.value=x[0];o.textContent=x[1];if(x[0]===value)o.selected=true;s.appendChild(o)});return s}
+function repair(){var tb=document.getElementById('attendanceTableBody');if(!tb)return;Array.prototype.forEach.call(tb.querySelectorAll('tr'),function(row){if(!row.cells||row.cells.length<3)return;var cell=row.cells[2],select=cell.querySelector('select.attendance-status'),sidv=sid(row),val=select&&valid(select.value)?select.value:'present';if(select){var opts=Array.prototype.map.call(select.options,function(o){return String(o.value)}),ok=opts.length===3&&opts.every(valid);if(ok){if(sidv&&!select.dataset.studentId)select.dataset.studentId=sidv;return}}var any=cell.querySelector('select');if(any&&valid(any.value))val=any.value;cell.replaceChildren(make(val,sidv))});if(typeof window.updateAttendanceSummary==='function'){try{window.updateAttendanceSummary()}catch(e){}}}
+function boot(){repair()}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+window.LHRepairAttendanceStatus=repair;
 })();
