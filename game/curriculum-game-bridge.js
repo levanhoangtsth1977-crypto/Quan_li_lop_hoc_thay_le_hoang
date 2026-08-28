@@ -1,14 +1,2 @@
-/* TRIỆU PHÚ HỌC ĐƯỜNG — CURRICULUM GAME BRIDGE 1.0
-   Mục tiêu: Môn -> Cxx -> đúng tên chủ đề; mỗi lựa chọn dùng toàn bộ câu có trong BO_CAU_HOI.
-   Không hiển thị số câu trong ngoặc. Không tạo câu hỏi giả.
-*/
-(function(){'use strict';
-function norm(v){return String(v==null?'':v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/Đ/g,'D').replace(/đ/g,'d').replace(/[\s_\-&/.:-]+/g,'').toUpperCase()}
-function sub(v){var s=norm(v);if(/^(TOAN|MATH|MATHEMATICS|MATHEMATICS5)$/.test(s))return'math';if(/^(TV|TIENGVIET|VIETNAMESE|VIETNAMESE5)$/.test(s))return'vietnamese';if(/^(KH|KHOAHOC|KHOAHOC5|SCIENCE|NATURALSCIENCE|NATURALSCIENCE5)$/.test(s))return'science';if(/^(LSDL|LSDIALI|LSDL5|LSDIALI5|LICHSUDIALI|LICHSUVADIALI|HISTORY|HISTORYGEOGRAPHY|HISTORYANDGEOGRAPHY)$/.test(s))return'history';return''}
-function code(v){var s=String(v==null?'':v).toUpperCase();var m=s.match(/(?:^|[-_])C[_-]?(\d{1,2})(?:[-_]|$)/);if(m)return'C'+String(Number(m[1])).padStart(2,'0');var n=norm(v),m2=n.match(/C(\d{1,2})(?:B\d|Q\d|$)/);return m2?'C'+String(Number(m2[1])).padStart(2,'0'):''}
-function qcode(q){return code(q&&q.topicCode)||code(q&&q.id)||code(q&&q.chapter)||code(q&&q.Chuong)||code(q&&q.topic)}
-function render(){var s=document.getElementById('subject'),c=document.getElementById('chapter'),m=document.getElementById('gameMode');if(!s||!c)return;if(m&&m.value==='mixed'){c.disabled=true;c.innerHTML='<option value="">🌐 Tổng hợp 4 môn</option>';return}var sk=sub(s.value),catalog=window.LH_CURRICULUM&&window.LH_CURRICULUM[sk],all=Array.isArray(window.GAME_QUESTIONS)?window.GAME_QUESTIONS:[];if(!sk)return;if(!Array.isArray(catalog)){catalog=[];var seen={};all.forEach(function(q){if(sub(q.subject||q.Mon)!==sk)return;var tc=qcode(q),name=String(q.chapter||q.Chuong||q.topic||'').trim();if(tc&&!seen[tc]){seen[tc]=1;catalog.push([tc,name||('Chủ đề '+Number(tc.slice(1)))])}});catalog.sort(function(a,b){return Number(a[0].slice(1))-Number(b[0].slice(1))})}var old=c.options[c.selectedIndex]?c.options[c.selectedIndex].dataset.topicCode:'';c.innerHTML='';var first=document.createElement('option');first.value='';first.textContent='📚 Chọn chủ đề / chương';c.appendChild(first);catalog.forEach(function(it){var o=document.createElement('option');o.value=it[1];o.textContent='📘 '+it[1];o.dataset.topicCode=it[0];o.dataset.subject=sk;c.appendChild(o)});c.disabled=false;if(old){for(var i=0;i<c.options.length;i++)if(c.options[i].dataset.topicCode===old){c.selectedIndex=i;break}}}
-function bind(){var s=document.getElementById('subject'),m=document.getElementById('gameMode');if(!s)return;s.onchange=render;if(m)m.onchange=render;render();}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(bind,80)},{once:true});else setTimeout(bind,80);
-window.LHGameCurriculumBridge={render:render};
-})();
+/* CURRICULUM GAME BRIDGE — compatibility only. */
+(function(){'use strict';window.LHGameCurriculumBridge={render:function(){return false}};})();
