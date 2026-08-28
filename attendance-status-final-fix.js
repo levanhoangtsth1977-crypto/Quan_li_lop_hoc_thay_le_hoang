@@ -1,29 +1,38 @@
-/* ATTENDANCE STATUS FINAL 6.2 — MOBILE/TOUCH PICKER ONLY
-   The main script.js remains the sole source of truth for students/attendance.
-   This module NEVER renders the attendance table and NEVER replaces renderAttendance.
+/* ATTENDANCE STATUS FINAL 6.3 — native select, NO capture blocking
+   Main script.js remains the source of truth for attendance rows/data.
 */
 (function(){
   'use strict';
-  if(window.__LH_ATTENDANCE_FINAL_62__) return;
-  window.__LH_ATTENDANCE_FINAL_62__=true;
-  function isStatus(el){return !!(el&&el.matches&&el.matches('#page-attendance select.attendance-status'));}
-  function openPicker(el){
-    if(!isStatus(el))return;
-    try{if(typeof el.showPicker==='function'){el.showPicker();return;}}catch(_){}
-    try{el.focus({preventScroll:true});}catch(_){try{el.focus();}catch(__){}}
-  }
+  if(window.__LH_ATTENDANCE_FINAL_63__) return;
+  window.__LH_ATTENDANCE_FINAL_63__=true;
+
   function install(){
-    if(!document.getElementById('lhAttendance62Css')){
-      const s=document.createElement('style');s.id='lhAttendance62Css';
+    if(!document.getElementById('lhAttendance63Css')){
+      const s=document.createElement('style');
+      s.id='lhAttendance63Css';
       s.textContent=`
-        #page-attendance select.attendance-status{display:block!important;width:100%!important;min-width:140px!important;min-height:42px!important;position:relative!important;z-index:9999!important;pointer-events:auto!important;visibility:visible!important;opacity:1!important;-webkit-appearance:auto!important;appearance:auto!important;touch-action:manipulation!important;cursor:pointer!important}
-        @media (max-width:680px){#page-attendance .table-container{overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch}#page-attendance .attendance-table{min-width:720px}#page-attendance select.attendance-status{min-height:48px!important;font-size:16px!important;padding:8px 34px 8px 10px!important;touch-action:manipulation!important}}
-      `;document.head.appendChild(s);
+        #page-attendance .table-container{overflow-x:auto!important;overflow-y:visible!important;-webkit-overflow-scrolling:touch!important}
+        #page-attendance .attendance-table{position:relative!important;z-index:1!important;min-width:720px}
+        #page-attendance .attendance-table td:nth-child(3){position:relative!important;z-index:20!important;min-width:170px!important;overflow:visible!important}
+        #page-attendance select.attendance-status{display:block!important;box-sizing:border-box!important;width:100%!important;min-width:150px!important;min-height:48px!important;padding:8px 34px 8px 12px!important;position:relative!important;z-index:30!important;pointer-events:auto!important;visibility:visible!important;opacity:1!important;appearance:auto!important;-webkit-appearance:auto!important;touch-action:manipulation!important;cursor:pointer!important;font-size:16px!important}
+      `;
+      document.head.appendChild(s);
     }
-    if(document.__lhAttendancePicker62)return;document.__lhAttendancePicker62=true;
-    document.addEventListener('pointerdown',function(e){const el=e.target&&e.target.closest?e.target.closest('#page-attendance select.attendance-status'):null;if(!el)return;e.stopPropagation();openPicker(el);},true);
-    document.addEventListener('touchstart',function(e){const el=e.target&&e.target.closest?e.target.closest('#page-attendance select.attendance-status'):null;if(!el)return;e.stopPropagation();},true);
-    document.addEventListener('click',function(e){const el=e.target&&e.target.closest?e.target.closest('#page-attendance select.attendance-status'):null;if(!el)return;e.stopPropagation();},true);
+
+    if(document.__lhAttendance63Bound)return;
+    document.__lhAttendance63Bound=true;
+
+    // Do NOT intercept pointerdown/touchstart/click. Native select controls need them.
+    document.addEventListener('change',function(e){
+      const el=e.target;
+      if(el&&el.matches&&el.matches('#page-attendance select.attendance-status')){
+        if(typeof window.renderAttendanceSummary==='function'){
+          try{window.renderAttendanceSummary();}catch(_){ }
+        }
+        document.dispatchEvent(new CustomEvent('lh:attendance-status-changed',{detail:{studentId:el.dataset.studentId,status:el.value}}));
+      }
+    },false);
   }
+
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
