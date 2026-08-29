@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Normalize UI and load stable learning layers
+      - name: Normalize core menus and learning UI
         shell: bash
         run: |
           python - <<'PY'
@@ -23,11 +23,11 @@ jobs:
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
 
-          # Remove known conflicting UI/event layers.
           for name in [
             'menu-final-direct.js','menu-special-fix.js','emergency-menu-router.js',
             'tien-ich-final.js','tien-ich-schema-v4-fix.js','event-sync-multi-v21.js',
-            'event-ui-stability-v214.js','dashboard-legacy-events-cleanup.js'
+            'event-ui-stability-v214.js','dashboard-legacy-events-cleanup.js',
+            'safe-student-picker.js'
           ]:
             s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*'+re.escape(name)+r'[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
 
@@ -38,12 +38,11 @@ jobs:
           if not re.search(r'data-page=["\\\']learning["\\\']',s,re.I):
             item='<button type="button" class="menu-item" data-page="learning"><i class="fa-solid fa-book-open"></i><span>Học tập</span></button>\\n'
             marker='<button type="button" class="menu-item" data-page="statistics">'
-            if marker in s: s=s.replace(marker,item+marker,1)
-            else: s=s.replace('</nav>',item+'</nav>',1)
+            s=s.replace(marker,item+marker,1) if marker in s else s.replace('</nav>',item+'</nav>',1)
 
-          # Remove obsolete manual learning entry controls, but preserve SMAS import.
-          s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*learning-menu\\.js[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
-          s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*learning-comments-student-picker\\.js[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
+          # Remove obsolete manual learning entry scripts. SMAS remains the supported learning workflow.
+          for name in ['learning-menu.js','learning-comments-student-picker.js']:
+            s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*'+re.escape(name)+r'[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
 
           # Keep exactly one utilities link.
           s=re.sub(r'<a[^>]*id=["\\\'][^"\\\']*(?:lhUtilitiesStandalone|lhStandaloneUtilities)[^"\\\']*["\\\'][^>]*>.*?</a>\\s*','',s,flags=re.I|re.S)
@@ -52,12 +51,7 @@ jobs:
           if marker in s: s=s.replace(marker,link+'\\n'+marker,1)
           elif 'id="lhUtilitiesStandalone"' not in s: s=s.replace('</nav>',link+'\\n</nav>',1)
 
-          # Ensure safe picker is loaded once.
-          s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*safe-student-picker\\.js[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
-          safe='<script src="safe-student-picker.js?v=1.0.0"></script>\\n'
-          s=s.replace('</body>',safe+'</body>',1) if '</body>' in s else s
-
-          # Ensure the SMAS learning HTML builder is loaded once, after core modules.
+          # Load the SMAS HTML builder exactly once. It creates the full Học tập panel.
           s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*learning-smas-import\\.js[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
           smas='<script src="learning-smas-import.js?v=1.1.0"></script>\\n'
           s=s.replace('</body>',smas+'</body>',1) if '</body>' in s else s+smas
@@ -70,19 +64,17 @@ jobs:
           p.write_text(s,encoding='utf-8')
           PY
 
-      - name: Verify normalized index
+      - name: Verify learning UI
         shell: bash
         run: |
           set -e
-          # Học tập exists; Nhận xét menu does not.
           grep -qi 'data-page="learning"' index.html
           ! grep -qi 'data-page="comments"' index.html
-          # SMAS and cleanup layers are present exactly once.
           test "$(grep -oi 'learning-smas-import.js' index.html | wc -l | tr -d ' ')" = "1"
           test "$(grep -oi 'learning-comments-menu-removal.js' index.html | wc -l | tr -d ' ')" = "1"
-          # Conflicting layers must not be loaded.
-          ! grep -qi 'event-sync-multi-v21.js' index.html
+          ! grep -qi 'safe-student-picker.js' index.html
           ! grep -qi 'event-ui-stability-v214.js' index.html
+          ! grep -qi 'event-sync-multi-v21.js' index.html
           ! grep -qi 'menu-final-direct.js' index.html
           ! grep -qi 'menu-special-fix.js' index.html
           ! grep -qi 'emergency-menu-router.js' index.html
@@ -91,7 +83,7 @@ jobs:
         shell: bash
         run: |
           git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git config user.email 41898282+users.noreply.github.com
           git add index.html
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "Restore Học tập SMAS HTML and remove obsolete manual controls"
