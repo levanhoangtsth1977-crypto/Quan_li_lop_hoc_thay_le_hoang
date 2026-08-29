@@ -1,13 +1,13 @@
 /* QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG
- * STUDENT PRIVATE LINKS 3.2.0
- * 1 học sinh = 1 link riêng dạng student-profile.html?t=TOKEN
+ * STUDENT PRIVATE LINKS 3.3.0
+ * 1 học sinh = 1 link riêng dạng student-profile-v4.html?t=TOKEN
  * Ưu tiên Google Sheets; fallback đúng vào students[] của DATA.JS qua getStudentsSafe().
  */
 (function () {
   'use strict';
-  const VERSION='3.2.0';
+  const VERSION='3.3.0';
   const PAGE_SELECTOR='#page-student-links,[data-page-section="student-links"]';
-  const PROFILE_PATH='student-profile.html';
+  const PROFILE_PATH='student-profile-v4.html';
   const SCHOOL_YEAR='2026-2027';
   const CLASS_NAME='5A3';
   const TOKEN_PREFIX=`LH_STUDENT_PROFILE_V3|${SCHOOL_YEAR}|${CLASS_NAME}|`;
