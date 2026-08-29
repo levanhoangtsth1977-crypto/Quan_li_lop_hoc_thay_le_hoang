@@ -1,13 +1,13 @@
-/* DATA SYNC VIETNAMESE FIX — SAFE COMPATIBILITY LAYER 2.0 */
+/* DATA SYNC VIETNAMESE FIX — SAFE COMPATIBILITY LAYER 2.1 */
 (function(){
 'use strict';
-if(window.__LH_DATA_SYNC_VIETNAMESE_FIX_20__)return;
-window.__LH_DATA_SYNC_VIETNAMESE_FIX_20__=true;
+if(window.__LH_DATA_SYNC_VIETNAMESE_FIX_21__)return;
+window.__LH_DATA_SYNC_VIETNAMESE_FIX_21__=true;
 
-/* Chuẩn hóa cấu hình lớp theo giao diện hiện hành. Không thay dữ liệu học sinh. */
+/* Nguồn cấu hình thật là global lexical const CLASS_CONFIG, không phải window property. */
 try{
-  if(window.CLASS_CONFIG && typeof window.CLASS_CONFIG==='object'){
-    window.CLASS_CONFIG.className='5A3';
+  if(typeof CLASS_CONFIG!=='undefined' && CLASS_CONFIG && typeof CLASS_CONFIG==='object'){
+    CLASS_CONFIG.className='5A3';
   }
 }catch(_){}
 
@@ -137,12 +137,19 @@ function copyText(value){
   return Promise.resolve(fallback());
 }
 
+function escapeHtml(v){
+  return text(v)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/\"/g,'&quot;')
+    .replace(/'/g,'&#039;');
+}
+
 function injectGPTSummaryUI(){
   try{
     const page=document.getElementById('page-ai');
     if(!page)return;
-
-    /* Dọn đúng phần do module này tạo; không đụng 4 thẻ AI gốc trong HTML. */
     page.querySelectorAll('#lhGPTSummaryCard').forEach(el=>el.remove());
 
     const card=document.createElement('section');
@@ -159,18 +166,11 @@ function injectGPTSummaryUI(){
         </div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
-        <button type="button" class="button primary" id="lhGPTBuildButton">
-          <i class="fa-solid fa-table-list"></i> Tổng hợp dữ liệu
-        </button>
-        <button type="button" class="button secondary" id="lhGPTCopyButton" disabled>
-          <i class="fa-solid fa-copy"></i> Sao chép bảng + prompt
-        </button>
-        <button type="button" class="button secondary" id="lhGPTOpenButton" disabled>
-          <i class="fa-solid fa-up-right-from-square"></i> Mở ChatGPT
-        </button>
+        <button type="button" class="button primary" id="lhGPTBuildButton"><i class="fa-solid fa-table-list"></i> Tổng hợp dữ liệu</button>
+        <button type="button" class="button secondary" id="lhGPTCopyButton" disabled><i class="fa-solid fa-copy"></i> Sao chép bảng + prompt</button>
+        <button type="button" class="button secondary" id="lhGPTOpenButton" disabled><i class="fa-solid fa-up-right-from-square"></i> Mở ChatGPT</button>
       </div>
-      <div id="lhGPTReportView" style="display:none;margin-top:14px;overflow:auto;"></div>
-    `;
+      <div id="lhGPTReportView" style="display:none;margin-top:14px;overflow:auto;"></div>`;
     page.appendChild(card);
 
     const buildBtn=card.querySelector('#lhGPTBuildButton');
@@ -183,23 +183,14 @@ function injectGPTSummaryUI(){
       const body=report.rows.map(r=>
         `<tr><td>${r.stt}</td><td>${escapeHtml(r.name)}</td><td>${r.excused}</td><td>${r.absent}</td><td>${r.totalAbsent}</td><td>${r.violations}</td><td>${r.rewards}</td></tr>`
       ).join('');
-      view.innerHTML=`
-        <div style="margin-bottom:10px;"><strong>${report.total.students} học sinh</strong> · Vắng có phép ${report.total.excused} · Vắng không phép ${report.total.absent} · Vi phạm ${report.total.violations} · Khen thưởng ${report.total.rewards}</div>
-        <table class="data-table" style="min-width:760px;">
-          <thead><tr><th>STT</th><th>Học sinh</th><th>Vắng có phép</th><th>Vắng không phép</th><th>Tổng vắng</th><th>Vi phạm</th><th>Khen thưởng</th></tr></thead>
-          <tbody>${body}</tbody>
-        </table>`;
+      view.innerHTML=`<div style="margin-bottom:10px;"><strong>${report.total.students} học sinh</strong> · Vắng có phép ${report.total.excused} · Vắng không phép ${report.total.absent} · Vi phạm ${report.total.violations} · Khen thưởng ${report.total.rewards}</div><table class="data-table" style="min-width:760px;"><thead><tr><th>STT</th><th>Học sinh</th><th>Vắng có phép</th><th>Vắng không phép</th><th>Tổng vắng</th><th>Vi phạm</th><th>Khen thưởng</th></tr></thead><tbody>${body}</tbody></table>`;
       view.style.display='block';
     }
 
     buildBtn.addEventListener('click',function(e){
-      e.preventDefault();
-      e.stopPropagation();
+      e.preventDefault();e.stopPropagation();
       latest=buildGPTReport();
-      if(!latest.rows.length){
-        window.showToast?.('Chưa có danh sách học sinh để tổng hợp.','warning');
-        return;
-      }
+      if(!latest.rows.length){window.showToast?.('Chưa có danh sách học sinh để tổng hợp.','warning');return;}
       renderReport(latest);
       copyBtn.disabled=false;
       openBtn.disabled=false;
@@ -207,45 +198,27 @@ function injectGPTSummaryUI(){
     },{passive:false});
 
     copyBtn.addEventListener('click',function(e){
-      e.preventDefault();
-      e.stopPropagation();
+      e.preventDefault();e.stopPropagation();
       if(!latest)return;
-      copyText(latest.prompt).then(ok=>{
-        window.showToast?.(ok?'Đã sao chép bảng + prompt.':'Không thể tự sao chép. Hãy chọn và sao chép thủ công từ nội dung báo cáo. ',ok?'success':'warning');
-      });
+      copyText(latest.prompt).then(ok=>window.showToast?.(ok?'Đã sao chép bảng + prompt.':'Không thể tự sao chép. Hãy sao chép thủ công từ báo cáo.',ok?'success':'warning'));
     },{passive:false});
 
     openBtn.addEventListener('click',function(e){
-      e.preventDefault();
-      e.stopPropagation();
+      e.preventDefault();e.stopPropagation();
       if(!latest)return;
-      /* window.open chạy trực tiếp trong click để giảm nguy cơ popup blocker. */
       const win=window.open('https://chatgpt.com/','_blank','noopener,noreferrer');
-      if(!win){
-        window.showToast?.('Trình duyệt đã chặn cửa sổ ChatGPT. Hãy cho phép popup cho trang này.','warning');
-      }else{
-        copyText(latest.prompt).then(ok=>{
-          window.showToast?.(ok?'Đã mở ChatGPT và sao chép dữ liệu. Dán Ctrl+V để phân tích.':'Đã mở ChatGPT. Hãy sao chép bảng rồi dán vào ChatGPT.','success');
-        });
-      }
+      if(!win){window.showToast?.('Trình duyệt đã chặn cửa sổ ChatGPT. Hãy cho phép popup cho trang này.','warning');return;}
+      copyText(latest.prompt).then(ok=>window.showToast?.(ok?'Đã mở ChatGPT và sao chép dữ liệu. Dán Ctrl+V để phân tích.':'Đã mở ChatGPT. Hãy sao chép bảng rồi dán vào ChatGPT.','success'));
     },{passive:false});
   }catch(e){console.warn('[GPT SUMMARY]',e)}
-}
-
-function escapeHtml(v){
-  return text(v)
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/\"/g,'&quot;')
-    .replace(/'/g,'&#039;');
 }
 
 window.addEventListener('DOMContentLoaded',function(){
   removeDuplicateAICards();
   injectGPTSummaryUI();
   try{
-    if(document.getElementById('classSelect'))document.getElementById('classSelect').value='5A3';
+    const classSelect=document.getElementById('classSelect');
+    if(classSelect)classSelect.value='5A3';
     const hero=document.getElementById('heroClass');
     if(hero)hero.textContent='Lớp 5A3';
   }catch(_){}
