@@ -1,11 +1,12 @@
-/* LEARNING UI CLEANUP 3.0
+/* LEARNING UI CLEANUP 3.1
  * Học tập is a real runtime page section backed by SMAS.
  * Remove only obsolete standalone Nhận xét and manual learning entry controls.
+ * Also boots the isolated student gender summary module when Học sinh page exists.
  */
 (function(){
   'use strict';
-  if(window.__LH_LEARNING_UI_CLEANUP_30__) return;
-  window.__LH_LEARNING_UI_CLEANUP_30__=true;
+  if(window.__LH_LEARNING_UI_CLEANUP_31__) return;
+  window.__LH_LEARNING_UI_CLEANUP_31__=true;
 
   const norm=v=>String(v??'').trim().replace(/\s+/g,' ').toLocaleLowerCase('vi');
   const remove=el=>{if(!el||el===document.body)return;el.hidden=true;el.setAttribute('aria-hidden','true');el.remove();};
@@ -49,8 +50,18 @@
     if(window.__LEARNING_SMAS_IMPORT_10__) return;
     if(document.querySelector('script[data-lh-learning-smas]')) return;
     const s=document.createElement('script');
-    s.src='learning-smas-import.js?v=3.0.0';
+    s.src='learning-smas-import.js?v=3.1.0';
     s.dataset.lhLearningSmas='1';
+    s.async=false;
+    document.body.appendChild(s);
+  }
+
+  function loadStudentGenderSummary(){
+    if(document.querySelector('script[data-lh-student-gender-summary]')) return;
+    if(!document.getElementById('page-students')) return;
+    const s=document.createElement('script');
+    s.src='student-gender-summary.js?v=1.0.0';
+    s.dataset.lhStudentGenderSummary='1';
     s.async=false;
     document.body.appendChild(s);
   }
@@ -80,6 +91,7 @@
     removeCommentsMenu();
     removeManualLearningEntry();
     loadSmas();
+    loadStudentGenderSummary();
     section?.classList.remove('hidden');
   }
 
