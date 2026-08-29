@@ -1,11 +1,11 @@
-/* MENU RUNTIME FIX 8.11 — lean runtime
+/* MENU RUNTIME FIX 8.12 — lean runtime
    Navigation remains owned by script.js + UI ACTION PATCH.
    Attendance table is owned only by script.js.
 */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_811__) return;
-  window.__MENU_RUNTIME_FIX_811__=true;
+  if(window.__MENU_RUNTIME_FIX_812__) return;
+  window.__MENU_RUNTIME_FIX_812__=true;
 
   const $=s=>document.querySelector(s), text=v=>String(v??'').trim();
   const tabKey={DIEM_DANH:'attendanceRecords',VI_PHAM:'violationRecords',KHEN_THUONG:'rewardRecords'};
@@ -29,7 +29,8 @@
     loadOnce('learning-smas-import.js?v=20260826.1','data-lh-learning-smas-import');
     loadOnce('excellent-student-engine.js?v=20260826.1','data-lh-excellent-student-engine');
     loadOnce('home-ai-live-sync.js?v=20260826.5','data-lh-home-ai-live-sync');
-    loadOnce('class-name-final-fix.js?v=20260829.1','data-lh-class-name-final-fix');
+    loadOnce('learning-comments-student-picker.js?v=20260829.1','data-lh-learning-comments-student-picker');
+    loadOnce('class-name-final-fix.js?v=20260829.2','data-lh-class-name-final-fix');
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){install();boot();},{once:true});else{install();boot()}
 })();
