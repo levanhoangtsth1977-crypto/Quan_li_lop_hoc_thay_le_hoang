@@ -1,0 +1,4 @@
+FINAL STUDENT LINKS DEPLOYMENT 2026-08-30
+Class: 5A3
+Profile route: student-profile-v5.html
+API: absolute Vercel student-data proxy with Google endpoint fallback
