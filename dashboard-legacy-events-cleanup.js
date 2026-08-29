@@ -1,64 +1,31 @@
-/* ============================================================
-   TRANG CHỦ — DỌN DỮ LIỆU VI PHẠM / KHEN THƯỞNG CŨ
-   Chạy đúng 1 lần trên mỗi trình duyệt.
-   Không xóa học sinh, điểm danh, học tập, nhận xét...
-   ============================================================ */
-(function () {
-    "use strict";
-
-    const FLAG = "QL_LOP_HOC_LE_HOANG_LEGACY_EVENTS_CLEANED_V1";
-    if (localStorage.getItem(FLAG) === "1") return;
-
-    try {
-        const KEY = "QL_LOP_HOC_LE_HOANG_2026_2027";
-        const raw = localStorage.getItem(KEY);
-
-        if (raw) {
-            const data = JSON.parse(raw);
-            if (data && typeof data === "object") {
-                data.violations = [];
-                data.rewards = [];
-                data.savedAt = new Date().toISOString();
-                localStorage.setItem(KEY, JSON.stringify(data));
-            }
-        }
-
-        /* Đồng bộ ngay nếu Data Engine đã tồn tại. */
-        if (Array.isArray(window.violationRecords)) {
-            window.violationRecords.splice(0, window.violationRecords.length);
-        }
-        if (Array.isArray(window.rewardRecords)) {
-            window.rewardRecords.splice(0, window.rewardRecords.length);
-        }
-
-        if (typeof window.syncAppDataReferences === "function") {
-            window.syncAppDataReferences();
-        }
-
-        if (typeof window.saveClassData === "function") {
-            window.saveClassData();
-        }
-
-        localStorage.setItem(FLAG, "1");
-
-        /* Cập nhật các chỉ số Trang chủ ngay lập tức. */
-        ["statViolations", "statRewards", "violationBadge", "rewardBadge"].forEach(function (id) {
-            const el = document.getElementById(id);
-            if (el) el.textContent = "0";
+/* DASHBOARD DISPLAY — CANONICAL CLASS 5A3 */
+(function(){
+  'use strict';
+  const NAME='Lớp 5A3';
+  function cleanText(node){
+    if(!node || node.nodeType!==Node.TEXT_NODE) return;
+    node.nodeValue=String(node.nodeValue||'').replace(/Lớp\s*5(?:A|C)(?:3)?\b/gi,NAME);
+  }
+  function apply(){
+    try{
+      const hero=document.getElementById('heroClass');
+      if(hero) hero.textContent=NAME;
+      const select=document.getElementById('classSelect');
+      if(select){
+        Array.from(select.options||[]).forEach(o=>{
+          if(/5(?:A|C)(?:3)?/i.test(String(o.textContent||''))) o.textContent=NAME;
+          if(o.value==='5C'||o.value==='5C3'||o.value==='5A'||o.value==='5A3') o.value='5A3';
         });
-
-        const activity = document.getElementById("recentActivityList");
-        if (activity) {
-            activity.innerHTML = '<div class="empty-state"><span class="empty-icon"><i class="fa-solid fa-clock-rotate-left"></i></span><strong>Chưa có hoạt động</strong><p>Các hoạt động mới sẽ xuất hiện tại đây.</p></div>';
-        }
-
-        const attention = document.getElementById("attentionStudentList");
-        if (attention) {
-            attention.innerHTML = '<div class="empty-state"><span class="empty-icon"><i class="fa-solid fa-heart"></i></span><strong>Chưa có dữ liệu</strong><p>Hệ thống sẽ tổng hợp khi có dữ liệu.</p></div>';
-        }
-
-        console.info("Legacy violation/reward data cleaned once.");
-    } catch (error) {
-        console.error("Legacy event cleanup failed:", error);
-    }
+        select.value='5A3';
+      }
+      const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+      let n;while((n=walker.nextNode())) cleanText(n);
+    }catch(_){ }
+  }
+  function boot(){
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',apply,{once:true});
+    else apply();
+    window.addEventListener('google-sheets-data-ready',apply,{once:true});
+  }
+  boot();
 })();
