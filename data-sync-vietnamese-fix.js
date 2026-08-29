@@ -18,15 +18,22 @@ function removeDuplicateAICards(){
 }
 
 window.addEventListener('DOMContentLoaded',function(){
-  // Runs after ui-complete-fix.js DOMContentLoaded handler because this script is loaded later.
   removeDuplicateAICards();
+  // Keep duplicate UI removed if a late script re-adds it, without polling.
+  const page=document.getElementById('page-ai');
+  if(page&&!window.__LH_AI_DEDUPE_OBSERVER__){
+    const observer=new MutationObserver(function(){
+      page.querySelectorAll('.ui-complete-page').forEach(el=>el.remove());
+    });
+    observer.observe(page,{childList:true,subtree:true});
+    window.__LH_AI_DEDUPE_OBSERVER__=observer;
+  }
 },{once:true});
 
 window.addEventListener('google-sheets-data-ready',function(){
   try{if(typeof window.syncAppDataReferences==='function')window.syncAppDataReferences()}catch(_){}
   try{if(typeof window.renderStudents==='function')window.renderStudents()}catch(_){}
   try{if(typeof window.renderDashboard==='function')window.renderDashboard()}catch(_){}
-  // A data sync can trigger UI rerender; keep the canonical AI block only.
   removeDuplicateAICards();
 });
 
