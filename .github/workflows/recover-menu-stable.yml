@@ -29,36 +29,57 @@ jobs:
             'event-ui-stability-v214.js','dashboard-legacy-events-cleanup.js',
             'safe-student-picker.js'
           ]:
-            s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*'+re.escape(name)+r'[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
+            s=re.sub(r'<script\b[^>]*src=["\'][^"\']*'+re.escape(name)+r'[^"\']*["\'][^>]*></script>\s*','',s,flags=re.I)
 
           # Keep Học tập; remove only the obsolete standalone Nhận xét menu.
-          s=re.sub(r'<button\\b[^>]*data-page=["\\\']comments["\\\'][^>]*>.*?</button>\\s*','',s,flags=re.I|re.S)
-          s=re.sub(r'<a\\b[^>]*data-page=["\\\']comments["\\\'][^>]*>.*?</a>\\s*','',s,flags=re.I|re.S)
+          s=re.sub(r'<button\b[^>]*data-page=["\']comments["\'][^>]*>.*?</button>\s*','',s,flags=re.I|re.S)
+          s=re.sub(r'<a\b[^>]*data-page=["\']comments["\'][^>]*>.*?</a>\s*','',s,flags=re.I|re.S)
 
-          if not re.search(r'data-page=["\\\']learning["\\\']',s,re.I):
-            item='<button type="button" class="menu-item" data-page="learning"><i class="fa-solid fa-book-open"></i><span>Học tập</span></button>\\n'
+          if not re.search(r'data-page=["\']learning["\']',s,re.I):
+            item='<button type="button" class="menu-item" data-page="learning"><i class="fa-solid fa-book-open"></i><span>Học tập</span></button>\n'
             marker='<button type="button" class="menu-item" data-page="statistics">'
             s=s.replace(marker,item+marker,1) if marker in s else s.replace('</nav>',item+'</nav>',1)
 
           # Remove obsolete manual learning entry scripts. SMAS remains the supported learning workflow.
           for name in ['learning-menu.js','learning-comments-student-picker.js']:
-            s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*'+re.escape(name)+r'[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
+            s=re.sub(r'<script\b[^>]*src=["\'][^"\']*'+re.escape(name)+r'[^"\']*["\'][^>]*></script>\s*','',s,flags=re.I)
 
           # Keep exactly one utilities link.
-          s=re.sub(r'<a[^>]*id=["\\\'][^"\\\']*(?:lhUtilitiesStandalone|lhStandaloneUtilities)[^"\\\']*["\\\'][^>]*>.*?</a>\\s*','',s,flags=re.I|re.S)
+          s=re.sub(r'<a[^>]*id=["\'][^"\']*(?:lhUtilitiesStandalone|lhStandaloneUtilities)["\'][^>]*>.*?</a>\s*','',s,flags=re.I|re.S)
           link='<a class="menu-item" id="lhUtilitiesStandalone" href="tien-ich.html"><i class="fa-solid fa-toolbox"></i><span>Tiện ích</span></a>'
           marker='<button type="button" class="menu-item" data-page="settings">'
-          if marker in s: s=s.replace(marker,link+'\\n'+marker,1)
-          elif 'id="lhUtilitiesStandalone"' not in s: s=s.replace('</nav>',link+'\\n</nav>',1)
+          if marker in s: s=s.replace(marker,link+'\n'+marker,1)
+          elif 'id="lhUtilitiesStandalone"' not in s: s=s.replace('</nav>',link+'\n</nav>',1)
+
+          # IMPORTANT: Học tập must exist as a real HTML page section, not only as a menu item.
+          # Keep this section free of obsolete manual entry / Nhận xét controls.
+          learning_section='''<section class="page-section" id="page-learning" data-page-section="learning">
+          <div class="page-header">
+            <div>
+              <span class="page-eyebrow"><i class="fa-solid fa-book-open"></i> Dữ liệu học tập</span>
+              <h1>Học tập</h1>
+              <p>Quản lý kết quả học tập định kỳ từ bảng tổng hợp SMAS và làm nguồn đối chiếu xét học sinh xuất sắc.</p>
+            </div>
+          </div>
+          <div id="lhLearningPageBody"></div>
+          </section>\n'''
+          if not re.search(r'id=["\']page-learning["\']',s,re.I):
+            marker=r'(?=<section\b[^>]*id=["\']page-statistics["\'])'
+            if re.search(marker,s,re.I):
+              s=re.sub(marker,learning_section,s,count=1,flags=re.I)
+            else:
+              marker2=r'(?=<section\b[^>]*data-page-section=["\']statistics["\'])'
+              if re.search(marker2,s,re.I): s=re.sub(marker2,learning_section,s,count=1,flags=re.I)
+              else: s=s.replace('</main>',learning_section+'</main>',1)
 
           # Load the SMAS HTML builder exactly once. It creates the full Học tập panel.
-          s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*learning-smas-import\\.js[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
-          smas='<script src="learning-smas-import.js?v=1.1.0"></script>\\n'
+          s=re.sub(r'<script\b[^>]*src=["\'][^"\']*learning-smas-import\.js[^"\']*["\'][^>]*></script>\s*','',s,flags=re.I)
+          smas='<script src="learning-smas-import.js?v=1.2.0"></script>\n'
           s=s.replace('</body>',smas+'</body>',1) if '</body>' in s else s+smas
 
           # Load the cleanup layer last so obsolete manual UI cannot reappear.
-          s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*learning-comments-menu-removal\\.js[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
-          cleanup='<script src="learning-comments-menu-removal.js?v=2.1.0"></script>\\n'
+          s=re.sub(r'<script\b[^>]*src=["\'][^"\']*learning-comments-menu-removal\.js[^"\']*["\'][^>]*></script>\s*','',s,flags=re.I)
+          cleanup='<script src="learning-comments-menu-removal.js?v=2.1.0"></script>\n'
           s=s.replace('</body>',cleanup+'</body>',1) if '</body>' in s else s+cleanup
 
           p.write_text(s,encoding='utf-8')
@@ -69,6 +90,8 @@ jobs:
         run: |
           set -e
           grep -qi 'data-page="learning"' index.html
+          grep -qi 'id="page-learning"' index.html
+          grep -qi 'data-page-section="learning"' index.html
           ! grep -qi 'data-page="comments"' index.html
           test "$(grep -oi 'learning-smas-import.js' index.html | wc -l | tr -d ' ')" = "1"
           test "$(grep -oi 'learning-comments-menu-removal.js' index.html | wc -l | tr -d ' ')" = "1"
@@ -86,5 +109,5 @@ jobs:
           git config user.email 41898282+users.noreply.github.com
           git add index.html
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "Restore Học tập SMAS HTML and remove obsolete manual controls"
+          git commit -m "Add real Học tập HTML page and restore SMAS UI"
           git push origin HEAD:master
