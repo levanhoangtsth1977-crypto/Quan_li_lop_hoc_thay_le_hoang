@@ -34,15 +34,25 @@ jobs:
           ]
           for pat in patterns:
             s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*'+pat+r'[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
+
+          # Remove obsolete standalone Nhận xét menu. Keep Học tập because it contains SMAS import.
+          s=re.sub(r'<button\\b[^>]*data-page=["\\\']comments["\\\'][^>]*>.*?</button>\\s*','',s,flags=re.I|re.S)
+
           # Keep exactly one standalone utilities link.
           s=re.sub(r'<a[^>]*id=["\\\'][^"\\\']*(?:lhUtilitiesStandalone|lhStandaloneUtilities)[^"\\\']*["\\\'][^>]*>.*?</a>\\s*','',s,flags=re.I|re.S)
           link='<a class="menu-item" id="lhUtilitiesStandalone" href="tien-ich.html"><i class="fa-solid fa-toolbox"></i><span>Tiện ích</span></a>'
           marker='<button type="button" class="menu-item" data-page="settings">'
           s=s.replace(marker,link+'\\n'+marker,1) if marker in s else s.replace('</nav>',link+'\\n</nav>',1)
-          tag='<script src="safe-student-picker.js?v=1.0.0"></script>\\n'
+
           # Ensure one safe picker script.
           s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*safe-student-picker\\.js[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
+          s=s.replace('</body>','<script src="safe-student-picker.js?v=1.0.0"></script>\\n</body>',1) if '</body>' in s else s
+
+          # Ensure the learning UI cleanup script is loaded once, after all modules.
+          s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*learning-comments-menu-removal\\.js[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
+          tag='<script src="learning-comments-menu-removal.js?v=2.0.0"></script>\\n'
           s=s.replace('</body>',tag+'</body>',1) if '</body>' in s else s+tag
+
           p.write_text(s,encoding='utf-8')
           PY
 
@@ -52,6 +62,8 @@ jobs:
           set -e
           test "$(grep -oi 'tien-ich.html' index.html | wc -l | tr -d ' ')" = "1"
           test "$(grep -oi 'safe-student-picker.js' index.html | wc -l | tr -d ' ')" = "1"
+          test "$(grep -oi 'learning-comments-menu-removal.js' index.html | wc -l | tr -d ' ')" = "1"
+          ! grep -qi 'data-page="comments"' index.html
           ! grep -qi 'event-sync-multi-v21.js' index.html
           ! grep -qi 'event-ui-stability-v214.js' index.html
           ! grep -qi 'menu-final-direct.js' index.html
@@ -67,5 +79,5 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add index.html
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "Restore core menus and isolate student picker"
+          git commit -m "Load stable learning UI cleanup and remove obsolete comments menu"
           git push origin HEAD:master
