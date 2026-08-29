@@ -1,17 +1,21 @@
-/* ATTENDANCE STATUS CLEAN 8.0
+/* ATTENDANCE STATUS CLEAN 8.1
    One compact native status dropdown per student.
    Student column is text only; status column contains only:
    present / excused / absent.
+   The status options are revalidated immediately before opening so legacy
+   student-picker code can never replace them with student names.
    No observers, no capture interception, no repeated timers.
 */
 (function(){
   'use strict';
-  if(window.__LH_ATTENDANCE_CLEAN_80__) return;
-  window.__LH_ATTENDANCE_CLEAN_80__=true;
+  if(window.__LH_ATTENDANCE_CLEAN_81__) return;
+  window.__LH_ATTENDANCE_CLEAN_81__=true;
 
   const STATUS=[['present','Có mặt'],['excused','Có phép'],['absent','Không phép']];
-  const norm=v=>{v=String(v==null?'':v).trim();return STATUS.some(x=>x[0]===v)?v:'present'};
+  const VALUES=new Set(STATUS.map(x=>x[0]));
+  const norm=v=>{v=String(v==null?'':v).trim();return VALUES.has(v)?v:'present'};
   const txt=v=>String(v==null?'':v).trim();
+  const isStatusSelect=el=>!!(el&&el.matches&&el.matches('#attendanceTableBody select.attendance-status'));
 
   function students(){
     try{
@@ -23,7 +27,7 @@
   }
 
   function studentIdByName(name){
-    const n=txt(name).replace(/^\d+\.\s*/, '');
+    const n=txt(name).replace(/^\d+\.\s*/,'');
     const a=students();
     const s=a.find(x=>txt(x.name||x.studentName)===n);
     return txt(s&&(s.id||s.studentId||s.studentCode));
@@ -47,14 +51,36 @@
     return 'present';
   }
 
+  function fillStatusOptions(select,current){
+    if(!select) return;
+    const keep=norm(current||select.value);
+    select.replaceChildren();
+    STATUS.forEach(([value,label])=>{
+      const o=document.createElement('option');
+      o.value=value;
+      o.textContent=label;
+      o.selected=value===keep;
+      select.appendChild(o);
+    });
+    select.value=keep;
+  }
+
+  function ensureStatusOptions(select){
+    if(!isStatusSelect(select)) return;
+    const id=txt(select.dataset.studentId);
+    const value=norm(select.value);
+    const options=[...select.options];
+    const valid=options.length===3 && options.every((o,i)=>o.value===STATUS[i][0] && o.textContent===STATUS[i][1]);
+    if(!valid) fillStatusOptions(select,value||recordStatus(id));
+    else select.value=value;
+  }
+
   function makeStatusSelect(id,current){
     const s=document.createElement('select');
     s.className='attendance-status';
     s.dataset.studentId=txt(id);
     s.setAttribute('aria-label','Trạng thái điểm danh');
-    STATUS.forEach(([value,label])=>{
-      const o=document.createElement('option');o.value=value;o.textContent=label;o.selected=value===norm(current);s.appendChild(o);
-    });
+    fillStatusOptions(s,norm(current));
     return s;
   }
 
@@ -72,16 +98,15 @@
     }
     if(!studentName) studentName=txt(studentCell.getAttribute('data-student-name'));
     studentCell.replaceChildren();
-    const strong=document.createElement('strong');strong.textContent=studentName || ('Học sinh '+(index+1));
+    const strong=document.createElement('strong');
+    strong.textContent=studentName||('Học sinh '+(index+1));
     studentCell.appendChild(strong);
 
     const old=statusCell.querySelector('select');
-    let current='present';
+    let current=old&&VALUES.has(txt(old.value))?txt(old.value):'present';
     let id=txt(row.dataset.studentId||studentCell.dataset.studentId||old?.dataset.studentId||'');
-    if(old && STATUS.some(x=>x[0]===txt(old.value))) current=txt(old.value);
     if(!id) id=studentIdByName(studentName);
-    if(!STATUS.some(x=>x[0]===current)) current=recordStatus(id,date);
-
+    if(!VALUES.has(current)) current=recordStatus(id,date);
     statusCell.replaceChildren(makeStatusSelect(id,current));
     row.dataset.studentId=id;
   }
@@ -96,33 +121,63 @@
 
   function summary(){
     let p=0,e=0,a=0;
-    document.querySelectorAll('#attendanceTableBody select.attendance-status').forEach(s=>{if(s.value==='present')p++;else if(s.value==='excused')e++;else if(s.value==='absent')a++;});
-    [['attendancePresent',p],['attendancePresentCount',p],['attendanceExcused',e],['attendanceExcusedCount',e],['attendanceAbsent',a],['attendanceAbsentCount',a]].forEach(([id,v])=>{const el=document.getElementById(id);if(el)el.textContent=String(v);});
+    document.querySelectorAll('#attendanceTableBody select.attendance-status').forEach(s=>{
+      const v=norm(s.value);
+      if(v==='present')p++; else if(v==='excused')e++; else if(v==='absent')a++;
+    });
+    [['attendancePresent',p],['attendancePresentCount',p],['attendanceExcused',e],['attendanceExcusedCount',e],['attendanceAbsent',a],['attendanceAbsentCount',a]].forEach(([id,v])=>{
+      const el=document.getElementById(id); if(el)el.textContent=String(v);
+    });
   }
 
   function bind(){
-    if(document.__lhAttendance80Bound)return;document.__lhAttendance80Bound=true;
+    if(document.__lhAttendance81Bound)return;
+    document.__lhAttendance81Bound=true;
+
+    document.addEventListener('pointerdown',function(e){
+      const t=e.target;
+      if(isStatusSelect(t)) ensureStatusOptions(t);
+    },true);
+    document.addEventListener('mousedown',function(e){
+      const t=e.target;
+      if(isStatusSelect(t)) ensureStatusOptions(t);
+    },true);
+    document.addEventListener('focusin',function(e){
+      const t=e.target;
+      if(isStatusSelect(t)) ensureStatusOptions(t);
+    },true);
     document.addEventListener('change',function(e){
       const t=e.target;
-      if(t?.matches?.('#attendanceTableBody select.attendance-status')){summary();return;}
+      if(isStatusSelect(t)){
+        ensureStatusOptions(t);
+        summary();
+        return;
+      }
       if(t?.matches?.('#attendanceDate')) setTimeout(normalize,0);
     },false);
+
     const b=document.getElementById('saveAttendance');
-    if(b&&!b.dataset.lhAttendanceBound80){b.dataset.lhAttendanceBound80='1';b.addEventListener('click',()=>setTimeout(summary,0),false);}
+    if(b&&!b.dataset.lhAttendanceBound81){
+      b.dataset.lhAttendanceBound81='1';
+      b.addEventListener('click',()=>setTimeout(summary,0),false);
+    }
   }
 
   function css(){
-    if(document.getElementById('lhAttendanceClean80Css'))return;
-    const s=document.createElement('style');s.id='lhAttendanceClean80Css';s.textContent=`
+    if(document.getElementById('lhAttendanceClean81Css'))return;
+    const s=document.createElement('style');
+    s.id='lhAttendanceClean81Css';
+    s.textContent=`
       #page-attendance .attendance-table td:nth-child(2){min-width:280px!important;}
       #page-attendance .attendance-table td:nth-child(3){min-width:150px!important;overflow:visible!important;}
-      #page-attendance .attendance-table select.attendance-status{display:block!important;width:100%!important;min-width:140px!important;height:40px!important;padding:6px 28px 6px 9px!important;border:1px solid #cbd5e1!important;border-radius:8px!important;background:#fff!important;color:#172033!important;font-size:14px!important;line-height:1.2!important;cursor:pointer!important;pointer-events:auto!important;touch-action:auto!important;}
-      @media(max-width:680px){#page-attendance .attendance-table td:nth-child(2){min-width:220px!important;}#page-attendance .attendance-table select.attendance-status{min-width:135px!important;height:42px!important;font-size:15px!important;}}
-    `;document.head.appendChild(s);
+      #page-attendance .attendance-table select.attendance-status{display:block!important;width:100%!important;min-width:135px!important;height:40px!important;padding:6px 28px 6px 9px!important;border:1px solid #cbd5e1!important;border-radius:8px!important;background:#fff!important;color:#172033!important;font-size:14px!important;line-height:1.2!important;cursor:pointer!important;pointer-events:auto!important;touch-action:auto!important;}
+      @media(max-width:680px){#page-attendance .attendance-table td:nth-child(2){min-width:220px!important;}#page-attendance .attendance-table select.attendance-status{min-width:130px!important;height:42px!important;font-size:15px!important;}}
+    `;
+    document.head.appendChild(s);
   }
 
   function boot(){css();bind();setTimeout(normalize,0);}
-  window.LHAttendanceFinal={normalize,summary,boot};
+  window.LHAttendanceFinal={normalize,summary,boot,ensureStatusOptions};
   window.renderAttendanceSummary=summary;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
