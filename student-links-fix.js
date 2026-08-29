@@ -1,13 +1,12 @@
 /* QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG
- * STUDENT PRIVATE LINKS 3.3.0
- * 1 học sinh = 1 link riêng dạng student-profile-v4.html?t=TOKEN
- * Ưu tiên Google Sheets; fallback đúng vào students[] của DATA.JS qua getStudentsSafe().
+ * STUDENT PRIVATE LINKS 3.4.0
+ * 1 học sinh = 1 link riêng dạng student-profile-v5.html?t=TOKEN
  */
 (function () {
   'use strict';
-  const VERSION='3.3.0';
+  const VERSION='3.4.0';
   const PAGE_SELECTOR='#page-student-links,[data-page-section="student-links"]';
-  const PROFILE_PATH='student-profile-v4.html';
+  const PROFILE_PATH='student-profile-v5.html';
   const SCHOOL_YEAR='2026-2027';
   const CLASS_NAME='5A3';
   const TOKEN_PREFIX=`LH_STUDENT_PROFILE_V3|${SCHOOL_YEAR}|${CLASS_NAME}|`;
@@ -15,17 +14,14 @@
   const RETRY_MS=500;
   const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
   const clean=v=>String(v??'').trim().replace(/\s+/g,' ');
-  let retryTimer=null;
-  let retryCount=0;
+  let retryTimer=null,retryCount=0;
   function getRoster(){
     const google=Array.isArray(window.GOOGLE_SHEETS_STUDENTS)?window.GOOGLE_SHEETS_STUDENTS:[];
-    let app=[];
-    try{if(typeof window.getStudentsSafe==='function'){const x=window.getStudentsSafe();if(Array.isArray(x))app=x}}catch(_){}
+    let app=[];try{if(typeof window.getStudentsSafe==='function'){const x=window.getStudentsSafe();if(Array.isArray(x))app=x}}catch(_){}
     if(!app.length&&Array.isArray(window.students))app=window.students;
     const source=google.length?google:app,seen=new Set();
     return source.map((item,index)=>({...item,id:clean(item?.id),name:clean(item?.name||item?.studentName),_stt:Number(item?.stt)||index+1}))
-      .filter(item=>item.id&&item.name&&!seen.has(item.id)&&seen.add(item.id))
-      .sort((a,b)=>a._stt-b._stt);
+      .filter(item=>item.id&&item.name&&!seen.has(item.id)&&seen.add(item.id)).sort((a,b)=>a._stt-b._stt);
   }
   async function tokenForStudent(id){
     const raw=TOKEN_PREFIX+clean(id);
@@ -35,10 +31,8 @@
   function toast(message,type='info'){if(typeof window.showToast==='function')window.showToast(message,type);else console.info(message)}
   async function copyText(value){if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(value);return}const ta=document.createElement('textarea');ta.value=value;ta.setAttribute('readonly','');ta.style.position='fixed';ta.style.left='-9999px';document.body.appendChild(ta);ta.select();if(!document.execCommand('copy'))throw new Error('copy_failed');ta.remove()}
   function showLoading(page){page.innerHTML='<div class="page-header"><div><span class="page-eyebrow"><i class="fa-solid fa-link"></i> Truy cập học sinh</span><h1>Link học sinh</h1><p>Đang đồng bộ danh sách học sinh...</p></div></div><div class="info-banner"><i class="fa-solid fa-spinner fa-spin"></i><div><strong>Đang tải dữ liệu</strong><p>Hệ thống đang lấy danh sách lớp 5A3 từ nguồn dữ liệu chung.</p></div></div>'}
-  function showNoData(page){page.innerHTML='<div class="page-header"><div><span class="page-eyebrow"><i class="fa-solid fa-link"></i> Truy cập học sinh</span><h1>Link học sinh</h1><p>Chưa nhận được danh sách học sinh từ nguồn dữ liệu chung.</p></div></div><div class="info-banner warning"><i class="fa-solid fa-triangle-exclamation"></i><div><strong>Chưa thể tạo link</strong><p>Không có danh sách học sinh trong Google Sheets hoặc bộ nhớ dữ liệu hiện tại.</p></div></div>'}
   async function render(){
-    const page=document.querySelector(PAGE_SELECTOR);if(!page)return;
-    const roster=getRoster();
+    const page=document.querySelector(PAGE_SELECTOR);if(!page)return;const roster=getRoster();
     if(!roster.length){showLoading(page);retryLoad();return}
     retryCount=0;if(retryTimer){clearTimeout(retryTimer);retryTimer=null}
     const rows=await Promise.all(roster.map(async(student,index)=>{const token=await tokenForStudent(student.id);const url=new URL(PROFILE_PATH,window.location.href);url.searchParams.set('t',token);return `<div class="student-link-item" data-student-row><div class="student-link-info"><span class="student-link-index">${index+1}</span><div><strong>${esc(student.name)}</strong><small>${esc(student.studentCode||'')}</small></div></div><input type="text" readonly value="${esc(url.href)}" aria-label="Link cá nhân của ${esc(student.name)}"><div class="student-link-actions"><button type="button" class="button secondary" data-copy-private-link="${esc(url.href)}"><i class="fa-solid fa-copy"></i> Sao chép</button><a class="button primary" href="${esc(url.href)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square"></i> Mở</a></div></div>`}));
