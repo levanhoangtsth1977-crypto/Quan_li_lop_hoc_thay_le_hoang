@@ -1,6 +1,9 @@
 const { createHash } = require('node:crypto');
 
-const UPSTREAM = 'https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrNWY5DCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
+const UPSTREAMS = [
+  'https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrNWY5DCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec',
+  'https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrNWY5DCEPpm2rkpXTn-sNPA/exec'
+];
 const PREFIX = 'LH_STUDENT_PROFILE_V3|2026-2027|5A3|';
 const clean = value => String(value ?? '').trim().replace(/\s+/g, ' ');
 const tokenForStudent = id => createHash('sha256').update(PREFIX + clean(id), 'utf8').digest('hex');
@@ -18,36 +21,66 @@ function parsePayload(text) {
   return null;
 }
 
-async function fetchUpstream() {
+async function tryEndpoint(baseUrl) {
   const headers = {
     Accept: 'application/json,text/plain,*/*',
-    'User-Agent': 'Mozilla/5.0 (compatible; StudentProfileProxy/1.0)'
+    'User-Agent': 'Mozilla/5.0 (compatible; StudentProfileProxy/1.1)'
   };
+  let lastError = null;
 
-  // Preferred: Code.gs returns pure JSON when callback is omitted.
-  const direct = await fetch(`${UPSTREAM}?action=get_all&_=${Date.now()}`, {
-    redirect: 'follow', cache: 'no-store', headers
-  });
-  const directText = await direct.text();
-  if (direct.ok) {
-    const directData = parsePayload(directText);
-    if (directData?.ok) return directData;
+  try {
+    const direct = await fetch(`${baseUrl}?action=get_all&_=${Date.now()}`, {
+      redirect: 'follow', cache: 'no-store', headers
+    });
+    const directText = await direct.text();
+    if (direct.ok) {
+      const directData = parsePayload(directText);
+      if (directData?.ok) return directData;
+    }
+    lastError = new Error(`direct HTTP ${direct.status}`);
+  } catch (error) {
+    lastError = error;
   }
 
-  // Fallback: tolerate legacy JSONP response.
-  const jsonp = await fetch(`${UPSTREAM}?action=get_all&callback=__LH_PROXY_CALLBACK&_=${Date.now()}`, {
-    redirect: 'follow', cache: 'no-store', headers
-  });
-  const jsonpText = await jsonp.text();
-  if (!jsonp.ok) throw new Error(`Google Apps Script HTTP ${jsonp.status}`);
-  const jsonpData = parsePayload(jsonpText);
-  if (!jsonpData?.ok) throw new Error(jsonpData?.error || 'Nguồn Google không trả dữ liệu hợp lệ.');
-  return jsonpData;
+  try {
+    const jsonp = await fetch(`${baseUrl}?action=get_all&callback=__LH_PROXY_CALLBACK&_=${Date.now()}`, {
+      redirect: 'follow', cache: 'no-store', headers
+    });
+    const jsonpText = await jsonp.text();
+    if (jsonp.ok) {
+      const jsonpData = parsePayload(jsonpText);
+      if (jsonpData?.ok) return jsonpData;
+      lastError = new Error('JSONP không trả dữ liệu hợp lệ');
+    } else {
+      lastError = new Error(`jsonp HTTP ${jsonp.status}`);
+    }
+  } catch (error) {
+    lastError = error;
+  }
+
+  throw lastError || new Error('Google Apps Script không phản hồi');
+}
+
+async function fetchUpstream() {
+  let lastError = null;
+  for (const endpoint of UPSTREAMS) {
+    try {
+      return await tryEndpoint(endpoint);
+    } catch (error) {
+      lastError = error;
+      console.warn('[student-data] upstream failed:', endpoint, error?.message || error);
+    }
+  }
+  throw lastError || new Error('Không có Google Apps Script endpoint hoạt động');
 }
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
   res.setHeader('Cache-Control', 'no-store, max-age=0');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+
   const token = clean(req.query?.t || '');
   if (!token) return res.status(400).json({ ok: false, error: 'Thiếu mã truy cập cá nhân.' });
 
@@ -73,9 +106,6 @@ module.exports = async function handler(req, res) {
     });
   } catch (error) {
     console.error('[student-data]', error?.message || error);
-    return res.status(502).json({
-      ok: false,
-      error: 'Không truy cập được nguồn dữ liệu Google.'
-    });
+    return res.status(502).json({ ok: false, error: 'Không truy cập được nguồn dữ liệu Google.' });
   }
 };
