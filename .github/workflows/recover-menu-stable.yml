@@ -52,7 +52,6 @@ jobs:
           elif 'id="lhUtilitiesStandalone"' not in s: s=s.replace('</nav>',link+'\n</nav>',1)
 
           # IMPORTANT: Học tập must exist as a real HTML page section, not only as a menu item.
-          # Keep this section free of obsolete manual entry / Nhận xét controls.
           learning_section='''<section class="page-section" id="page-learning" data-page-section="learning">
           <div class="page-header">
             <div>
@@ -72,6 +71,15 @@ jobs:
               if re.search(marker2,s,re.I): s=re.sub(marker2,learning_section,s,count=1,flags=re.I)
               else: s=s.replace('</main>',learning_section+'</main>',1)
 
+          # Force exactly one current student-links loader and always use a fresh query string.
+          student_links='<script src="student-links-fix.js?v=3.2.1"></script>\n'
+          s=re.sub(r'<script\b[^>]*src=["\'][^"\']*student-links-fix\.js[^"\']*["\'][^>]*></script>\s*','',s,flags=re.I)
+          insert_marker='<script src="script.js?v=4.1.1"></script>\n'
+          if insert_marker in s:
+            s=s.replace(insert_marker,insert_marker+student_links,1)
+          else:
+            s=s.replace('</body>',student_links+'</body>',1)
+
           # Load the SMAS HTML builder exactly once. It creates the full Học tập panel.
           s=re.sub(r'<script\b[^>]*src=["\'][^"\']*learning-smas-import\.js[^"\']*["\'][^>]*></script>\s*','',s,flags=re.I)
           smas='<script src="learning-smas-import.js?v=1.2.0"></script>\n'
@@ -85,7 +93,7 @@ jobs:
           p.write_text(s,encoding='utf-8')
           PY
 
-      - name: Verify learning UI
+      - name: Verify learning UI and student links loader
         shell: bash
         run: |
           set -e
@@ -95,6 +103,8 @@ jobs:
           ! grep -qi 'data-page="comments"' index.html
           test "$(grep -oi 'learning-smas-import.js' index.html | wc -l | tr -d ' ')" = "1"
           test "$(grep -oi 'learning-comments-menu-removal.js' index.html | wc -l | tr -d ' ')" = "1"
+          test "$(grep -oi 'student-links-fix.js?v=3.2.1' index.html | wc -l | tr -d ' ')" = "1"
+          ! grep -qi 'student-links-fix.js?v=1.1' index.html
           ! grep -qi 'safe-student-picker.js' index.html
           ! grep -qi 'event-ui-stability-v214.js' index.html
           ! grep -qi 'event-sync-multi-v21.js' index.html
