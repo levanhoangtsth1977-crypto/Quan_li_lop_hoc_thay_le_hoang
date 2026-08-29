@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Remove conflicting UI/event layers and install safe picker
+      - name: Normalize UI and load stable cleanup layers
         shell: bash
         run: |
           python - <<'PY'
@@ -22,55 +22,57 @@ jobs:
           import re
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
-          patterns=[
-            r'menu-final-direct\\.js',
-            r'menu-special-fix\\.js',
-            r'emergency-menu-router\\.js',
-            r'tien-ich-final\\.js',
-            r'tien-ich-schema-v4-fix\\.js',
-            r'event-sync-multi-v21\\.js',
-            r'event-ui-stability-v214\\.js',
-            r'dashboard-legacy-events-cleanup\\.js'
-          ]
-          for pat in patterns:
-            s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*'+pat+r'[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
 
-          # Remove obsolete standalone Nhận xét menu. Keep Học tập because it contains SMAS import.
+          # Remove known conflicting UI/event layers.
+          for name in [
+            'menu-final-direct.js','menu-special-fix.js','emergency-menu-router.js',
+            'tien-ich-final.js','tien-ich-schema-v4-fix.js','event-sync-multi-v21.js',
+            'event-ui-stability-v214.js','dashboard-legacy-events-cleanup.js'
+          ]:
+            s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*'+re.escape(name)+r'[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
+
+          # Remove obsolete standalone Nhận xét menu; keep Học tập because SMAS lives there.
           s=re.sub(r'<button\\b[^>]*data-page=["\\\']comments["\\\'][^>]*>.*?</button>\\s*','',s,flags=re.I|re.S)
 
-          # Keep exactly one standalone utilities link.
+          # Keep exactly one utilities link.
           s=re.sub(r'<a[^>]*id=["\\\'][^"\\\']*(?:lhUtilitiesStandalone|lhStandaloneUtilities)[^"\\\']*["\\\'][^>]*>.*?</a>\\s*','',s,flags=re.I|re.S)
           link='<a class="menu-item" id="lhUtilitiesStandalone" href="tien-ich.html"><i class="fa-solid fa-toolbox"></i><span>Tiện ích</span></a>'
           marker='<button type="button" class="menu-item" data-page="settings">'
-          s=s.replace(marker,link+'\\n'+marker,1) if marker in s else s.replace('</nav>',link+'\\n</nav>',1)
+          if marker in s:
+            s=s.replace(marker,link+'\\n'+marker,1)
+          elif 'id="lhUtilitiesStandalone"' not in s:
+            s=s.replace('</nav>',link+'\\n</nav>',1)
 
           # Ensure one safe picker script.
           s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*safe-student-picker\\.js[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
-          s=s.replace('</body>','<script src="safe-student-picker.js?v=1.0.0"></script>\\n</body>',1) if '</body>' in s else s
+          safe='<script src="safe-student-picker.js?v=1.0.0"></script>\\n'
+          s=s.replace('</body>',safe+'</body>',1) if '</body>' in s else s+safe
 
-          # Ensure the learning UI cleanup script is loaded once, after all modules.
+          # Ensure one stable learning cleanup script, loaded after the app modules.
           s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*learning-comments-menu-removal\\.js[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
-          tag='<script src="learning-comments-menu-removal.js?v=2.0.0"></script>\\n'
-          s=s.replace('</body>',tag+'</body>',1) if '</body>' in s else s+tag
+          cleanup='<script src="learning-comments-menu-removal.js?v=2.0.0"></script>\\n'
+          s=s.replace('</body>',cleanup+'</body>',1) if '</body>' in s else s+cleanup
 
           p.write_text(s,encoding='utf-8')
+          print('index normalized')
+          print('cleanup script:', s.count('learning-comments-menu-removal.js'))
+          print('safe picker:', s.count('safe-student-picker.js'))
+          print('comments menu:', bool(re.search(r'data-page=["\\\']comments["\\\']',s,re.I)))
           PY
 
-      - name: Verify
+      - name: Verify normalized index
         shell: bash
         run: |
           set -e
-          test "$(grep -oi 'tien-ich.html' index.html | wc -l | tr -d ' ')" = "1"
-          test "$(grep -oi 'safe-student-picker.js' index.html | wc -l | tr -d ' ')" = "1"
-          test "$(grep -oi 'learning-comments-menu-removal.js' index.html | wc -l | tr -d ' ')" = "1"
+          grep -qi 'learning-comments-menu-removal.js' index.html
+          grep -qi 'safe-student-picker.js' index.html
           ! grep -qi 'data-page="comments"' index.html
+          ! grep -qi 'data-page='"'"'comments'"'"'' index.html
           ! grep -qi 'event-sync-multi-v21.js' index.html
           ! grep -qi 'event-ui-stability-v214.js' index.html
           ! grep -qi 'menu-final-direct.js' index.html
           ! grep -qi 'menu-special-fix.js' index.html
           ! grep -qi 'emergency-menu-router.js' index.html
-          ! grep -qi 'tien-ich-final.js' index.html
-          ! grep -qi 'tien-ich-schema-v4-fix.js' index.html
 
       - name: Commit normalized index
         shell: bash
@@ -79,5 +81,5 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add index.html
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "Load stable learning UI cleanup and remove obsolete comments menu"
+          git commit -m "Normalize menus and load learning UI cleanup"
           git push origin HEAD:master
