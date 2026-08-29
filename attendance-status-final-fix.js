@@ -1,78 +1,77 @@
-/* ATTENDANCE STATUS CLEAN 8.1
+/* ATTENDANCE STATUS CLEAN 9.0
    One compact native status dropdown per student.
-   Student column is text only; status column contains only:
-   present / excused / absent.
-   The status options are revalidated immediately before opening so legacy
-   student-picker code can never replace them with student names.
-   No observers, no capture interception, no repeated timers.
+   Student column is text only.
+   Status column options are always exactly:
+   Có mặt / Có phép / Không phép.
+   This module owns only attendance status controls.
 */
 (function(){
   'use strict';
-  if(window.__LH_ATTENDANCE_CLEAN_81__) return;
-  window.__LH_ATTENDANCE_CLEAN_81__=true;
+  if(window.__LH_ATTENDANCE_CLEAN_90__) return;
+  window.__LH_ATTENDANCE_CLEAN_90__=true;
 
   const STATUS=[['present','Có mặt'],['excused','Có phép'],['absent','Không phép']];
-  const VALUES=new Set(STATUS.map(x=>x[0]));
-  const norm=v=>{v=String(v==null?'':v).trim();return VALUES.has(v)?v:'present'};
+  const VALID=new Set(STATUS.map(x=>x[0]));
   const txt=v=>String(v==null?'':v).trim();
+  const norm=v=>VALID.has(txt(v))?txt(v):'present';
   const isStatusSelect=el=>!!(el&&el.matches&&el.matches('#attendanceTableBody select.attendance-status'));
 
   function students(){
     try{
       if(typeof window.getStudentsSafe==='function'){
-        const a=window.getStudentsSafe(); if(Array.isArray(a)) return a;
+        const a=window.getStudentsSafe();
+        if(Array.isArray(a)) return a;
       }
-    }catch(e){}
+    }catch(_){ }
     return Array.isArray(window.students)?window.students:[];
   }
 
   function studentIdByName(name){
     const n=txt(name).replace(/^\d+\.\s*/,'');
-    const a=students();
-    const s=a.find(x=>txt(x.name||x.studentName)===n);
-    return txt(s&&(s.id||s.studentId||s.studentCode));
+    const s=students().find(x=>txt(x?.name||x?.studentName)===n);
+    return txt(s?.id||s?.studentId||s?.studentCode);
+  }
+
+  function getRecords(){
+    if(typeof window.getAttendanceRecords==='function'){
+      try{const a=window.getAttendanceRecords();if(Array.isArray(a))return a;}catch(_){ }
+    }
+    if(Array.isArray(window.attendanceRecords))return window.attendanceRecords;
+    if(Array.isArray(window.DIEM_DANH))return window.DIEM_DANH;
+    const a=window.GOOGLE_SHEET_DATA?.tabs?.DIEM_DANH;
+    return Array.isArray(a)?a:[];
   }
 
   function recordStatus(id,date){
-    const key=txt(id),d=txt(date||document.getElementById('attendanceDate')?.value);
-    const pools=[];
-    if(Array.isArray(window.attendanceRecords)) pools.push(window.attendanceRecords);
-    if(Array.isArray(window.DIEM_DANH)) pools.push(window.DIEM_DANH);
-    if(window.GOOGLE_SHEET_DATA?.tabs?.DIEM_DANH && Array.isArray(window.GOOGLE_SHEET_DATA.tabs.DIEM_DANH)) pools.push(window.GOOGLE_SHEET_DATA.tabs.DIEM_DANH);
-    for(const arr of pools){
-      for(let i=arr.length-1;i>=0;i--){
-        const r=arr[i]||{};
-        const rid=txt(r.studentId||r.id||r.studentCode);
-        const rd=txt(r.date||r.ngay);
-        const st=norm(r.status||r.trangThai);
-        if(rid===key && (!d || rd.slice(0,10)===d)) return st;
-      }
+    const key=txt(id), d=txt(date||document.getElementById('attendanceDate')?.value);
+    const a=getRecords();
+    for(let i=a.length-1;i>=0;i--){
+      const r=a[i]||{};
+      const rid=txt(r.studentId||r.id||r.studentCode);
+      const rd=txt(r.date||r.ngay).slice(0,10);
+      if(rid===key && (!d||rd===d)) return norm(r.status||r.trangThai);
     }
     return 'present';
   }
 
-  function fillStatusOptions(select,current){
-    if(!select) return;
+  function rebuildOptions(select,current){
     const keep=norm(current||select.value);
     select.replaceChildren();
-    STATUS.forEach(([value,label])=>{
+    for(const [value,label] of STATUS){
       const o=document.createElement('option');
       o.value=value;
       o.textContent=label;
-      o.selected=value===keep;
       select.appendChild(o);
-    });
+    }
     select.value=keep;
   }
 
-  function ensureStatusOptions(select){
-    if(!isStatusSelect(select)) return;
-    const id=txt(select.dataset.studentId);
-    const value=norm(select.value);
-    const options=[...select.options];
-    const valid=options.length===3 && options.every((o,i)=>o.value===STATUS[i][0] && o.textContent===STATUS[i][1]);
-    if(!valid) fillStatusOptions(select,value||recordStatus(id));
-    else select.value=value;
+  function repairSelect(select){
+    if(!isStatusSelect(select))return;
+    const valid=select.options.length===3 && STATUS.every((x,i)=>
+      select.options[i]?.value===x[0] && txt(select.options[i]?.textContent)===x[1]
+    );
+    if(!valid) rebuildOptions(select,select.value);
   }
 
   function makeStatusSelect(id,current){
@@ -80,33 +79,38 @@
     s.className='attendance-status';
     s.dataset.studentId=txt(id);
     s.setAttribute('aria-label','Trạng thái điểm danh');
-    fillStatusOptions(s,norm(current));
+    rebuildOptions(s,current);
     return s;
   }
 
   function normalizeRow(row,index,date){
-    const cells=row.cells; if(!cells||cells.length<3)return;
+    const cells=row?.cells;
+    if(!cells||cells.length<3)return;
     const studentCell=cells[1], statusCell=cells[2];
-    let studentName='';
-    const studentSelect=studentCell.querySelector('select');
-    if(studentSelect){
-      const selected=studentSelect.options[studentSelect.selectedIndex];
-      studentName=txt(selected?.textContent||selected?.value);
-      studentSelect.remove();
-    }else{
-      studentName=txt(studentCell.textContent).replace(/^\d+\.\s*/,'');
+
+    let name=txt(studentCell.textContent).replace(/^\d+\.\s*/,'');
+    const studentPicker=studentCell.querySelector('select:not(.attendance-status)');
+    if(studentPicker){
+      const option=studentPicker.options[studentPicker.selectedIndex];
+      name=txt(option?.textContent||option?.value)||name;
+      studentPicker.remove();
     }
-    if(!studentName) studentName=txt(studentCell.getAttribute('data-student-name'));
+    if(!name)name='Học sinh '+(index+1);
+
+    const old=statusCell.querySelector('select.attendance-status, select');
+    let id=txt(row.dataset.studentId||studentCell.dataset.studentId||old?.dataset.studentId);
+    let current=VALID.has(txt(old?.value))?txt(old.value):'';
+    if(!id)id=studentIdByName(name);
+    if(!current)current=recordStatus(id,date);
+
+    if(studentCell.querySelector('select')){
+      studentCell.querySelectorAll('select').forEach(x=>x.remove());
+    }
     studentCell.replaceChildren();
     const strong=document.createElement('strong');
-    strong.textContent=studentName||('Học sinh '+(index+1));
+    strong.textContent=name;
     studentCell.appendChild(strong);
 
-    const old=statusCell.querySelector('select');
-    let current=old&&VALUES.has(txt(old.value))?txt(old.value):'present';
-    let id=txt(row.dataset.studentId||studentCell.dataset.studentId||old?.dataset.studentId||'');
-    if(!id) id=studentIdByName(studentName);
-    if(!VALUES.has(current)) current=recordStatus(id,date);
     statusCell.replaceChildren(makeStatusSelect(id,current));
     row.dataset.studentId=id;
   }
@@ -122,51 +126,57 @@
   function summary(){
     let p=0,e=0,a=0;
     document.querySelectorAll('#attendanceTableBody select.attendance-status').forEach(s=>{
+      repairSelect(s);
       const v=norm(s.value);
-      if(v==='present')p++; else if(v==='excused')e++; else if(v==='absent')a++;
+      if(v==='present')p++;else if(v==='excused')e++;else a++;
     });
     [['attendancePresent',p],['attendancePresentCount',p],['attendanceExcused',e],['attendanceExcusedCount',e],['attendanceAbsent',a],['attendanceAbsentCount',a]].forEach(([id,v])=>{
-      const el=document.getElementById(id); if(el)el.textContent=String(v);
+      const el=document.getElementById(id);if(el)el.textContent=String(v);
     });
   }
 
   function bind(){
-    if(document.__lhAttendance81Bound)return;
-    document.__lhAttendance81Bound=true;
+    if(document.__lhAttendance90Bound)return;
+    document.__lhAttendance90Bound=true;
 
-    document.addEventListener('pointerdown',function(e){
-      const t=e.target;
-      if(isStatusSelect(t)) ensureStatusOptions(t);
+    document.addEventListener('pointerdown',e=>{
+      if(isStatusSelect(e.target))repairSelect(e.target);
     },true);
-    document.addEventListener('mousedown',function(e){
-      const t=e.target;
-      if(isStatusSelect(t)) ensureStatusOptions(t);
+    document.addEventListener('focusin',e=>{
+      if(isStatusSelect(e.target))repairSelect(e.target);
     },true);
-    document.addEventListener('focusin',function(e){
-      const t=e.target;
-      if(isStatusSelect(t)) ensureStatusOptions(t);
-    },true);
-    document.addEventListener('change',function(e){
-      const t=e.target;
-      if(isStatusSelect(t)){
-        ensureStatusOptions(t);
+    document.addEventListener('change',e=>{
+      if(isStatusSelect(e.target)){repairSelect(e.target);summary();return;}
+      if(e.target?.matches?.('#attendanceDate'))normalize();
+    });
+
+    const body=document.getElementById('attendanceTableBody');
+    if(body){
+      const observer=new MutationObserver(mutations=>{
+        let check=false;
+        for(const m of mutations){
+          if(m.type==='childList'){
+            if(m.target.closest?.('#attendanceTableBody')||m.target.id==='attendanceTableBody')check=true;
+          }
+        }
+        if(!check)return;
+        document.querySelectorAll('#attendanceTableBody select.attendance-status').forEach(repairSelect);
         summary();
-        return;
-      }
-      if(t?.matches?.('#attendanceDate')) setTimeout(normalize,0);
-    },false);
+      });
+      observer.observe(body,{childList:true,subtree:true});
+    }
 
-    const b=document.getElementById('saveAttendance');
-    if(b&&!b.dataset.lhAttendanceBound81){
-      b.dataset.lhAttendanceBound81='1';
-      b.addEventListener('click',()=>setTimeout(summary,0),false);
+    const save=document.getElementById('saveAttendance');
+    if(save&&!save.dataset.lhAttendanceBound90){
+      save.dataset.lhAttendanceBound90='1';
+      save.addEventListener('click',()=>setTimeout(summary,0),false);
     }
   }
 
   function css(){
-    if(document.getElementById('lhAttendanceClean81Css'))return;
+    if(document.getElementById('lhAttendanceClean90Css'))return;
     const s=document.createElement('style');
-    s.id='lhAttendanceClean81Css';
+    s.id='lhAttendanceClean90Css';
     s.textContent=`
       #page-attendance .attendance-table td:nth-child(2){min-width:280px!important;}
       #page-attendance .attendance-table td:nth-child(3){min-width:150px!important;overflow:visible!important;}
@@ -176,8 +186,8 @@
     document.head.appendChild(s);
   }
 
-  function boot(){css();bind();setTimeout(normalize,0);}
-  window.LHAttendanceFinal={normalize,summary,boot,ensureStatusOptions};
+  function boot(){css();bind();normalize();}
+  window.LHAttendanceFinal={normalize,summary,boot,repairSelect};
   window.renderAttendanceSummary=summary;
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
