@@ -1,0 +1,6 @@
+{
+  "redirects": [
+    {"source": "/student-profile.html", "destination": "/student-profile-v5.html", "permanent": false},
+    {"source": "/student-profile-v4.html", "destination": "/student-profile-v5.html", "permanent": false}
+  ]
+}
