@@ -29,7 +29,8 @@
     loadOnce('learning-smas-import.js?v=20260826.1','data-lh-learning-smas-import');
     loadOnce('learning-student-picker-fix.js?v=20260826.2','data-lh-learning-student-picker-fix');
     loadOnce('excellent-student-engine.js?v=20260826.1','data-lh-excellent-student-engine');
-    loadOnce('attendance-status-final-fix.js?v=8.0.0','data-lh-attendance-status-final-fix');
+    loadOnce('home-ai-live-sync.js?v=20260826.5','data-lh-home-ai-live-sync');
+    loadOnce('attendance-status-final-fix.js?v=8.1.0','data-lh-attendance-status-final-fix');
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){install();boot();},{once:true});else{install();boot()}
 })();
