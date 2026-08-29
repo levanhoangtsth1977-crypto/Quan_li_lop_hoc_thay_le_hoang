@@ -1,12 +1,12 @@
-/* MENU RUNTIME FIX 8.9 — lean runtime, single attendance owner
+/* MENU RUNTIME FIX 8.10 — lean runtime, single attendance owner + sticky state
    Navigation remains owned by script.js + UI ACTION PATCH 2.1.0.
    No extra menu router. No repeated timer loaders.
-   Attendance status is owned only by attendance-status-final-fix.js.
+   Attendance status is owned by attendance-status-final-fix.js + sticky state.
 */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_890__) return;
-  window.__MENU_RUNTIME_FIX_890__=true;
+  if(window.__MENU_RUNTIME_FIX_810__) return;
+  window.__MENU_RUNTIME_FIX_810__=true;
 
   const $=s=>document.querySelector(s), text=v=>String(v??'').trim();
   const tabKey={DIEM_DANH:'attendanceRecords',VI_PHAM:'violationRecords',KHEN_THUONG:'rewardRecords'};
@@ -32,6 +32,7 @@
     loadOnce('excellent-student-engine.js?v=20260826.1','data-lh-excellent-student-engine');
     loadOnce('home-ai-live-sync.js?v=20260826.5','data-lh-home-ai-live-sync');
     loadOnce('attendance-status-final-fix.js?v=9.0.0','data-lh-attendance-status-final-fix');
+    loadOnce('attendance-status-sticky-fix.js?v=1.0.0','data-lh-attendance-status-sticky-fix');
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){install();boot();},{once:true});else{install();boot()}
 })();
