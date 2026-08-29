@@ -1,11 +1,12 @@
-/* LEARNING UI CLEANUP 2.1
+/* LEARNING UI CLEANUP 2.2
  * KEEP: Học tập menu/page + SMAS import + excellent-student analysis.
  * REMOVE: standalone Nhận xét menu/page and obsolete manual learning entry.
+ * Also bootstraps the SMAS HTML builder so Học tập is never blank.
  */
 (function(){
   'use strict';
-  if(window.__LH_LEARNING_UI_CLEANUP_21__) return;
-  window.__LH_LEARNING_UI_CLEANUP_21__=true;
+  if(window.__LH_LEARNING_UI_CLEANUP_22__) return;
+  window.__LH_LEARNING_UI_CLEANUP_22__=true;
 
   const norm=v=>String(v??'').trim().replace(/\s+/g,' ').toLocaleLowerCase('vi');
   const remove=el=>{if(!el||el===document.body)return;el.hidden=true;el.setAttribute('aria-hidden','true');el.remove();};
@@ -13,7 +14,6 @@
   function ensureLearningMenu(){
     const menu=document.querySelector('.main-menu');
     if(!menu)return;
-    // Never delete Học tập. Restore it when an older cleanup/cache removed it.
     if(!menu.querySelector('[data-page="learning"]')){
       const ref=menu.querySelector('[data-page="statistics"],[data-page="student-links"]');
       const b=document.createElement('button');
@@ -29,7 +29,6 @@
     document.querySelectorAll('.main-menu .menu-item,[data-page],[data-page-link]').forEach(el=>{
       const page=norm(el.getAttribute?.('data-page')||el.getAttribute?.('data-page-link')||'');
       const text=norm(el.textContent);
-      // Only comments is obsolete here. learning is explicitly protected.
       if(page==='comments'||text==='nhận xét')remove(el);
     });
     remove(document.getElementById('page-comments'));
@@ -57,18 +56,40 @@
     document.querySelectorAll('[data-action="add-comment"],[data-action="add-comment-record"],[data-page-link="comments"]').forEach(remove);
   }
 
+  function ensureSmasModule(){
+    if(window.__LEARNING_SMAS_IMPORT_10__)return;
+    if(document.querySelector('script[data-lh-smas-module="1"]'))return;
+    const learning=document.querySelector('[data-page-section="learning"],#page-learning');
+    if(!learning)return;
+    const script=document.createElement('script');
+    script.dataset.lhSmasModule='1';
+    script.src='learning-smas-import.js?v=1.1.0';
+    script.async=false;
+    script.onload=()=>{
+      try{
+        // learning-smas-import.js initializes automatically; this hook is optional.
+        if(typeof window.ensureLearningSMAS==='function')window.ensureLearningSMAS();
+      }catch(e){console.warn('[SMAS] bootstrap',e);}
+    };
+    script.onerror=()=>console.error('[SMAS] Không tải được learning-smas-import.js');
+    document.body.appendChild(script);
+  }
+
   function clean(){
     ensureLearningMenu();
     removeCommentsMenu();
     removeManualLearningEntry();
     removeCommentsBlock();
+    ensureSmasModule();
   }
 
   function boot(){
     clean();
     window.addEventListener('load',clean,{once:true});
     window.addEventListener('pageshow',clean);
-    // Recheck only a few times during app hydration; do not observe the whole DOM forever.
+    document.addEventListener('click',e=>{
+      if(e.target?.closest?.('[data-page="learning"]'))setTimeout(clean,0);
+    },true);
     setTimeout(clean,300);
     setTimeout(clean,1000);
     setTimeout(clean,2500);
