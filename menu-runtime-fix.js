@@ -1,12 +1,13 @@
-/* MENU RUNTIME FIX 8.13 — lean runtime
+/* MENU RUNTIME FIX 8.14 — lean runtime
    Navigation remains owned by script.js + UI ACTION PATCH.
    Attendance table is owned only by script.js.
-   Learning uses SMAS data as the periodic source.
+   Learning data remains available from SMAS import for statistics/AI.
+   Obsolete top-level Learning and Comments pages are removed.
 */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_813__) return;
-  window.__MENU_RUNTIME_FIX_813__=true;
+  if(window.__MENU_RUNTIME_FIX_814__) return;
+  window.__MENU_RUNTIME_FIX_814__=true;
 
   const $=s=>document.querySelector(s), text=v=>String(v??'').trim();
   const tabKey={DIEM_DANH:'attendanceRecords',VI_PHAM:'violationRecords',KHEN_THUONG:'rewardRecords'};
@@ -21,8 +22,20 @@
   function esc(v){return text(v).replace(/[&<>\\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
   function render(tab){const p=ensure();if(!p)return;const a=grouped('DIEM_DANH'),v=grouped('VI_PHAM'),r=grouped('KHEN_THUONG'),data=tab==='DIEM_DANH'?a:tab==='VI_PHAM'?v:r,title=tab==='DIEM_DANH'?'HS vắng':tab==='VI_PHAM'?'HS vi phạm':'HS khen thưởng';p.innerHTML='<div><h2 style="margin:0">📊 Theo dõi toàn bộ quá trình</h2></div><div style="display:flex;gap:10px;flex-wrap:wrap;margin:15px 0">'+[['DIEM_DANH',a,'👤 HS vắng'],['VI_PHAM',v,'⚠️ HS vi phạm'],['KHEN_THUONG',r,'🏆 HS khen thưởng']].map(x=>'<button type="button" class="button '+(x[0]===tab?'primary':'secondary')+'" data-lh-stat-tab="'+x[0]+'">'+x[2]+' ('+x[1].length+' HS / '+x[1].reduce((n,z)=>n+z.count,0)+' lượt)</button>').join('')+'</div><div id="lhLifetimeDetail"></div>';const d=$('#lhLifetimeDetail');if(!data.length){d.innerHTML='<div class="empty-state"><strong>Chưa có dữ liệu</strong><p>Chưa có '+title.toLowerCase()+' trong dữ liệu hiện tại.</p></div>';return}d.innerHTML='<div class="table-container" style="overflow:auto"><table class="data-table"><thead><tr><th>STT</th><th>Học sinh</th><th>Số lượt</th><th>Lần gần nhất</th></tr></thead><tbody>'+data.map((x,i)=>{const dates=x.records.map(z=>text(z.date||z.createdAt||z.updatedAt)).filter(Boolean).sort();return'<tr><td>'+(i+1)+'</td><td><strong>'+esc(x.name)+'</strong></td><td><strong>'+x.count+'</strong></td><td>'+esc(dates.at(-1)||'—')+'</td></tr>'}).join('')+'</tbody></table></div>'}
   function install(){document.addEventListener('click',function(e){const tab=e.target&&e.target.closest?e.target.closest('[data-lh-stat-tab]'):null;if(tab){e.preventDefault();e.stopPropagation();render(tab.dataset.lhStatTab);}},false)}
-  function loadOnce(src,attr){if(document.querySelector('script['+attr+']'))return;const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(attr,'1');document.head.appendChild(s)}
+  function removeObsoleteUI(){
+    document.querySelectorAll('.main-menu .menu-item,[data-page]').forEach(el=>{
+      const page=String(el.getAttribute?.('data-page')||'').trim().toLowerCase();
+      const label=text(el.textContent).toLocaleLowerCase('vi');
+      if(page==='learning'||page==='comments'||label==='học tập'||label==='nhận xét'){
+        if(el.closest('.main-menu')) el.remove();
+      }
+    });
+    ['page-learning','page-comments'].forEach(id=>{const el=document.getElementById(id);if(el)el.remove();});
+    document.querySelectorAll('[data-page-link="learning"],[data-page-link="comments"],[data-action="add-learning"],[data-action="add-comment"],[data-action="add-comment-record"]').forEach(el=>el.remove());
+  }
   function boot(){
+    install();
+    removeObsoleteUI();
     loadOnce('student-profile-repair.js?v=20260826.2','data-lh-profile-repair');
     loadOnce('reward-delete-fix.js?v=20260826.1','data-lh-reward-delete-fix');
     loadOnce('menu-badge-sync-fix.js?v=20260826.1','data-lh-menu-badge-sync');
@@ -30,8 +43,8 @@
     loadOnce('learning-smas-import.js?v=20260826.1','data-lh-learning-smas-import');
     loadOnce('excellent-student-engine.js?v=20260826.1','data-lh-excellent-student-engine');
     loadOnce('home-ai-live-sync.js?v=20260826.5','data-lh-home-ai-live-sync');
-    loadOnce('learning-manual-entry-disabled.js?v=20260829.1','data-lh-learning-manual-entry-disabled');
     loadOnce('class-name-final-fix.js?v=20260829.2','data-lh-class-name-final-fix');
   }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){install();boot();},{once:true});else{install();boot()}
+  function loadOnce(src,attr){if(document.querySelector('script['+attr+']'))return;const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(attr,'1');document.head.appendChild(s)}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
