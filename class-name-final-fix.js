@@ -1,8 +1,8 @@
-/* CLASS NAME FINAL FIX 2.1 — canonical display label is Lớp 5A3. */
+/* CLASS NAME FINAL FIX 3.0 — canonical display label: Lớp 5A3. */
 (function(){
   'use strict';
-  if(window.__LH_CLASS_NAME_FINAL_21__)return;
-  window.__LH_CLASS_NAME_FINAL_21__=true;
+  if(window.__LH_CLASS_NAME_FINAL_30__)return;
+  window.__LH_CLASS_NAME_FINAL_30__=true;
   var NAME='Lớp 5A3';
   window.LH_CLASS_NAME='5A3';
   document.documentElement.dataset.lhClass='5A3';
@@ -23,16 +23,9 @@
     }catch(e){console.warn('[CLASS NAME FINAL]',e)}
   }
   function boot(){
-    [0,100,300,800,1500,3000].forEach(function(ms){setTimeout(fix,ms)});
+    [0,100,300,800,1500,3000,6000].forEach(function(ms){setTimeout(fix,ms)});
     if(window.MutationObserver){
-      new MutationObserver(function(mutations){
-        var changed=false;
-        mutations.forEach(function(m){
-          if(m.type==='characterData'){normalizeNode(m.target);changed=true;}
-          else if(m.type==='childList'&&m.addedNodes&&m.addedNodes.length)changed=true;
-        });
-        if(changed)requestAnimationFrame(fix);
-      }).observe(document.body,{childList:true,subtree:true,characterData:true});
+      new MutationObserver(function(){requestAnimationFrame(fix)}).observe(document.body,{childList:true,subtree:true,characterData:true});
     }
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
