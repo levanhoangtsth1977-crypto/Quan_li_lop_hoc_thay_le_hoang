@@ -1,9 +1,9 @@
-/* GOOGLE API BRIDGE 9.4 — AUTHORITATIVE DATA + LEARNING/COMMENTS + DELETE-ALL UI + STUDENT PROFILE + PRIVATE LINKS */
+/* GOOGLE API BRIDGE 9.4 — ACTIVE APPS SCRIPT DEPLOYMENT */
 'use strict';
 (function(){
 if(window.__LH_GOOGLE_BRIDGE_940__)return;
 window.__LH_GOOGLE_BRIDGE_940__=true;
-const CFG=Object.freeze({url:'https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrNWY5DCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec',key:'QL_LOP_HOC_LE_HOANG_2026_2027',sheetId:'1v9H6dReZiC_fCg6T9ISdfWOy1FN1HJQXXrKsABiCLI4',version:'MASTER-9.4'});
+const CFG=Object.freeze({url:'https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec',key:'QL_LOP_HOC_LE_HOANG_2026_2027',sheetId:'1v9H6dReZiC_fCg6T9ISdfWOy1FN1HJQXXrKsABiCLI4',version:'MASTER-9.4-ACTIVE-APP-URL'});
 let loading=null,loadedOnce=false;
 function jsonp(action,params){return new Promise((resolve,reject)=>{const cb='__LH940_'+Date.now()+'_'+Math.random().toString(36).slice(2),s=document.createElement('script');let done=false;const finish=(e,d)=>{if(done)return;done=true;clearTimeout(t);try{delete window[cb]}catch(_){}s.remove();e?reject(e):resolve(d)};const t=setTimeout(()=>finish(Error('Google Apps Script không phản hồi sau 20 giây')),20000);window[cb]=d=>finish(null,d);s.onerror=()=>finish(Error('Không truy cập được Google Apps Script'));const q=Object.assign({action,callback:cb,_:Date.now()},params||{});s.src=CFG.url+'?'+Object.keys(q).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(typeof q[k]==='string'?q[k]:JSON.stringify(q[k]))).join('&');document.head.appendChild(s)})}
 const clean=v=>String(v??'').trim().replace(/\s+/g,' ');
