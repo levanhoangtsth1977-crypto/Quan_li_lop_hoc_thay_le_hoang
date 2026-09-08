@@ -33,6 +33,7 @@
     ['page-learning','page-comments'].forEach(id=>{const el=document.getElementById(id);if(el)el.remove();});
     document.querySelectorAll('[data-page-link="learning"],[data-page-link="comments"],[data-action="add-learning"],[data-action="add-comment"],[data-action="add-comment-record"]').forEach(el=>el.remove());
   }
+  function loadOnce(src,attr){if(document.querySelector('script['+attr+']'))return;const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(attr,'1');document.head.appendChild(s)}
   function boot(){
     install();
     removeObsoleteUI();
@@ -44,7 +45,7 @@
     loadOnce('excellent-student-engine.js?v=20260826.1','data-lh-excellent-student-engine');
     loadOnce('home-ai-live-sync.js?v=20260826.5','data-lh-home-ai-live-sync');
     loadOnce('class-name-final-fix.js?v=20260829.2','data-lh-class-name-final-fix');
+    loadOnce('events-student-roster-sync.js?v=1.0.0','data-lh-events-student-roster-sync');
   }
-  function loadOnce(src,attr){if(document.querySelector('script['+attr+']'))return;const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(attr,'1');document.head.appendChild(s)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
