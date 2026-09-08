@@ -46,6 +46,7 @@
     loadOnce('home-ai-live-sync.js?v=20260826.5','data-lh-home-ai-live-sync');
     loadOnce('class-name-final-fix.js?v=20260829.2','data-lh-class-name-final-fix');
     loadOnce('events-student-roster-sync.js?v=1.0.0','data-lh-events-student-roster-sync');
+    loadOnce('behavior-records-ai-summary.js?v=1.0.0','data-lh-behavior-records-ai-summary');
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
