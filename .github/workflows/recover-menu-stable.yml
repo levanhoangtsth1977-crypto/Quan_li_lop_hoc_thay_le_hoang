@@ -1,4 +1,4 @@
-name: One-time HTML normalization and integrity lock
+name: One-time HTML normalization and integrity lock v2
 
 on:
   push:
@@ -22,111 +22,32 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import re
-
           index = Path('index.html')
           s = index.read_text(encoding='utf-8')
-
-          # Remove the literal corruption introduced before the utilities link.
           s = s.replace('            n\\n<a class="menu-item"', '            <a class="menu-item"')
-          s = s.replace('            n\\n<a class="menu-item"', '            <a class="menu-item"')
-
-          # Keep exactly one google-api-bridge.js reference. Prefer the versioned one.
           refs = re.findall(r'<script\\b[^>]*src=["\\\']([^"\\\']*google-api-bridge\\.js[^"\\\']*)["\\\'][^>]*></script>', s, flags=re.I)
           if len(refs) > 1:
-              first = next((x for x in refs if 'version' in x.lower() or '?v=' in x.lower()), refs[0])
+              first = next((x for x in refs if '?v=' in x), refs[0])
               pattern = r'\\s*<script\\b[^>]*src=["\\\'][^"\\\']*google-api-bridge\\.js[^"\\\']*["\\\'][^>]*></script>'
-              matches = list(re.finditer(pattern, s, flags=re.I))
               keep = False
-              pieces = []
-              pos = 0
-              for m in matches:
-                  pieces.append(s[pos:m.start()])
-                  tag = m.group(0)
-                  if (not keep) and (first in tag):
-                      pieces.append(tag)
-                      keep = True
-                  pos = m.end()
-              pieces.append(s[pos:])
-              s = ''.join(pieces)
-
-          # Collapse exact duplicate deterministic loaders, preserving their first occurrence.
+              def one(m):
+                  nonlocal keep
+                  if keep: return ''
+                  if first in m.group(0): keep = True; return m.group(0)
+                  return ''
+              s = re.sub(pattern, one, s, flags=re.I)
           for filename in ['student-links-fix.js', 'learning-smas-import.js', 'behavior-records-ai-summary.js']:
               pattern = r'\\s*<script\\b[^>]*src=["\\\'][^"\\\']*' + re.escape(filename) + r'[^"\\\']*["\\\'][^>]*></script>'
               seen = False
               def keep_first(m):
                   nonlocal seen
-                  if seen:
-                      return ''
+                  if seen: return ''
                   seen = True
                   return m.group(0)
               s = re.sub(pattern, keep_first, s, flags=re.I)
-
           index.write_text(s, encoding='utf-8')
-
-          # Convert this workflow into a read-only integrity gate after this one normalization pass.
           workflow = Path('.github/workflows/recover-menu-stable.yml')
-          workflow_text = '''name: Verify core menu integrity
-
-on:
-  push:
-    branches: [master]
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-jobs:
-  verify:
-    if: github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Validate core menu wiring
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f index.html
-          for route in dashboard students attendance violations rewards learning statistics student-links ai lucky-wheel settings; do
-            grep -q "data-page=\\"$route\\"" index.html || { echo "Missing menu route: $route"; exit 1; }
-          done
-          for page in dashboard students attendance violations rewards learning statistics student-links ai; do
-            grep -q "id=\\"page-$page\\"" index.html || { echo "Missing page section: page-$page"; exit 1; }
-            grep -q "data-page-section=\\"$page\\"" index.html || { echo "Missing section marker: $page"; exit 1; }
-          done
-          for hook in studentTableBody attendanceTableBody violationTableBody rewardTableBody; do
-            grep -q "id=\\"$hook\\"" index.html || { echo "Missing table hook: $hook"; exit 1; }
-          done
-          if grep -q 'data-page="comments"' index.html; then echo 'Obsolete comments menu remains'; exit 1; fi
-          if grep -qF 'n\\\\n<a class="menu-item"' index.html; then echo 'Corrupt literal newline marker remains'; exit 1; fi
-          test "$(grep -o 'data-page=\\"learning\\"' index.html | wc -l | tr -d ' ')" -eq 1
-          test "$(grep -o 'id=\\"page-learning\\"' index.html | wc -l | tr -d ' ')" -eq 1
-          for file in google-api-bridge.js student-links-fix.js learning-smas-import.js behavior-records-ai-summary.js; do
-            count=$(grep -o "$file" index.html | wc -l | tr -d ' ')
-            test "$count" -eq 1 || { echo "Expected exactly one reference for $file; found $count"; exit 1; }
-          done
-
-      - name: Validate HTML nesting
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          from html.parser import HTMLParser
-          class Parser(HTMLParser):
-              def __init__(self): super().__init__(); self.stack=[]
-              def handle_starttag(self, tag, attrs):
-                  if tag not in {'meta','link','input','img','br','hr','source','area','base','embed','param','track','wbr'}: self.stack.append(tag)
-              def handle_endtag(self, tag):
-                  if tag in {'meta','link','input','img','br','hr','source','area','base','embed','param','track','wbr'}: return
-                  if not self.stack or self.stack[-1] != tag: raise SystemExit(f'HTML nesting mismatch at </{tag}>')
-                  self.stack.pop()
-          p=Parser(); p.feed(Path('index.html').read_text(encoding='utf-8')); p.close()
-          if p.stack: raise SystemExit(f'Unclosed HTML tags: {p.stack[-10:]}')
-          print('HTML integrity OK')
-          PY
-'''
-          workflow.write_text(workflow_text, encoding='utf-8')
+          workflow.write_text('''name: Verify core menu integrity\n\non:\n  push:\n    branches: [master]\n  workflow_dispatch:\n\npermissions:\n  contents: read\n\njobs:\n  verify:\n    if: github.actor != 'github-actions[bot]'\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - name: Validate core menu wiring\n        shell: bash\n        run: |\n          set -euo pipefail\n          test -f index.html\n          for route in dashboard students attendance violations rewards learning statistics student-links ai lucky-wheel settings; do\n            grep -q "data-page=\\\"$route\\\"" index.html\n          done\n          for page in dashboard students attendance violations rewards learning statistics student-links ai; do\n            grep -q "id=\\\"page-$page\\\"" index.html\n            grep -q "data-page-section=\\\"$page\\\"" index.html\n          done\n          for hook in studentTableBody attendanceTableBody violationTableBody rewardTableBody; do\n            grep -q "id=\\\"$hook\\\"" index.html\n          done\n          ! grep -q 'data-page=\"comments\"' index.html\n          ! grep -qF 'n\\\\n<a class=\"menu-item\"' index.html\n          test "$(grep -o 'data-page=\\\"learning\\\"' index.html | wc -l | tr -d ' ')" -eq 1\n          test "$(grep -o 'id=\\\"page-learning\\\"' index.html | wc -l | tr -d ' ')" -eq 1\n          for file in google-api-bridge.js student-links-fix.js learning-smas-import.js behavior-records-ai-summary.js; do\n            test "$(grep -o \"$file\" index.html | wc -l | tr -d ' ')" -eq 1\n          done\n          echo 'Core menu integrity OK'\n      - name: Validate HTML nesting\n        shell: bash\n        run: |\n          set -euo pipefail\n          python - <<'PY'\n          from pathlib import Path\n          from html.parser import HTMLParser\n          class P(HTMLParser):\n              def __init__(self): super().__init__(); self.stack=[]\n              def handle_starttag(self, tag, attrs):\n                  if tag not in {'meta','link','input','img','br','hr','source','area','base','embed','param','track','wbr'}: self.stack.append(tag)\n              def handle_endtag(self, tag):\n                  if tag in {'meta','link','input','img','br','hr','source','area','base','embed','param','track','wbr'}: return\n                  if not self.stack or self.stack[-1] != tag: raise SystemExit(f'HTML nesting mismatch at </{tag}>')\n                  self.stack.pop()\n          p=P(); p.feed(Path('index.html').read_text(encoding='utf-8')); p.close()\n          if p.stack: raise SystemExit(f'Unclosed HTML tags: {p.stack[-10:]}')\n          print('HTML integrity OK')\n          PY\n''', encoding='utf-8')
           PY
 
       - name: Commit normalized HTML and lock the workflow
@@ -137,5 +58,5 @@ jobs:
           git config user.email 41898282+users.noreply.github.com
           git add index.html .github/workflows/recover-menu-stable.yml
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "Deduplicate core loaders and lock integrity workflow"
+          git commit -m "Finalize core loader cleanup and lock integrity checks"
           git push origin HEAD:master
