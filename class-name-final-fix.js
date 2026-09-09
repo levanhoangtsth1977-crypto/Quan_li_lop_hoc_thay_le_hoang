@@ -1,43 +1,77 @@
-/* CLASS NAME FINAL FIX 5.0 — canonical display label: Lớp 5A3. */
+/* CLASS NAME FINAL FIX 6.0 — canonical display label: Lớp 5A3. */
 (function(){
   'use strict';
-  if(window.__LH_CLASS_NAME_FINAL_50__)return;
-  window.__LH_CLASS_NAME_FINAL_50__=true;
+  if(window.__LH_CLASS_NAME_FINAL_60__)return;
+  window.__LH_CLASS_NAME_FINAL_60__=true;
   var NAME='Lớp 5A3';
-  window.LH_CLASS_NAME='5A3';
-  document.documentElement.dataset.lhClass='5A3';
+  var CODE='5A3';
+  window.LH_CLASS_NAME=CODE;
+  document.documentElement.dataset.lhClass=CODE;
 
-  function normalizeNode(n){
-    if(!n||n.nodeType!==Node.TEXT_NODE||!n.nodeValue)return;
-    n.nodeValue=n.nodeValue
-      .replace(/Lớp\s*5(?:A|C)3\b/gi,NAME)
-      .replace(/Lớp\s*5C\b/gi,NAME)
-      .replace(/\b5C3\b/gi,'5A3')
-      .replace(/\b5C\b/gi,'5A3');
+  function fixElement(el){
+    if(!el)return;
+    var attrNames=['data-class','data-class-name','data-lop'];
+    attrNames.forEach(function(a){
+      if(el.hasAttribute&&el.hasAttribute(a)){
+        var v=String(el.getAttribute(a)||'').trim();
+        if(/^5C3?$/i.test(v)||/^Lớp\s*5C3?$/i.test(v))el.setAttribute(a,CODE);
+      }
+    });
+    var t=String(el.textContent||'').trim();
+    if(/^(?:Lớp\s*)?5C3?$/i.test(t))el.textContent=NAME;
+  }
+
+  function fixHero(){
+    var hc=document.getElementById('heroClass');
+    if(hc && hc.textContent.trim()!==NAME) hc.textContent=NAME;
+  }
+
+  function fixSelectors(){
+    document.querySelectorAll('#classSelect option').forEach(function(o){
+      var t=String(o.textContent||'').trim();
+      if(/^Lớp\s*5C3?$/i.test(t)||/^5C3?$/i.test(t)){o.textContent=NAME;o.value=CODE;}
+    });
   }
 
   function fix(){
     try{
-      document.querySelectorAll('#classSelect option').forEach(function(o){
-        var t=String(o.textContent||'').trim();
-        if(/^Lớp\s*5(?:A|C)3?$/i.test(t)||/^5C3?$/i.test(t))o.textContent=NAME;
-      });
-      var hc=document.getElementById('heroClass');
-      if(hc)hc.textContent=NAME;
-      var nodes=document.querySelectorAll('[data-class],[data-class-name],[data-lop]');
-      nodes.forEach(function(el){
-        var t=String(el.textContent||'').trim();
-        if(/^(?:Lớp\s*)?5C3?$/i.test(t))el.textContent=NAME;
-      });
-      var walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
-      var n;while((n=walker.nextNode()))normalizeNode(n);
-    }catch(e){console.warn('[CLASS NAME FINAL 5.0]',e)}
+      fixHero();
+      fixSelectors();
+      document.querySelectorAll('[data-class],[data-class-name],[data-lop]').forEach(fixElement);
+    }catch(e){console.warn('[CLASS NAME FINAL 6.0]',e)}
   }
 
-  function schedule(){requestAnimationFrame(fix)}
-  ['google-sheets-data-ready','data-changed','students-updated','records-updated','class-data-updated'].forEach(function(ev){
+  function schedule(){
+    if(window.__LH_CLASS_FIX_PENDING__)return;
+    window.__LH_CLASS_FIX_PENDING__=true;
+    requestAnimationFrame(function(){
+      window.__LH_CLASS_FIX_PENDING__=false;
+      fix();
+    });
+  }
+
+  ['google-sheets-data-ready','data-changed','students-updated','records-updated','class-data-updated','navigation-changed','page-changed'].forEach(function(ev){
     window.addEventListener(ev,schedule,false);
   });
 
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',fix,{once:true});else fix();
+  function observe(){
+    try{
+      var hc=document.getElementById('heroClass');
+      if(hc){
+        new MutationObserver(function(){
+          if(hc.textContent.trim()!==NAME)hc.textContent=NAME;
+        }).observe(hc,{childList:true,characterData:true,subtree:true});
+      }
+      var cs=document.getElementById('classSelect');
+      if(cs){
+        new MutationObserver(function(){fixSelectors();}).observe(cs,{childList:true,subtree:true});
+      }
+    }catch(e){console.warn('[CLASS NAME OBSERVER]',e)}
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',function(){fix();observe();},{once:true});
+  }else{fix();observe();}
+  setTimeout(fix,250);
+  setTimeout(fix,1000);
 })();
