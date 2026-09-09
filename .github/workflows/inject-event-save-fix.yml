@@ -1,4 +1,4 @@
-name: Inject event save JSONP fix
+name: Normalize core HTML loaders and event save fallback
 
 on:
   push:
@@ -14,36 +14,66 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Ensure event save fix is loaded exactly once
+      - name: Normalize core loaders and navigation
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
           python - <<'PY'
           from pathlib import Path
           import re
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
-          s=re.sub(r'<script\b[^>]*src=["\'][^"\']*event-save-jsonp-fix\.js[^"\']*["\'][^>]*></script>\s*','',s,flags=re.I)
-          tag='<script src="event-save-jsonp-fix.js?v=20260908.1"></script>\n'
+
+          # Repair the known literal navigation corruption.
+          s=s.replace('            n\\n<a class="menu-item"', '            <a class="menu-item"')
+
+          # Deduplicate the deterministic core loaders, retaining their first script tag.
+          for filename in [
+              'google-api-bridge.js',
+              'student-links-fix.js',
+              'learning-smas-import.js',
+              'behavior-records-ai-summary.js'
+          ]:
+              pattern=r'\\s*<script\\b[^>]*src=["\\\'][^"\\\']*'+re.escape(filename)+r'[^"\\\']*["\\\'][^>]*></script>'
+              matches=list(re.finditer(pattern,s,flags=re.I))
+              if len(matches)>1:
+                  parts=[]; pos=0
+                  for i,m in enumerate(matches):
+                      parts.append(s[pos:m.start()])
+                      if i==0: parts.append(m.group(0))
+                      pos=m.end()
+                  parts.append(s[pos:])
+                  s=''.join(parts)
+
+          # Ensure the event-save JSONP fallback exists exactly once.
+          s=re.sub(r'\\s*<script\\b[^>]*src=["\\\'][^"\\\']*event-save-jsonp-fix\\.js[^"\\\']*["\\\'][^>]*></script>', '', s, flags=re.I)
+          tag='<script src="event-save-jsonp-fix.js?v=20260908.1"></script>\\n'
           if '</body>' in s:
               s=s.replace('</body>',tag+'</body>',1)
           else:
-              s += '\n' + tag
+              s += '\\n'+tag
+
           p.write_text(s,encoding='utf-8')
           PY
 
-      - name: Verify
+      - name: Verify deterministic wiring
         shell: bash
         run: |
-          set -e
-          test "$(grep -oi 'event-save-jsonp-fix.js' index.html | wc -l | tr -d ' ')" = "1"
+          set -euo pipefail
+          ! grep -qF 'n\\\\n<a class="menu-item"' index.html
+          for file in google-api-bridge.js student-links-fix.js learning-smas-import.js behavior-records-ai-summary.js event-save-jsonp-fix.js; do
+            test "$(grep -o "$file" index.html | wc -l | tr -d ' ')" -eq 1
+          done
+          test "$(grep -o 'data-page=\"learning\"' index.html | wc -l | tr -d ' ')" -eq 1
+          test "$(grep -o 'id=\"page-learning\"' index.html | wc -l | tr -d ' ')" -eq 1
 
-      - name: Commit
+      - name: Commit normalized index only
         shell: bash
         run: |
+          set -euo pipefail
           git config user.name github-actions[bot]
           git config user.email 41898282+users.noreply.github.com
           git add index.html
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "fix: load JSONP event save fallback"
+          git commit -m "Normalize core HTML loaders and event save fallback"
           git push origin HEAD:master
