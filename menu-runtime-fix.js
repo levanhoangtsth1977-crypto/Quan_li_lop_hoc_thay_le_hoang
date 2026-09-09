@@ -1,4 +1,4 @@
-/* MENU RUNTIME FIX 8.18 — lean runtime
+/* MENU RUNTIME FIX 8.19 — lean runtime
    Navigation remains owned by script.js.
    Attendance table remains owned only by script.js.
    Learning/SMAS and behavior summaries are loaded as isolated modules.
@@ -6,8 +6,8 @@
 */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_818__) return;
-  window.__MENU_RUNTIME_FIX_818__=true;
+  if(window.__MENU_RUNTIME_FIX_819__) return;
+  window.__MENU_RUNTIME_FIX_819__=true;
   const loadOnce=(src,attr)=>{
     if(document.querySelector('script['+attr+']')) return;
     const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(attr,'1');document.head.appendChild(s);
@@ -24,8 +24,8 @@
     loadOnce('class-name-final-fix.js?v=6.0.0','data-lh-class-name-final-v60');
     loadOnce('events-student-roster-sync.js?v=1.0.0','data-lh-events-student-roster-sync');
     loadOnce('behavior-records-ai-summary.js?v=1.2.0','data-lh-behavior-ai-summary-v12');
-    /* Quick-pick catalogs for violation/reward forms. */
-    loadOnce('behavior-quick-options.js?v=1.0.0','data-lh-behavior-quick-options-v10');
+    /* Canonical quick-pick catalogs: v2 only. */
+    loadOnce('behavior-quick-options.js?v=2.0.0','data-lh-behavior-quick-options-v20');
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true});
   else boot();
