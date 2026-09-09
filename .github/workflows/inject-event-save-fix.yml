@@ -1,4 +1,4 @@
-name: Normalize core HTML loaders and event save fallback
+name: Normalize core HTML loaders and event save fallback v4
 
 on:
   push:
@@ -29,12 +29,7 @@ jobs:
           s=s.replace('n\\\\n<a class="menu-item"', '<a class="menu-item"')
 
           # Deduplicate deterministic core loaders, retaining the first script tag.
-          for filename in [
-              'google-api-bridge.js',
-              'student-links-fix.js',
-              'learning-smas-import.js',
-              'behavior-records-ai-summary.js'
-          ]:
+          for filename in ['google-api-bridge.js','student-links-fix.js','learning-smas-import.js','behavior-records-ai-summary.js']:
               pattern=r'\\s*<script\\b[^>]*src=["\\\'][^"\\\']*'+re.escape(filename)+r'[^"\\\']*["\\\'][^>]*></script>'
               matches=list(re.finditer(pattern,s,flags=re.I))
               if len(matches)>1:
@@ -43,19 +38,15 @@ jobs:
                       parts.append(s[pos:m.start()])
                       if i==0: parts.append(m.group(0))
                       pos=m.end()
-                  parts.append(s[pos:])
-                  s=''.join(parts)
+                  parts.append(s[pos:]); s=''.join(parts)
 
-          # Canonicalize current AI-summary cache version.
+          # Keep the current behavior summary module version.
           s=re.sub(r'(<script\\b[^>]*src=["\\\'][^"\\\']*behavior-records-ai-summary\\.js)(?:\\?[^"\\\']*)?(["\\\'][^>]*></script>)', r'\\1?v=1.2.0\\2', s, count=1, flags=re.I)
 
-          # Ensure the event-save JSONP fallback exists exactly once.
+          # Ensure event-save fallback exists exactly once.
           s=re.sub(r'\\s*<script\\b[^>]*src=["\\\'][^"\\\']*event-save-jsonp-fix\\.js[^"\\\']*["\\\'][^>]*></script>', '', s, flags=re.I)
           tag='<script src="event-save-jsonp-fix.js?v=20260908.1"></script>\\n'
-          if '</body>' in s:
-              s=s.replace('</body>',tag+'</body>',1)
-          else:
-              s += '\\n'+tag
+          s=s.replace('</body>',tag+'</body>',1) if '</body>' in s else s+'\\n'+tag
 
           p.write_text(s,encoding='utf-8')
           PY
