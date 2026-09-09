@@ -24,10 +24,11 @@ jobs:
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
 
-          # Repair the known literal navigation corruption.
-          s=s.replace('            n\\n<a class="menu-item"', '            <a class="menu-item"')
+          # Repair the known literal navigation corruption: the two characters "\\n".
+          s=s.replace('            n\\\\n<a class="menu-item"', '            <a class="menu-item"')
+          s=s.replace('n\\\\n<a class="menu-item"', '<a class="menu-item"')
 
-          # Deduplicate the deterministic core loaders, retaining their first script tag.
+          # Deduplicate deterministic core loaders, retaining the first script tag.
           for filename in [
               'google-api-bridge.js',
               'student-links-fix.js',
@@ -44,6 +45,9 @@ jobs:
                       pos=m.end()
                   parts.append(s[pos:])
                   s=''.join(parts)
+
+          # Canonicalize current AI-summary cache version.
+          s=re.sub(r'(<script\\b[^>]*src=["\\\'][^"\\\']*behavior-records-ai-summary\\.js)(?:\\?[^"\\\']*)?(["\\\'][^>]*></script>)', r'\\1?v=1.2.0\\2', s, count=1, flags=re.I)
 
           # Ensure the event-save JSONP fallback exists exactly once.
           s=re.sub(r'\\s*<script\\b[^>]*src=["\\\'][^"\\\']*event-save-jsonp-fix\\.js[^"\\\']*["\\\'][^>]*></script>', '', s, flags=re.I)
@@ -64,6 +68,7 @@ jobs:
           for file in google-api-bridge.js student-links-fix.js learning-smas-import.js behavior-records-ai-summary.js event-save-jsonp-fix.js; do
             test "$(grep -o "$file" index.html | wc -l | tr -d ' ')" -eq 1
           done
+          grep -q 'behavior-records-ai-summary.js?v=1.2.0' index.html
           test "$(grep -o 'data-page=\"learning\"' index.html | wc -l | tr -d ' ')" -eq 1
           test "$(grep -o 'id=\"page-learning\"' index.html | wc -l | tr -d ' ')" -eq 1
 
@@ -75,5 +80,5 @@ jobs:
           git config user.email 41898282+users.noreply.github.com
           git add index.html
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "Normalize core HTML loaders and event save fallback"
+          git commit -m "Normalize core HTML loaders and navigation"
           git push origin HEAD:master
