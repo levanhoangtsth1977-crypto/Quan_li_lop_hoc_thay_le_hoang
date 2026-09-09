@@ -1,0 +1,132 @@
+/* VI PHẠM — DESKTOP UI 1.0
+ * Scope tuyệt đối: #page-violations.
+ * Không thay đổi layout mobile hoặc menu khác.
+ */
+@media (min-width: 1024px) {
+  #page-violations {
+    --vio-gap: 18px;
+  }
+
+  #page-violations .page-header {
+    align-items: flex-end;
+    gap: var(--vio-gap);
+    margin-bottom: 18px;
+  }
+
+  #page-violations .page-header > div:first-child {
+    min-width: 0;
+  }
+
+  #page-violations .page-header h1 {
+    margin-bottom: 6px;
+    letter-spacing: -0.02em;
+  }
+
+  #page-violations .page-header p {
+    max-width: 760px;
+    margin-bottom: 0;
+  }
+
+  #page-violations .page-header > .button,
+  #page-violations .page-actions > .button {
+    flex: 0 0 auto;
+    min-height: 42px;
+    white-space: nowrap;
+  }
+
+  #page-violations .info-banner.warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 18px;
+    padding: 14px 16px;
+    border-radius: 12px;
+  }
+
+  #page-violations .info-banner.warning p {
+    margin: 3px 0 0;
+  }
+
+  #page-violations .table-container {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--card-bg);
+    box-shadow: var(--shadow-sm);
+  }
+
+  #page-violations #violationTable {
+    width: 100%;
+    min-width: 980px;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+  }
+
+  #page-violations #violationTable th,
+  #page-violations #violationTable td {
+    padding: 12px 14px;
+    vertical-align: middle;
+  }
+
+  #page-violations #violationTable th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    color: var(--text-secondary);
+    background: #f8fafc;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .02em;
+    white-space: nowrap;
+  }
+
+  #page-violations #violationTable th:nth-child(1),
+  #page-violations #violationTable td:nth-child(1) { width: 64px; text-align: center; }
+  #page-violations #violationTable th:nth-child(2),
+  #page-violations #violationTable td:nth-child(2) { width: 190px; }
+  #page-violations #violationTable th:nth-child(3),
+  #page-violations #violationTable td:nth-child(3) { width: 125px; }
+  #page-violations #violationTable th:nth-child(4),
+  #page-violations #violationTable td:nth-child(4) { width: 300px; }
+  #page-violations #violationTable th:nth-child(5),
+  #page-violations #violationTable td:nth-child(5) { width: 210px; }
+  #page-violations #violationTable th:nth-child(6),
+  #page-violations #violationTable td:nth-child(6) { width: 90px; text-align: center; }
+
+  #page-violations #violationTable tbody tr {
+    transition: background-color 140ms ease;
+  }
+
+  #page-violations #violationTable tbody tr:hover {
+    background: #fafcff;
+  }
+
+  #page-violations #violationTable tbody td {
+    color: var(--text-secondary);
+    border-top: 1px solid var(--border-light);
+    font-size: 13px;
+  }
+
+  #page-violations #violationTable tbody td:nth-child(2) {
+    color: var(--text-primary);
+  }
+
+  #page-violations #violationTable tbody td:nth-child(4),
+  #page-violations #violationTable tbody td:nth-child(5) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  #page-violations #violationTable .icon-button {
+    width: 34px;
+    height: 34px;
+    margin: 0 auto;
+  }
+
+  #page-violations #violationTable .empty-state {
+    padding: 42px 20px;
+  }
+}
