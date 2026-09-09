@@ -1,95 +1,83 @@
-name: Restore core menu and standalone utilities
+name: Verify core menu integrity
 
 on:
   push:
     branches: [master]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  restore:
+  verify:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Normalize core menus, learning UI and behavior tables
+      - name: Validate core menu wiring
         shell: bash
         run: |
+          set -euo pipefail
+          test -f index.html
+
+          for route in dashboard students attendance violations rewards learning statistics student-links ai lucky-wheel settings; do
+            grep -q "data-page=\"$route\"" index.html || { echo "Missing menu route: $route"; exit 1; }
+          done
+
+          for page in dashboard students attendance violations rewards learning statistics student-links ai; do
+            grep -q "id=\"page-$page\"" index.html || { echo "Missing page section: page-$page"; exit 1; }
+            grep -q "data-page-section=\"$page\"" index.html || { echo "Missing section marker: $page"; exit 1; }
+          done
+
+          for hook in studentTableBody attendanceTableBody violationTableBody rewardTableBody; do
+            grep -q "id=\"$hook\"" index.html || { echo "Missing table hook: $hook"; exit 1; }
+          done
+
+          if grep -q 'data-page="comments"' index.html; then
+            echo 'Obsolete comments menu remains'; exit 1
+          fi
+
+          if grep -qF 'n\n<a class="menu-item"' index.html; then
+            echo 'Corrupt literal newline marker remains in navigation'; exit 1
+          fi
+
+          test "$(grep -o 'data-page=\"learning\"' index.html | wc -l | tr -d ' ')" -eq 1
+          test "$(grep -o 'id=\"page-learning\"' index.html | wc -l | tr -d ' ')" -eq 1
+
+          # Script references must be unique. This catches accidental loader duplication.
+          for file in student-links-fix.js learning-smas-import.js behavior-records-ai-summary.js; do
+            count=$(grep -o "$file" index.html | wc -l | tr -d ' ')
+            test "$count" -eq 1 || { echo "Expected exactly one reference for $file; found $count"; exit 1; }
+          done
+
+      - name: Validate HTML nesting
+        shell: bash
+        run: |
+          set -euo pipefail
           python - <<'PY'
           from pathlib import Path
-          import re
-          p=Path('index.html')
-          s=p.read_text(encoding='utf-8')
+          from html.parser import HTMLParser
 
-          # Remove known conflicting external runtime layers from the HTML only.
-          for name in [
-            'menu-final-direct.js','menu-special-fix.js','emergency-menu-router.js',
-            'tien-ich-final.js','tien-ich-schema-v4-fix.js','event-sync-multi-v21.js',
-            'event-ui-stability-v214.js','dashboard-legacy-events-cleanup.js',
-            'safe-student-picker.js'
-          ]:
-            s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*'+re.escape(name)+r'[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
+          class Parser(HTMLParser):
+              def __init__(self):
+                  super().__init__(); self.stack=[]
+              def handle_starttag(self, tag, attrs):
+                  if tag not in {'meta','link','input','img','br','hr','source','area','base','embed','param','track','wbr'}:
+                      self.stack.append(tag)
+              def handle_startendtag(self, tag, attrs):
+                  pass
+              def handle_endtag(self, tag):
+                  if tag in {'meta','link','input','img','br','hr','source','area','base','embed','param','track','wbr'}:
+                      return
+                  if not self.stack or self.stack[-1] != tag:
+                      raise SystemExit(f'HTML nesting mismatch at </{tag}>')
+                  self.stack.pop()
 
-          # Keep Học tập, remove only obsolete standalone Nhận xét menu.
-          s=re.sub(r'<button\\b[^>]*data-page=["\\\']comments["\\\'][^>]*>.*?</button>\\s*','',s,flags=re.I|re.S)
-          s=re.sub(r'<a\\b[^>]*data-page=["\\\']comments["\\\'][^>]*>.*?</a>\\s*','',s,flags=re.I|re.S)
-
-          # Guarantee the Learning menu item and real HTML section.
-          if not re.search(r'data-page=["\\\']learning["\\\']',s,re.I):
-            item='<button type="button" class="menu-item" data-page="learning"><i class="fa-solid fa-book-open"></i><span>Học tập</span></button>\\n'
-            marker='<button type="button" class="menu-item" data-page="statistics">'
-            s=s.replace(marker,item+marker,1) if marker in s else s.replace('</nav>',item+'</nav>',1)
-          if not re.search(r'id=["\\\']page-learning["\\\']',s,re.I):
-            section='<section class="page-section" id="page-learning" data-page-section="learning"><div class="page-header"><div><span class="page-eyebrow"><i class="fa-solid fa-book-open"></i> Dữ liệu học tập</span><h1>Học tập</h1><p>Kết quả học tập định kỳ từ bảng tổng hợp SMAS.</p></div></div><div id="lhLearningPageBody"></div></section>\\n'
-            m=re.search(r'(?=<section\\b[^>]*id=["\\\']page-statistics["\\\'])',s,re.I)
-            s=re.sub(m,section,s,count=1,flags=re.I) if m else s.replace('</main>',section+'</main>',1)
-
-          # Guarantee a real violation table in static HTML.
-          if not re.search(r'id=["\\\']violationTableBody["\\\']',s,re.I):
-            table='<div class="table-container" id="lhViolationTableWrap"><table class="data-table" id="violationTable"><thead><tr><th>STT</th><th>Họ tên học sinh</th><th>Ngày vi phạm</th><th>Nội dung vi phạm</th><th>Hình thức xử lý</th><th>Thao tác</th></tr></thead><tbody id="violationTableBody"><tr><td colspan="6"><div class="empty-state"><strong>Chưa có dữ liệu vi phạm</strong><p>Các ghi nhận mới sẽ xuất hiện tại đây.</p></div></td></tr></tbody></table></div>\\n'
-            anchor=re.search(r'(<div class=["\\\']info-banner warning["\\\'][\\s\\S]*?</div>)',s,re.I)
-            s=s[:anchor.end()]+table+s[anchor.end():] if anchor else s.replace('</main>',table+'</main>',1)
-
-          # Guarantee reward body id without altering the reward structure.
-          if not re.search(r'id=["\\\']rewardTableBody["\\\']',s,re.I):
-            s=re.sub(r'(<section\\b[^>]*id=["\\\']page-rewards["\\\'][\\s\\S]*?<tbody)\\b[^>]*>',r'\\1 id="rewardTableBody">',s,count=1,flags=re.I)
-
-          # Exactly one direct loader for each module that needs deterministic loading.
-          for filename,tag in [
-            ('student-links-fix.js','<script src="student-links-fix.js?v=3.4.1"></script>\\n'),
-            ('learning-smas-import.js','<script src="learning-smas-import.js?v=2.0.0"></script>\\n'),
-            ('behavior-records-ai-summary.js','<script src="behavior-records-ai-summary.js?v=1.1.0"></script>\\n')
-          ]:
-            s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*'+re.escape(filename)+r'[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
-            s=s.replace('</body>',tag+'</body>',1) if '</body>' in s else s+tag
-
-          p.write_text(s,encoding='utf-8')
-          print('normalized index')
+          parser=Parser()
+          parser.feed(Path('index.html').read_text(encoding='utf-8'))
+          parser.close()
+          if parser.stack:
+              raise SystemExit(f'Unclosed HTML tags: {parser.stack[-10:]}')
+          print('HTML integrity OK')
           PY
-
-      - name: Verify required structure only
-        shell: bash
-        run: |
-          set -e
-          grep -qi 'data-page="learning"' index.html
-          grep -qi 'id="page-learning"' index.html
-          grep -qi 'data-page-section="learning"' index.html
-          grep -qi 'id="violationTable"' index.html
-          grep -qi 'id="violationTableBody"' index.html
-          grep -qi 'id="rewardTableBody"' index.html
-          grep -qi 'student-links-fix.js' index.html
-          grep -qi 'learning-smas-import.js' index.html
-          grep -qi 'behavior-records-ai-summary.js' index.html
-          if grep -qi 'data-page="comments"' index.html; then echo 'obsolete comments menu remains'; exit 1; fi
-
-      - name: Commit normalized index
-        shell: bash
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+users.noreply.github.com
-          git add index.html
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m "Add static behavior tables and stable module loaders"
-          git push origin HEAD:master
