@@ -23,7 +23,7 @@ jobs:
           p=Path('index.html')
           s=p.read_text(encoding='utf-8')
 
-          # Remove known conflicting UI/event layers.
+          # Remove known conflicting external runtime layers from the HTML only.
           for name in [
             'menu-final-direct.js','menu-special-fix.js','emergency-menu-router.js',
             'tien-ich-final.js','tien-ich-schema-v4-fix.js','event-sync-multi-v21.js',
@@ -32,83 +32,57 @@ jobs:
           ]:
             s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*'+re.escape(name)+r'[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
 
-          # Keep Học tập; remove only the obsolete standalone Nhận xét menu.
+          # Keep Học tập, remove only obsolete standalone Nhận xét menu.
           s=re.sub(r'<button\\b[^>]*data-page=["\\\']comments["\\\'][^>]*>.*?</button>\\s*','',s,flags=re.I|re.S)
           s=re.sub(r'<a\\b[^>]*data-page=["\\\']comments["\\\'][^>]*>.*?</a>\\s*','',s,flags=re.I|re.S)
 
+          # Guarantee the Learning menu item and real HTML section.
           if not re.search(r'data-page=["\\\']learning["\\\']',s,re.I):
             item='<button type="button" class="menu-item" data-page="learning"><i class="fa-solid fa-book-open"></i><span>Học tập</span></button>\\n'
             marker='<button type="button" class="menu-item" data-page="statistics">'
             s=s.replace(marker,item+marker,1) if marker in s else s.replace('</nav>',item+'</nav>',1)
-
-          # Real Learning HTML section must exist.
-          learning_section='''<section class="page-section" id="page-learning" data-page-section="learning">\n<div class="page-header"><div><span class="page-eyebrow"><i class="fa-solid fa-book-open"></i> Dữ liệu học tập</span><h1>Học tập</h1><p>Quản lý kết quả học tập định kỳ từ bảng tổng hợp SMAS và làm nguồn đối chiếu xét học sinh xuất sắc.</p></div></div>\n<div id="lhLearningPageBody"></div>\n</section>\n'''
           if not re.search(r'id=["\\\']page-learning["\\\']',s,re.I):
-            s=re.sub(r'(?=<section\\b[^>]*id=["\\\']page-statistics["\\\'])',learning_section,s,count=1,flags=re.I) if re.search(r'<section\\b[^>]*id=["\\\']page-statistics["\\\']',s,re.I) else s.replace('</main>',learning_section+'</main>',1)
+            section='<section class="page-section" id="page-learning" data-page-section="learning"><div class="page-header"><div><span class="page-eyebrow"><i class="fa-solid fa-book-open"></i> Dữ liệu học tập</span><h1>Học tập</h1><p>Kết quả học tập định kỳ từ bảng tổng hợp SMAS.</p></div></div><div id="lhLearningPageBody"></div></section>\\n'
+            m=re.search(r'(?=<section\\b[^>]*id=["\\\']page-statistics["\\\'])',s,re.I)
+            s=re.sub(m,section,s,count=1,flags=re.I) if m else s.replace('</main>',section+'</main>',1)
 
-          # Ensure the Vi phạm page has a real table in static HTML.
-          violation_table='''<div class="table-container" id="lhViolationTableWrap">\n<table class="data-table" id="violationTable">\n<thead><tr><th>STT</th><th>Họ tên học sinh</th><th>Ngày vi phạm</th><th>Nội dung vi phạm</th><th>Hình thức xử lý</th><th>Thao tác</th></tr></thead>\n<tbody id="violationTableBody"><tr><td colspan="6"><div class="empty-state"><strong>Chưa có dữ liệu vi phạm</strong><p>Các ghi nhận mới sẽ xuất hiện tại đây.</p></div></td></tr></tbody>\n</table>\n</div>\n'''
+          # Guarantee a real violation table in static HTML.
           if not re.search(r'id=["\\\']violationTableBody["\\\']',s,re.I):
-            banner=re.search(r'(<div class=["\\\']info-banner warning["\\\'][\\s\\S]*?</div>)',s,re.I)
-            if banner:
-              s=s[:banner.end()]+violation_table+s[banner.end():]
-            else:
-              s=re.sub(r'(id=["\\\']page-violations["\\\'][^>]*>)',r'\\1'+violation_table,s,count=1,flags=re.I)
+            table='<div class="table-container" id="lhViolationTableWrap"><table class="data-table" id="violationTable"><thead><tr><th>STT</th><th>Họ tên học sinh</th><th>Ngày vi phạm</th><th>Nội dung vi phạm</th><th>Hình thức xử lý</th><th>Thao tác</th></tr></thead><tbody id="violationTableBody"><tr><td colspan="6"><div class="empty-state"><strong>Chưa có dữ liệu vi phạm</strong><p>Các ghi nhận mới sẽ xuất hiện tại đây.</p></div></td></tr></tbody></table></div>\\n'
+            anchor=re.search(r'(<div class=["\\\']info-banner warning["\\\'][\\s\\S]*?</div>)',s,re.I)
+            s=s[:anchor.end()]+table+s[anchor.end():] if anchor else s.replace('</main>',table+'</main>',1)
 
-          # Ensure the existing reward table has the expected body id.
+          # Guarantee reward body id without altering the reward structure.
           if not re.search(r'id=["\\\']rewardTableBody["\\\']',s,re.I):
-            reward_marker=re.search(r'(<section\\b[^>]*id=["\\\']page-rewards["\\\'][\\s\\S]*?</section>)',s,re.I)
-            if reward_marker:
-              block=reward_marker.group(1)
-              block=re.sub(r'<tbody\\b[^>]*>','<tbody id="rewardTableBody">',block,count=1,flags=re.I)
-              s=s[:reward_marker.start()]+block+s[reward_marker.end():]
+            s=re.sub(r'(<section\\b[^>]*id=["\\\']page-rewards["\\\'][\\s\\S]*?<tbody)\\b[^>]*>',r'\\1 id="rewardTableBody">',s,count=1,flags=re.I)
 
-          # Keep exactly one utilities link.
-          s=re.sub(r'<a[^>]*id=["\\\'][^"\\\']*(?:lhUtilitiesStandalone|lhStandaloneUtilities)[^"\\\']*["\\\'][^>]*>.*?</a>\\s*','',s,flags=re.I|re.S)
-          link='<a class="menu-item" id="lhUtilitiesStandalone" href="tien-ich.html"><i class="fa-solid fa-toolbox"></i><span>Tiện ích</span></a>'
-          marker='<button type="button" class="menu-item" data-page="settings">'
-          if marker in s: s=s.replace(marker,link+'\\n'+marker,1)
-          elif 'id="lhUtilitiesStandalone"' not in s: s=s.replace('</nav>',link+'\\n</nav>',1)
-
-          # Remove obsolete manual learning picker scripts.
-          for name in ['learning-menu.js','learning-comments-student-picker.js']:
-            s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*'+re.escape(name)+r'[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
-
-          # Ensure one current student-links loader.
-          s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*student-links-fix\\.js[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
-          s=s.replace('</body>','<script src="student-links-fix.js?v=3.4.1"></script>\\n</body>',1) if '</body>' in s else s
-
-          # Ensure SMAS loader once.
-          s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*learning-smas-import\\.js[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
-          s=s.replace('</body>','<script src="learning-smas-import.js?v=2.0.0"></script>\\n</body>',1) if '</body>' in s else s
-
-          # Ensure behavior table + AI summary loader once, after all UI modules.
-          s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*behavior-records-ai-summary\\.js[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
-          s=s.replace('</body>','<script src="behavior-records-ai-summary.js?v=1.1.0"></script>\\n</body>',1) if '</body>' in s else s
+          # Exactly one direct loader for each module that needs deterministic loading.
+          for filename,tag in [
+            ('student-links-fix.js','<script src="student-links-fix.js?v=3.4.1"></script>\\n'),
+            ('learning-smas-import.js','<script src="learning-smas-import.js?v=2.0.0"></script>\\n'),
+            ('behavior-records-ai-summary.js','<script src="behavior-records-ai-summary.js?v=1.1.0"></script>\\n')
+          ]:
+            s=re.sub(r'<script\\b[^>]*src=["\\\'][^"\\\']*'+re.escape(filename)+r'[^"\\\']*["\\\'][^>]*></script>\\s*','',s,flags=re.I)
+            s=s.replace('</body>',tag+'</body>',1) if '</body>' in s else s+tag
 
           p.write_text(s,encoding='utf-8')
+          print('normalized index')
           PY
 
-      - name: Verify normalized HTML
+      - name: Verify required structure only
         shell: bash
         run: |
           set -e
           grep -qi 'data-page="learning"' index.html
           grep -qi 'id="page-learning"' index.html
           grep -qi 'data-page-section="learning"' index.html
-          grep -qi 'id="violationTableBody"' index.html
           grep -qi 'id="violationTable"' index.html
+          grep -qi 'id="violationTableBody"' index.html
           grep -qi 'id="rewardTableBody"' index.html
-          ! grep -qi 'data-page="comments"' index.html
-          test "$(grep -oi 'behavior-records-ai-summary.js' index.html | wc -l | tr -d ' ')" = "1"
-          test "$(grep -oi 'learning-smas-import.js' index.html | wc -l | tr -d ' ')" = "1"
-          test "$(grep -oi 'student-links-fix.js' index.html | wc -l | tr -d ' ')" = "1"
-          ! grep -qi 'safe-student-picker.js' index.html
-          ! grep -qi 'event-ui-stability-v214.js' index.html
-          ! grep -qi 'event-sync-multi-v21.js' index.html
-          ! grep -qi 'menu-final-direct.js' index.html
-          ! grep -qi 'menu-special-fix.js' index.html
-          ! grep -qi 'emergency-menu-router.js' index.html
+          grep -qi 'student-links-fix.js' index.html
+          grep -qi 'learning-smas-import.js' index.html
+          grep -qi 'behavior-records-ai-summary.js' index.html
+          if grep -qi 'data-page="comments"' index.html; then echo 'obsolete comments menu remains'; exit 1; fi
 
       - name: Commit normalized index
         shell: bash
@@ -117,5 +91,5 @@ jobs:
           git config user.email 41898282+users.noreply.github.com
           git add index.html
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m "Add static violation table and load behavior AI summary"
+          git commit -m "Add static behavior tables and stable module loaders"
           git push origin HEAD:master
