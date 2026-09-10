@@ -1,14 +1,15 @@
-/* MENU RUNTIME FIX 8.28 — lean + idempotent runtime
+/* MENU RUNTIME FIX 8.29 — lean + idempotent runtime
    Navigation remains owned by script.js.
    Attendance remains owned by script.js.
    Core feature modules load once by canonical filename.
    Student links: one shared website URL for the whole class.
    Site integrity guard validates menu/section links once after boot.
+   Learning uses SMAS; redundant manual learning entry is removed.
 */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_828__) return;
-  window.__MENU_RUNTIME_FIX_828__=true;
+  if(window.__MENU_RUNTIME_FIX_829__) return;
+  window.__MENU_RUNTIME_FIX_829__=true;
 
   function canonicalFile(src){
     try{return new URL(src,document.baseURI).pathname.split('/').pop().toLowerCase();}
@@ -45,6 +46,7 @@
     loadOnce('behavior-ui-canonical.js?v=1.0.0','data-lh-behavior-ui-canonical-v10');
     loadOnce('violation-reset-sync.js?v=1.0.0','data-lh-violation-reset-sync-v10');
     loadOnce('site-integrity-guard.js?v=1.0.0','data-lh-site-integrity-guard-v10');
+    loadOnce('learning-smas-ui-clean.js?v=1.0.0','data-lh-learning-smas-ui-clean-v10');
     loadViolationDesktop();
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
