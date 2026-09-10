@@ -1,4 +1,4 @@
-/* MENU RUNTIME FIX 8.33 — lean + idempotent runtime
+/* MENU RUNTIME FIX 8.34 — lean + idempotent runtime
    Navigation remains owned by script.js.
    Attendance remains owned by script.js.
    Core feature modules load once by canonical filename.
@@ -6,8 +6,8 @@
 */
 (function(){
 'use strict';
-if(window.__MENU_RUNTIME_FIX_833__)return;
-window.__MENU_RUNTIME_FIX_833__=true;
+if(window.__MENU_RUNTIME_FIX_834__)return;
+window.__MENU_RUNTIME_FIX_834__=true;
 function canonicalFile(src){try{return new URL(src,document.baseURI).pathname.split('/').pop().toLowerCase()}catch(_){return String(src||'').split('?')[0].split('#')[0].split('/').pop().toLowerCase()}}
 function loadOnce(src,attr){const target=canonicalFile(src);if(document.querySelector('script['+attr+']'))return false;for(const s of document.querySelectorAll('script[src]'))if(canonicalFile(s.getAttribute('src'))===target)return false;const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(attr,'1');document.head.appendChild(s);return true}
 function loadViolationDesktop(){if(window.innerWidth<1024)return;if(document.querySelector('link[data-lh-violation-desktop-ui]'))return;const l=document.createElement('link');l.rel='stylesheet';l.href='violation-desktop-ui.css?v=1.0.0';l.setAttribute('data-lh-violation-desktop-ui','1');document.head.appendChild(l)}
@@ -22,7 +22,7 @@ loadOnce('home-ai-live-sync.js?v=20260826.5','data-lh-home-ai-live-sync');
 loadOnce('class-name-final-fix.js?v=6.0.0','data-lh-class-name-final-v60');
 loadOnce('events-student-roster-sync.js?v=1.0.0','data-lh-events-student-roster-sync');
 loadOnce('behavior-records-ai-summary.js?v=1.2.0','data-lh-behavior-ai-summary-v12');
-loadOnce('student-links-fix.js?v=6.0.0','data-lh-student-links-shared-v60');
+loadOnce('student-links-fix.js?v=7.0.0','data-lh-student-links-shared-v70');
 loadOnce('student-public-lock.js?v=1.0.0','data-lh-student-public-lock-v10');
 loadOnce('violation-desktop-runtime.js?v=1.0.0','data-lh-violation-desktop-runtime-v10');
 loadOnce('behavior-ui-canonical-v11.js?v=1.1.0','data-lh-behavior-ui-canonical-v11');
