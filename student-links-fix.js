@@ -1,86 +1,83 @@
-/* STUDENT LINKS 6.0 — shared website URL
- * Menu “Link học sinh” quản lý 01 link website dùng chung cho cả lớp.
- * Không tạo link riêng theo studentId tại menu này.
- * Deep-link cá nhân (nếu hệ thống cần) do cơ chế hồ sơ riêng quản lý.
+/* STUDENT LINKS 7.0 — shared + per-student
+ * Menu “Link học sinh” có 01 link website chung + danh sách link riêng từng học sinh.
+ * Link riêng dùng ?student=<studentId> và mở đúng dữ liệu của học sinh đó.
+ * Không thay đổi Data Engine; chỉ đọc students[] và cấu hình link hiện có.
  */
 (function(){
   'use strict';
-  if(window.__LH_STUDENT_LINKS_SHARED_60__) return;
-  window.__LH_STUDENT_LINKS_SHARED_60__=true;
+  if(window.__LH_STUDENT_LINKS_SHARED_70__) return;
+  window.__LH_STUDENT_LINKS_SHARED_70__=true;
 
   const PAGE_SELECTOR='#page-student-links,[data-page-section="student-links"]';
-  const CACHE_KEY='__LH_SHARED_STUDENT_WEBSITE_URL__';
+  const esc=v=>String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const toast=(message,type='info')=>{if(typeof window.showToast==='function')window.showToast(message,type);else console.info(message)};
+  const getStudents=()=>{try{return typeof window.getStudentsSafe==='function'?(window.getStudentsSafe()||[]):(Array.isArray(window.students)?window.students:[])}catch{return[]}};
 
   function baseUrl(){
-    try{
-      const u=new URL(window.location.href);
-      u.search='';
-      u.hash='';
-      return u.href;
-    }catch{return window.location.href.split('?')[0].split('#')[0];}
+    try{const u=new URL(window.location.href);u.search='';u.hash='';return u.href}
+    catch{return window.location.href.split('?')[0].split('#')[0]}
   }
-  function esc(v){return String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
-  function toast(message,type='info'){if(typeof window.showToast==='function')window.showToast(message,type);else console.info(message);}
-
+  function studentUrl(studentId){
+    const u=new URL(baseUrl());
+    u.searchParams.set((window.STUDENT_LINK_CONFIG?.parameterName)||'student',String(studentId));
+    return u.href;
+  }
   async function copyText(value){
-    if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(value);return;}
-    const ta=document.createElement('textarea');
-    ta.value=value;ta.readOnly=true;ta.style.position='fixed';ta.style.left='-9999px';
-    document.body.appendChild(ta);ta.select();
-    if(!document.execCommand('copy'))throw new Error('copy_failed');
-    ta.remove();
+    if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(value);return}
+    const ta=document.createElement('textarea');ta.value=value;ta.readOnly=true;ta.style.position='fixed';ta.style.left='-9999px';
+    document.body.appendChild(ta);ta.select();if(!document.execCommand('copy'))throw new Error('copy_failed');ta.remove();
   }
 
   function render(){
-    const page=document.querySelector(PAGE_SELECTOR);
-    if(!page)return;
-    const url=baseUrl();
-    try{sessionStorage.setItem(CACHE_KEY,url);}catch{}
+    const page=document.querySelector(PAGE_SELECTOR);if(!page)return;
+    const shared=baseUrl();
+    const students=getStudents().filter(s=>s&&String(s.id??'').trim()&&String(s.name??'').trim());
     page.innerHTML=`
       <div class="page-header">
         <div>
-          <span class="page-eyebrow"><i class="fa-solid fa-link"></i> Website dùng chung</span>
+          <span class="page-eyebrow"><i class="fa-solid fa-link"></i> Liên kết học sinh</span>
           <h1>Link học sinh</h1>
-          <p>Một đường link website dùng chung cho học sinh và phụ huynh truy cập hệ thống.</p>
-        </div>
-      </div>
-      <div class="info-banner">
-        <i class="fa-solid fa-shield-halved"></i>
-        <div>
-          <strong>🌐 Link website dùng chung</strong>
-          <p>Đây là đường dẫn chung của hệ thống. Không tạo link riêng theo từng học sinh tại mục này.</p>
+          <p>Quản lý link website chung của lớp và link riêng để mở đúng trang tổng hợp của từng học sinh.</p>
         </div>
       </div>
       <section class="dashboard-panel" id="sharedStudentWebsitePanel">
-        <div class="panel-header">
-          <div>
-            <h3>Đường dẫn website lớp</h3>
-            <p>Học sinh/phụ huynh dùng cùng một địa chỉ để truy cập website.</p>
-          </div>
+        <div class="panel-header"><div><h3>🌐 Link website dùng chung của lớp</h3><p>Dùng chung cho tất cả học sinh và phụ huynh.</p></div></div>
+        <div class="student-link-shared-row">
+          <input id="sharedStudentWebsiteUrl" type="text" readonly value="${esc(shared)}" aria-label="Link website dùng chung">
+          <button type="button" class="button secondary" id="copySharedStudentWebsite"><i class="fa-solid fa-copy"></i> Sao chép</button>
+          <a class="button primary" href="${esc(shared)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square"></i> Mở website</a>
         </div>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <input id="sharedStudentWebsiteUrl" type="text" readonly value="${esc(url)}" aria-label="Link website dùng chung">
-          <button type="button" class="button secondary" id="copySharedStudentWebsite"><i class="fa-solid fa-copy"></i> Sao chép link</button>
-          <a class="button primary" id="openSharedStudentWebsite" href="${esc(url)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square"></i> Mở website</a>
+      </section>
+      <section class="dashboard-panel" id="perStudentLinksPanel">
+        <div class="panel-header">
+          <div><h3>👤 Link riêng từng học sinh</h3><p>Mỗi link mở đúng dữ liệu tổng hợp của một học sinh.</p></div>
+          <span class="mini-stat"><span>Học sinh</span><strong>${students.length}</strong></span>
+        </div>
+        <div class="table-container" style="overflow:auto">
+          <table class="data-table" id="studentLinksTable">
+            <thead><tr><th>STT</th><th>Họ tên học sinh</th><th>Link riêng</th><th>Thao tác</th></tr></thead>
+            <tbody id="studentLinksTableBody"></tbody>
+          </table>
         </div>
       </section>`;
 
-    const copyBtn=document.getElementById('copySharedStudentWebsite');
-    if(copyBtn)copyBtn.addEventListener('click',async()=>{
-      try{await copyText(url);toast('Đã sao chép link website dùng chung.','success');}
-      catch{toast('Không thể sao chép link.','error');}
-    });
+    const body=document.getElementById('studentLinksTableBody');
+    if(!students.length){body.innerHTML='<tr><td colspan="4"><div class="empty-state"><span class="empty-icon"><i class="fa-solid fa-users"></i></span><strong>Chưa có học sinh</strong><p>Link riêng sẽ được tạo sau khi có danh sách học sinh.</p></div></td></tr>';return}
+    body.innerHTML=students.map((s,i)=>{
+      const url=studentUrl(s.id);
+      return `<tr><td>${i+1}</td><td><strong>${esc(s.name)}</strong></td><td><input type="text" readonly value="${esc(url)}" aria-label="Link riêng ${esc(s.name)}"></td><td><div class="student-link-actions"><button type="button" class="button secondary" data-copy-student-link="${esc(s.id)}"><i class="fa-solid fa-copy"></i> Sao chép</button><a class="button primary" href="${esc(url)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square"></i> Mở</a></div></td></tr>`;
+    }).join('');
+
+    document.getElementById('copySharedStudentWebsite')?.addEventListener('click',async()=>{try{await copyText(shared);toast('Đã sao chép link website chung.','success')}catch{toast('Không thể sao chép link.','error')}});
+    body.querySelectorAll('[data-copy-student-link]').forEach(btn=>btn.addEventListener('click',async()=>{try{await copyText(studentUrl(btn.dataset.copyStudentLink));toast('Đã sao chép link riêng của học sinh.','success')}catch{toast('Không thể sao chép link.','error')}}));
   }
 
   function boot(){
     render();
-    document.addEventListener('click',event=>{
-      const menu=event.target.closest?.('.menu-item[data-page="student-links"]');
-      if(menu)setTimeout(render,0);
-    },false);
+    document.addEventListener('click',e=>{if(e.target.closest?.('.menu-item[data-page="student-links"]'))setTimeout(render,0)},false);
     window.addEventListener('google-sheets-data-ready',()=>setTimeout(render,0),false);
+    window.addEventListener('students-updated',()=>setTimeout(render,0),false);
+    window.addEventListener('data-changed',()=>setTimeout(render,0),false);
   }
-
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
-  else boot();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
