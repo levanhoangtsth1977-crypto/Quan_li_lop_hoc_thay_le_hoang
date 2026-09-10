@@ -1,13 +1,13 @@
-/* MENU RUNTIME FIX 8.31 — lean + idempotent runtime
+/* MENU RUNTIME FIX 8.32 — lean + idempotent runtime
    Navigation remains owned by script.js.
    Attendance remains owned by script.js.
    Core feature modules load once by canonical filename.
-   One-time current violation cleanup runs once and self-disables after success.
+   One canonical behavior UI module owns Vi phạm/Khen thưởng display and quick-pick catalogs.
 */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_831__) return;
-  window.__MENU_RUNTIME_FIX_831__=true;
+  if(window.__MENU_RUNTIME_FIX_832__) return;
+  window.__MENU_RUNTIME_FIX_832__=true;
 
   function canonicalFile(src){
     try{return new URL(src,document.baseURI).pathname.split('/').pop().toLowerCase();}
@@ -37,7 +37,7 @@
     loadOnce('class-name-final-fix.js?v=6.0.0','data-lh-class-name-final-v60');
     loadOnce('events-student-roster-sync.js?v=1.0.0','data-lh-events-student-roster-sync');
     loadOnce('behavior-records-ai-summary.js?v=1.2.0','data-lh-behavior-ai-summary-v12');
-    loadOnce('behavior-quick-options.js?v=2.0.0','data-lh-behavior-quick-options-v20');
+    /* behavior-ui-canonical owns both the behavior tables and the quick-pick catalogs. */
     loadOnce('student-links-fix.js?v=6.0.0','data-lh-student-links-shared-v60');
     loadOnce('student-public-lock.js?v=1.0.0','data-lh-student-public-lock-v10');
     loadOnce('violation-desktop-runtime.js?v=1.0.0','data-lh-violation-desktop-runtime-v10');
