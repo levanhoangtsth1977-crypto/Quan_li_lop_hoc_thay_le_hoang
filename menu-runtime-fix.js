@@ -1,13 +1,13 @@
-/* MENU RUNTIME FIX 8.23 — lean + idempotent runtime
+/* MENU RUNTIME FIX 8.24 — lean + idempotent runtime
    Navigation remains owned by script.js.
    Attendance remains owned by script.js.
    Core feature modules load once by canonical filename.
-   Student links: one student = one personal deep link.
+   Student links: one shared website URL for the whole class.
 */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_823__) return;
-  window.__MENU_RUNTIME_FIX_823__=true;
+  if(window.__MENU_RUNTIME_FIX_824__) return;
+  window.__MENU_RUNTIME_FIX_824__=true;
 
   function canonicalFile(src){
     try{return new URL(src,document.baseURI).pathname.split('/').pop().toLowerCase();}
@@ -33,8 +33,9 @@
     loadOnce('events-student-roster-sync.js?v=1.0.0','data-lh-events-student-roster-sync');
     loadOnce('behavior-records-ai-summary.js?v=1.2.0','data-lh-behavior-ai-summary-v12');
     loadOnce('behavior-quick-options.js?v=2.0.0','data-lh-behavior-quick-options-v20');
-    loadOnce('student-links-fix.js?v=5.0.0','data-lh-student-links-personal-v50');
-    /* Personal-view lock: only active when ?student=<id> is present. */
+
+    /* Link học sinh hiện dùng đúng một URL website chung. */
+    loadOnce('student-links-fix.js?v=6.0.0','data-lh-student-links-shared-v60');
     loadOnce('student-public-lock.js?v=1.0.0','data-lh-student-public-lock-v10');
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
