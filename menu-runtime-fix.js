@@ -1,31 +1,30 @@
-/* MENU RUNTIME FIX 8.26 — lean + idempotent runtime
+/* MENU RUNTIME FIX 8.27 — lean + idempotent runtime
    Navigation remains owned by script.js.
    Attendance remains owned by script.js.
    Core feature modules load once by canonical filename.
    Student links: one shared website URL for the whole class.
-   Vi phạm desktop UI: scoped CSS loader, desktop only.
-   Vi phạm/Khen thưởng display: one canonical renderer.
+   Behavior reset: VI_PHAM only, synchronized with Google Sheets before local clear.
 */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_826__) return;
-  window.__MENU_RUNTIME_FIX_826__=true;
+  if(window.__MENU_RUNTIME_FIX_827__) return;
+  window.__MENU_RUNTIME_FIX_827__=true;
 
   function canonicalFile(src){
     try{return new URL(src,document.baseURI).pathname.split('/').pop().toLowerCase();}
     catch(_){return String(src||'').split('?')[0].split('#')[0].split('/').pop().toLowerCase();}
   }
   function loadOnce(src,attr){
-    if(document.querySelector('script['+attr+']')) return false;
     const target=canonicalFile(src);
-    let exists=false;
-    document.querySelectorAll('script[src]').forEach(s=>{if(canonicalFile(s.getAttribute('src'))===target) exists=true;});
-    if(exists) return false;
+    let exists=document.querySelector('script['+attr+']');
+    if(exists)return false;
+    document.querySelectorAll('script[src]').forEach(s=>{if(canonicalFile(s.getAttribute('src'))===target)exists=s;});
+    if(exists)return false;
     const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(attr,'1');document.head.appendChild(s);return true;
   }
   function loadViolationDesktop(){
-    if(window.innerWidth<1024) return;
-    if(document.querySelector('link[data-lh-violation-desktop-ui]')) return;
+    if(window.innerWidth<1024)return;
+    if(document.querySelector('link[data-lh-violation-desktop-ui]'))return;
     const link=document.createElement('link');link.rel='stylesheet';link.href='violation-desktop-ui.css?v=1.0.0';link.setAttribute('data-lh-violation-desktop-ui','1');document.head.appendChild(link);
   }
   function boot(){
@@ -43,8 +42,8 @@
     loadOnce('student-links-fix.js?v=6.0.0','data-lh-student-links-shared-v60');
     loadOnce('student-public-lock.js?v=1.0.0','data-lh-student-public-lock-v10');
     loadOnce('violation-desktop-runtime.js?v=1.0.0','data-lh-violation-desktop-runtime-v10');
-    /* Canonical UI renderer: does not own persistence. */
     loadOnce('behavior-ui-canonical.js?v=1.0.0','data-lh-behavior-ui-canonical-v10');
+    loadOnce('violation-reset-sync.js?v=1.0.0','data-lh-violation-reset-sync-v10');
     loadViolationDesktop();
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
