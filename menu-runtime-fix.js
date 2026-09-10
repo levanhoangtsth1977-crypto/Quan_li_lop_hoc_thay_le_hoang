@@ -1,13 +1,13 @@
-/* MENU RUNTIME FIX 8.22 — lean + idempotent runtime
+/* MENU RUNTIME FIX 8.23 — lean + idempotent runtime
    Navigation remains owned by script.js.
-   Attendance remains owned only by script.js.
+   Attendance remains owned by script.js.
    Core feature modules load once by canonical filename.
    Student links: one student = one personal deep link.
 */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_822__) return;
-  window.__MENU_RUNTIME_FIX_822__=true;
+  if(window.__MENU_RUNTIME_FIX_823__) return;
+  window.__MENU_RUNTIME_FIX_823__=true;
 
   function canonicalFile(src){
     try{return new URL(src,document.baseURI).pathname.split('/').pop().toLowerCase();}
@@ -33,8 +33,9 @@
     loadOnce('events-student-roster-sync.js?v=1.0.0','data-lh-events-student-roster-sync');
     loadOnce('behavior-records-ai-summary.js?v=1.2.0','data-lh-behavior-ai-summary-v12');
     loadOnce('behavior-quick-options.js?v=2.0.0','data-lh-behavior-quick-options-v20');
-    /* IMPORTANT: personal links only. Never load student-links-shared-override.js. */
     loadOnce('student-links-fix.js?v=5.0.0','data-lh-student-links-personal-v50');
+    /* Personal-view lock: only active when ?student=<id> is present. */
+    loadOnce('student-public-lock.js?v=1.0.0','data-lh-student-public-lock-v10');
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
