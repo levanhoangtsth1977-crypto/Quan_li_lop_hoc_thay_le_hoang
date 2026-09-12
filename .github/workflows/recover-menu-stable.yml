@@ -15,11 +15,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate menu, sections, internal links and asset wiring
+      - name: Validate menu, sections, internal links and module wiring
         shell: bash
         run: |
           set -euo pipefail
           test -f index.html
+          test -f menu-runtime-fix.js
 
           python - <<'PY'
           from pathlib import Path
@@ -28,11 +29,13 @@ jobs:
           from html.parser import HTMLParser
 
           html = Path('index.html').read_text(encoding='utf-8')
+          runtime = Path('menu-runtime-fix.js').read_text(encoding='utf-8')
           required = [
               'dashboard','students','attendance','violations','rewards','learning',
               'statistics','student-links','ai','lucky-wheel','settings'
           ]
 
+          # One and only one canonical menu route per required page.
           routes = re.findall(r'data-page=["\']([^"\']+)', html)
           counts = Counter(routes)
           missing = [x for x in required if counts[x] != 1]
@@ -42,6 +45,7 @@ jobs:
           if extras:
               raise SystemExit(f'data-page invalid: {extras}')
 
+          # One and only one section for every menu route.
           sections = re.findall(r'data-page-section=["\']([^"\']+)', html)
           section_ids = re.findall(r'id=["\']page-([^"\']+)["\']', html)
           for page in required:
@@ -50,45 +54,54 @@ jobs:
               if section_ids.count(page) != 1:
                   raise SystemExit(f'page section id missing/duplicate: {page}: {section_ids.count(page)}')
 
+          # Internal SPA links must point to a canonical page.
           links = re.findall(r'data-page-link=["\']([^"\']+)', html)
           bad_links = sorted(set(links) - set(required))
           if bad_links:
               raise SystemExit(f'data-page-link invalid: {bad_links}')
 
+          # Standalone utilities link must remain an actual file link.
           hrefs = re.findall(r'href=["\']([^"\']+)', html)
           if 'tien-ich.html' not in hrefs:
               raise SystemExit('Standalone Tiện ích link missing')
           if not Path('tien-ich.html').is_file():
               raise SystemExit('tien-ich.html missing')
 
-          # Canonical runtime/quick-pick loaders must exist and be wired once.
-          expected_scripts = [
-              'menu-runtime-fix.js','behavior-quick-options.js','home-class-logo.js',
-              'site-link-integrity.js'
-          ]
+          # Static script includes: no duplicate exact JS/CSS paths in index.html.
           scripts = re.findall(r'<script[^>]+src=["\']([^"\']+)', html, flags=re.I)
-          for name in expected_scripts:
-              count = sum(1 for src in scripts if src.split('?')[0] == name)
-              if count != 1:
-                  raise SystemExit(f'Script wiring count for {name}: {count}')
-
-          # Detect duplicate exact JS/CSS includes in index.html.
-          for attr, label in [('script','JS'), ('link','CSS')]:
-              if attr == 'script':
-                  values = scripts
-              else:
-                  values = re.findall(r'<link[^>]+href=["\']([^"\']+)', html, flags=re.I)
+          for label, values in [
+              ('JS', scripts),
+              ('CSS', re.findall(r'<link[^>]+href=["\']([^"\']+)', html, flags=re.I))
+          ]:
               normalized = [x.split('?')[0] for x in values]
               dup = sorted(k for k,v in Counter(normalized).items() if k and v > 1)
               if dup:
                   raise SystemExit(f'Duplicate {label} includes in index.html: {dup}')
 
+          # Static modules below are intentionally owned by index.html.
+          for name in ('learning-smas-import.js','behavior-records-ai-summary.js'):
+              count = sum(1 for src in scripts if src.split('?')[0] == name)
+              if count != 1:
+                  raise SystemExit(f'Static module include count for {name}: {count}')
+
+          # Runtime-only modules must be loaded by one canonical loadOnce entry.
+          for name in ('behavior-quick-options.js','home-class-logo.js','site-link-integrity.js'):
+              count = runtime.count("loadOnce('" + name + "'")
+              if count != 1:
+                  raise SystemExit(f'Runtime loader count for {name}: {count}')
+
+          # The two static modules above must NOT also be runtime loaded.
+          for name in ('learning-smas-import.js','behavior-records-ai-summary.js'):
+              if "loadOnce('" + name + "'" in runtime:
+                  raise SystemExit(f'Duplicate runtime/static ownership for {name}')
+
+          # No obsolete menu entry or legacy class in index.html.
           if re.search(r'data-page=["\']comments["\']', html):
               raise SystemExit('Legacy comments menu found')
           if '5C' in html or '5c' in html:
               raise SystemExit('Legacy class 5C found in index.html')
 
-          print('Static menu/link/loader integrity OK')
+          print('Static menu/link/module integrity OK')
           PY
 
       - name: Validate HTML nesting
