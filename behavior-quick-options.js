@@ -1,11 +1,11 @@
-/* BEHAVIOR QUICK OPTIONS 2.1
- * CHỈ thay danh mục lựa chọn trong form Vi phạm.
- * Không thay đổi menu Khen thưởng, router, Data Engine hay cấu trúc bản ghi.
+/* BEHAVIOR QUICK OPTIONS 2.2
+ * Canonical quick-pick catalog for the Vi phạm form.
+ * Re-applies when the Vi phạm form is opened so later UI rendering cannot replace it.
  */
 (function(){
   'use strict';
-  if(window.__LH_BEHAVIOR_QUICK_OPTIONS_21__) return;
-  window.__LH_BEHAVIOR_QUICK_OPTIONS_21__=true;
+  if(window.__LH_BEHAVIOR_QUICK_OPTIONS_22__) return;
+  window.__LH_BEHAVIOR_QUICK_OPTIONS_22__=true;
 
   const VIOLATIONS = [
     ['talking-disorder','Nói chuyện riêng, gây mất trật tự trong lớp học'],
@@ -36,16 +36,26 @@
     const current=el.value;
     el.replaceChildren(new Option('Chọn nội dung',''));
     VIOLATIONS.forEach(([value,label])=>el.add(new Option(label,value)));
-    if(VIOLATIONS.some(x=>x[0]===current)) el.value=current;
+    if(VIOLATIONS.some(([value])=>value===current)) el.value=current;
     return true;
   }
 
-  window.LH_BEHAVIOR_QUICK_OPTIONS={VIOLATIONS,applyViolationOptions};
-
-  function boot(){
+  function reinforce(){
     applyViolationOptions();
-    [300,1000,2500].forEach(ms=>setTimeout(applyViolationOptions,ms));
+    requestAnimationFrame(applyViolationOptions);
   }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true});
-  else boot();
+
+  window.LH_BEHAVIOR_QUICK_OPTIONS={VIOLATIONS,applyViolationOptions,reinforce};
+
+  document.addEventListener('click',function(event){
+    const trigger=event.target.closest?.('[data-action="add-violation"]');
+    if(trigger) setTimeout(reinforce,0);
+  },true);
+
+  document.addEventListener('focusin',function(event){
+    if(event.target?.id==='violationType') reinforce();
+  },true);
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',reinforce,{once:true});
+  else reinforce();
 })();
