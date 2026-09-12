@@ -1,13 +1,11 @@
-/* BEHAVIOR QUICK OPTIONS 2.4
- * Canonical quick-pick catalogs for Vi phạm + Khen thưởng.
- * Chỉ thay danh sách lựa chọn trong 2 form.
- * Không thay đổi router, Data Engine hay cấu trúc bản ghi.
- * Theo dõi riêng rewardModal/violationModal để chống module khác reset options.
+/* BEHAVIOR QUICK OPTIONS 2.5
+ * Danh muc chuan hoa cho 2 form Vi pham / Khen thuong.
+ * Chi thay danh sach lua chon; giu nguyen router, Data Engine va cau truc ban ghi.
  */
 (function(){
   'use strict';
-  if(window.__LH_BEHAVIOR_QUICK_OPTIONS_24__) return;
-  window.__LH_BEHAVIOR_QUICK_OPTIONS_24__=true;
+  if(window.__LH_BEHAVIOR_QUICK_OPTIONS_25__) return;
+  window.__LH_BEHAVIOR_QUICK_OPTIONS_25__=true;
 
   const VIOLATIONS = [
     ['talking-disorder','Nói chuyện riêng, gây mất trật tự trong lớp học'],
