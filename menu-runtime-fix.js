@@ -1,8 +1,8 @@
-/* MENU RUNTIME FIX 8.21 — lean runtime */
+/* MENU RUNTIME FIX 8.22 — lean runtime */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_821__) return;
-  window.__MENU_RUNTIME_FIX_821__=true;
+  if(window.__MENU_RUNTIME_FIX_822__) return;
+  window.__MENU_RUNTIME_FIX_822__=true;
   const loadOnce=(src,attr)=>{
     if(document.querySelector('script['+attr+']')) return;
     const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(attr,'1');document.head.appendChild(s);
@@ -20,6 +20,8 @@
     loadOnce('behavior-records-ai-summary.js?v=1.2.0','data-lh-behavior-ai-summary-v12');
     loadOnce('behavior-quick-options.js?v=2.5.0','data-lh-behavior-quick-options-v25');
     loadOnce('home-class-logo.js?v=1.2.0','data-lh-home-class-logo-v120');
+    /* Canonical navigation/link integrity: one menu item per page, no orphan links. */
+    loadOnce('site-link-integrity.js?v=2.0.0','data-lh-site-link-integrity-v20');
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true});
   else boot();
