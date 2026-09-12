@@ -1,8 +1,8 @@
-/* MENU RUNTIME FIX 8.26 — lean runtime */
+/* MENU RUNTIME FIX 8.27 — lean runtime */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_826__) return;
-  window.__MENU_RUNTIME_FIX_826__=true;
+  if(window.__MENU_RUNTIME_FIX_827__) return;
+  window.__MENU_RUNTIME_FIX_827__=true;
   const loadOnce=(src,attr)=>{
     if(document.querySelector('script['+attr+']')) return;
     const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(attr,'1');document.head.appendChild(s);
@@ -19,7 +19,7 @@
     loadOnce('events-student-roster-sync.js?v=1.0.0','data-lh-events-student-roster-sync');
     /* behavior-records-ai-summary.js is already a canonical static index include. */
     loadOnce('behavior-quick-options.js?v=2.5.0','data-lh-behavior-quick-options-v25');
-    loadOnce('home-class-logo.js?v=1.5.0','data-lh-home-class-logo-v150');
+    loadOnce('home-class-logo.js?v=1.6.0','data-lh-home-class-logo-v160');
     /* Canonical navigation/link integrity: one menu item per page, no orphan links. */
     loadOnce('site-link-integrity.js?v=2.0.0','data-lh-site-link-integrity-v20');
   }
