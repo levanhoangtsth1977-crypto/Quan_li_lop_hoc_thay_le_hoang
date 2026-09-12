@@ -1,49 +1,163 @@
-/* HOME CLASS LOGO 1.4 — homepage-only 5A3 branding. */
+/* HOME CLASS LOGO 1.5 — homepage-only 5A3 branding with reliable mobile placement. */
 (function(){
   'use strict';
-  if(window.__LH_HOME_CLASS_LOGO_14__) return;
-  window.__LH_HOME_CLASS_LOGO_14__=true;
-  const LOGO_SRC='assets/logo-5a3.jpg?v=20260913.1';
+  if(window.__LH_HOME_CLASS_LOGO_15__) return;
+  window.__LH_HOME_CLASS_LOGO_15__=true;
+  const LOGO_SRC='assets/logo-5a3.jpg?v=20260913.2';
+  const LOGO_ALT='Logo lớp 5A3 Trường Tiểu học Nghĩa Hành';
 
   function ensureStyle(){
     if(document.getElementById('lhHomeClassLogoStyle')) return;
     const s=document.createElement('style');
     s.id='lhHomeClassLogoStyle';
     s.textContent=`
-      #lhHomeClassLogo{display:flex!important;align-items:center!important;justify-content:center!important;width:min(28vw,260px)!important;min-width:180px!important;height:100%!important;margin-left:auto!important;flex:0 0 auto!important;position:relative!important;z-index:2!important;visibility:visible!important;opacity:1!important;}
-      #lhHomeClassLogo img{display:block!important;visibility:visible!important;opacity:1!important;width:190px!important;height:190px!important;max-width:190px!important;max-height:190px!important;min-width:190px!important;min-height:190px!important;object-fit:cover!important;border-radius:50%!important;}
-      @media (max-width:900px){#lhHomeClassLogo{width:150px!important;min-width:150px!important;}#lhHomeClassLogo img{width:130px!important;height:130px!important;max-width:130px!important;max-height:130px!important;min-width:130px!important;min-height:130px!important;}}
-      @media (max-width:640px){#lhHomeClassLogo{width:112px!important;min-width:112px!important;}#lhHomeClassLogo img{width:98px!important;height:98px!important;max-width:98px!important;max-height:98px!important;min-width:98px!important;min-height:98px!important;}}
+      #lhHomeClassLogo{
+        display:flex!important;
+        align-items:center!important;
+        justify-content:center!important;
+        flex:0 0 auto!important;
+        width:min(28vw,260px)!important;
+        min-width:180px!important;
+        height:auto!important;
+        margin-left:auto!important;
+        position:relative!important;
+        z-index:20!important;
+        visibility:visible!important;
+        opacity:1!important;
+      }
+      #lhHomeClassLogo img{
+        display:block!important;
+        visibility:visible!important;
+        opacity:1!important;
+        width:190px!important;
+        height:190px!important;
+        min-width:190px!important;
+        min-height:190px!important;
+        max-width:190px!important;
+        max-height:190px!important;
+        object-fit:contain!important;
+        border-radius:50%!important;
+      }
+      @media (max-width:900px){
+        #lhHomeClassLogo{
+          width:150px!important;
+          min-width:150px!important;
+          margin-left:auto!important;
+        }
+        #lhHomeClassLogo img{
+          width:130px!important;
+          height:130px!important;
+          min-width:130px!important;
+          min-height:130px!important;
+          max-width:130px!important;
+          max-height:130px!important;
+        }
+      }
+      @media (max-width:640px){
+        #page-dashboard .dashboard-hero{
+          overflow:visible!important;
+        }
+        #lhHomeClassLogo{
+          width:100%!important;
+          min-width:0!important;
+          flex:0 0 100%!important;
+          margin:16px 0 2px!important;
+          padding:0!important;
+          justify-content:center!important;
+          position:relative!important;
+          z-index:50!important;
+          order:99!important;
+        }
+        #lhHomeClassLogo img{
+          width:112px!important;
+          height:112px!important;
+          min-width:112px!important;
+          min-height:112px!important;
+          max-width:112px!important;
+          max-height:112px!important;
+        }
+      }
+      @media (min-width:641px){
+        #lhHomeClassLogo.lh-logo-mobile{
+          width:min(28vw,260px)!important;
+          min-width:180px!important;
+          flex:0 0 auto!important;
+          margin-left:auto!important;
+          margin-top:0!important;
+        }
+      }
     `;
     document.head.appendChild(s);
+  }
+
+  function isMobile(){
+    return window.matchMedia && window.matchMedia('(max-width:640px)').matches;
+  }
+
+  function ensureNode(){
+    let wrap=document.getElementById('lhHomeClassLogo');
+    if(wrap) return wrap;
+    wrap=document.createElement('div');
+    wrap.id='lhHomeClassLogo';
+    wrap.setAttribute('aria-label',LOGO_ALT);
+    const img=document.createElement('img');
+    img.alt=LOGO_ALT;
+    img.loading='eager';
+    img.decoding='async';
+    img.width=190;
+    img.height=190;
+    img.src=LOGO_SRC;
+    img.addEventListener('error',function(){
+      console.warn('[HOME CLASS LOGO] Không tải được:',LOGO_SRC);
+    },{once:true});
+    wrap.appendChild(img);
+    return wrap;
   }
 
   function apply(){
     const hero=document.querySelector('#page-dashboard .dashboard-hero');
     if(!hero) return;
     ensureStyle();
-    let wrap=document.getElementById('lhHomeClassLogo');
-    if(!wrap){
+    const wrap=ensureNode();
+    const img=wrap.querySelector('img');
+    if(img){
+      const expected=new URL(LOGO_SRC,document.baseURI).href;
+      if(img.src!==expected) img.src=LOGO_SRC;
+      img.style.display='block';
+      img.style.visibility='visible';
+      img.style.opacity='1';
+    }
+
+    const mobile=isMobile();
+    wrap.classList.toggle('lh-logo-mobile',mobile);
+
+    if(mobile){
+      const content=hero.querySelector('.hero-content');
+      if(content){
+        const meta=content.querySelector('.hero-meta');
+        if(meta && meta.parentNode===content) meta.insertAdjacentElement('afterend',wrap);
+        else if(wrap.parentNode!==content) content.appendChild(wrap);
+      }else if(wrap.parentNode!==hero){
+        hero.appendChild(wrap);
+      }
+    }else{
       const target=hero.querySelector('.hero-illustration');
-      wrap=document.createElement('div');
-      wrap.id='lhHomeClassLogo';
-      wrap.setAttribute('aria-label','Logo lớp 5A3 Trường Tiểu học Nghĩa Hành');
-      if(target) target.replaceWith(wrap); else hero.appendChild(wrap);
+      if(target && target.parentNode===hero) target.replaceWith(wrap);
+      else if(wrap.parentNode!==hero) hero.appendChild(wrap);
     }
-    let img=wrap.querySelector('img');
-    if(!img){
-      img=document.createElement('img');
-      img.alt='Logo lớp 5A3 Trường Tiểu học Nghĩa Hành';
-      img.loading='eager';
-      img.decoding='async';
-      wrap.appendChild(img);
-    }
-    const expected=new URL(LOGO_SRC,document.baseURI).href;
-    if(img.src!==expected) img.src=LOGO_SRC;
   }
 
-  function boot(){apply();[300,800,1500].forEach(ms=>setTimeout(apply,ms));}
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true}); else boot();
+  function boot(){
+    apply();
+    [100,400,900,1600].forEach(ms=>setTimeout(apply,ms));
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true});
+  else boot();
+
+  window.addEventListener('resize',apply,false);
   window.addEventListener('google-sheets-data-ready',apply,false);
   window.addEventListener('class-data-updated',apply,false);
+  window.addEventListener('navigation-changed',apply,false);
+  window.addEventListener('page-changed',apply,false);
 })();
