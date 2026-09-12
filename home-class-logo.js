@@ -1,16 +1,16 @@
-/* HOME CLASS LOGO 1.8 — persistent homepage 5A3 branding. */
+/* HOME CLASS LOGO 1.9 — persistent homepage 5A3 branding; mobile text-left/logo-right. */
 (function(){
   'use strict';
-  if(window.__LH_HOME_CLASS_LOGO_18__) return;
-  window.__LH_HOME_CLASS_LOGO_18__=true;
+  if(window.__LH_HOME_CLASS_LOGO_19__) return;
+  window.__LH_HOME_CLASS_LOGO_19__=true;
 
   const LOGO_ALT='Logo lớp 5A3 Trường Tiểu học Nghĩa Hành';
   const LOGO_SOURCES=[
-    '/assets/logo-5a3.jpg?v=20260913.5',
-    'https://quan-li-lop-hoc-thay-le-hoang.vercel.app/assets/logo-5a3.jpg?v=20260913.5',
-    'https://raw.githubusercontent.com/levanhoangtsth1977-crypto/Quan_li_lop_hoc_thay_le_hoang/master/assets/logo-5a3.jpg?v=20260913.5'
+    '/assets/logo-5a3.jpg?v=20260913.6',
+    'https://quan-li-lop-hoc-thay-le-hoang.vercel.app/assets/logo-5a3.jpg?v=20260913.6',
+    'https://raw.githubusercontent.com/levanhoangtsth1977-crypto/Quan_li_lop_hoc_thay_le_hoang/master/assets/logo-5a3.jpg?v=20260913.6'
   ];
-  const STYLE_ID='lhHomeClassLogoStyle18';
+  const STYLE_ID='lhHomeClassLogoStyle19';
   let observerStarted=false;
   let applyQueued=false;
 
@@ -23,7 +23,18 @@
       #lhHomeClassLogo img{display:block!important;visibility:visible!important;opacity:1!important;width:190px!important;height:190px!important;min-width:190px!important;min-height:190px!important;max-width:190px!important;max-height:190px!important;object-fit:contain!important;border:0!important;border-radius:50%!important;}
       @media (max-width:1100px){#lhHomeClassLogo{width:190px!important;min-width:190px!important;}#lhHomeClassLogo img{width:155px!important;height:155px!important;min-width:155px!important;min-height:155px!important;max-width:155px!important;max-height:155px!important;}}
       @media (max-width:900px){#lhHomeClassLogo{width:150px!important;min-width:150px!important;}#lhHomeClassLogo img{width:130px!important;height:130px!important;min-width:130px!important;min-height:130px!important;max-width:130px!important;max-height:130px!important;}}
-      @media (max-width:640px){#page-dashboard .dashboard-hero{overflow:visible!important;}#lhHomeClassLogo{width:100%!important;min-width:0!important;flex:0 0 100%!important;margin:16px 0 4px!important;padding:0!important;justify-content:center!important;position:relative!important;z-index:10000!important;order:99!important;}#lhHomeClassLogo img{width:112px!important;height:112px!important;min-width:112px!important;min-height:112px!important;max-width:112px!important;max-height:112px!important;}}
+      @media (max-width:640px){
+        #page-dashboard .dashboard-hero{display:grid!important;grid-template-columns:minmax(0,1fr) 120px!important;column-gap:10px!important;align-items:center!important;overflow:visible!important;}
+        #page-dashboard .dashboard-hero .hero-content{min-width:0!important;grid-column:1!important;grid-row:1!important;}
+        #lhHomeClassLogo{grid-column:2!important;grid-row:1!important;width:120px!important;min-width:120px!important;max-width:120px!important;flex:none!important;margin:0!important;padding:0!important;align-self:center!important;justify-self:center!important;position:relative!important;z-index:10000!important;order:initial!important;}
+        #lhHomeClassLogo img{width:108px!important;height:108px!important;min-width:108px!important;min-height:108px!important;max-width:108px!important;max-height:108px!important;object-fit:contain!important;}
+        #page-dashboard .dashboard-hero .hero-illustration{display:none!important;}
+      }
+      @media (max-width:380px){
+        #page-dashboard .dashboard-hero{grid-template-columns:minmax(0,1fr) 98px!important;column-gap:6px!important;}
+        #lhHomeClassLogo{width:98px!important;min-width:98px!important;max-width:98px!important;}
+        #lhHomeClassLogo img{width:88px!important;height:88px!important;min-width:88px!important;min-height:88px!important;max-width:88px!important;max-height:88px!important;}
+      }
     `;
     document.head.appendChild(s);
   }
@@ -48,11 +59,18 @@
     img.addEventListener('error',function(){
       const i=Number(img.dataset.lhLogoSourceIndex||0)+1;
       if(i<LOGO_SOURCES.length){img.dataset.lhLogoSourceIndex=String(i);img.src=LOGO_SOURCES[i];}
-      else console.warn('[HOME CLASS LOGO 1.8] Không tải được logo.');
+      else console.warn('[HOME CLASS LOGO 1.9] Không tải được logo.');
     },false);
     img.src=LOGO_SOURCES[0];
     wrap.appendChild(img);
     return wrap;
+  }
+
+  function placeMobile(hero,wrap){
+    const content=hero.querySelector('.hero-content');
+    if(content && wrap.parentNode!==hero)hero.appendChild(wrap);
+    else if(!content && wrap.parentNode!==hero)hero.appendChild(wrap);
+    if(wrap.parentNode!==hero)hero.appendChild(wrap);
   }
 
   function apply(){
@@ -65,12 +83,8 @@
     wrap.classList.toggle('lh-logo-mobile',!!mobile);
 
     if(mobile){
-      const content=hero.querySelector('.hero-content');
-      if(content){
-        const meta=content.querySelector('.hero-meta');
-        if(meta&&meta.parentNode===content)meta.insertAdjacentElement('afterend',wrap);
-        else if(wrap.parentNode!==content)content.appendChild(wrap);
-      }else if(wrap.parentNode!==hero)hero.appendChild(wrap);
+      // Important: the logo must be a direct child of the hero so CSS can place it on the right.
+      placeMobile(hero,wrap);
     }else{
       const illustration=hero.querySelector('.hero-illustration');
       if(illustration&&illustration.parentNode===hero){illustration.replaceWith(wrap);}
@@ -78,7 +92,7 @@
     }
 
     const img=wrap.querySelector('img');
-    if(img && !img.complete) img.src=img.src;
+    if(img && img.src==='')img.src=LOGO_SOURCES[0];
   }
 
   function queueApply(){
@@ -93,7 +107,7 @@
     if(!target)return;
     observerStarted=true;
     new MutationObserver(mutations=>{
-      if(mutations.some(m=>m.type==='childList')) queueApply();
+      if(mutations.some(m=>m.type==='childList'))queueApply();
     }).observe(target,{childList:true,subtree:true});
   }
 
