@@ -1,8 +1,8 @@
-/* MENU RUNTIME FIX 8.40 — lean + idempotent runtime */
+/* MENU RUNTIME FIX 8.41 — lean + idempotent runtime */
 (function(){
 'use strict';
-if(window.__MENU_RUNTIME_FIX_840__)return;
-window.__MENU_RUNTIME_FIX_840__=true;
+if(window.__MENU_RUNTIME_FIX_841__)return;
+window.__MENU_RUNTIME_FIX_841__=true;
 function canonicalFile(src){try{return new URL(src,document.baseURI).pathname.split('/').pop().toLowerCase()}catch(_){return String(src||'').split('?')[0].split('#')[0].split('/').pop().toLowerCase()}}
 function loadOnce(src,attr){const target=canonicalFile(src);if(document.querySelector('script['+attr+']'))return false;for(const s of document.querySelectorAll('script[src]'))if(canonicalFile(s.getAttribute('src'))===target)return false;const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(attr,'1');document.head.appendChild(s);return true}
 function loadViolationDesktop(){if(window.innerWidth<1024)return;if(document.querySelector('link[data-lh-violation-desktop-ui]'))return;const l=document.createElement('link');l.rel='stylesheet';l.href='violation-desktop-ui.css?v=1.0.0';l.setAttribute('data-lh-violation-desktop-ui','1');document.head.appendChild(l)}
@@ -29,6 +29,7 @@ loadOnce('clear-current-violations-once.js?v=20260912.1','data-lh-clear-current-
 loadOnce('behavior-records-dedupe.js?v=1.0.0','data-lh-behavior-records-dedupe-v10');
 loadOnce('behavior-render-lock.js?v=1.0.0','data-lh-behavior-render-lock-v10');
 loadOnce('behavior-quick-options.js?v=2.4.0','data-lh-behavior-quick-options-v24');
+loadOnce('home-logo.js?v=1.0.0','data-lh-home-logo-v10');
 loadViolationDesktop();
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
