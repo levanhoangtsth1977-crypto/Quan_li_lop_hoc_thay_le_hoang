@@ -14,22 +14,83 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate core menu wiring
+
+      - name: Validate menu, sections, internal links and asset wiring
         shell: bash
         run: |
           set -euo pipefail
           test -f index.html
-          for route in dashboard students attendance violations rewards learning statistics student-links ai lucky-wheel settings; do grep -q "data-page=\"$route\"" index.html; done
-          for page in dashboard students attendance violations rewards learning statistics student-links ai; do grep -q "id=\"page-$page\"" index.html; grep -q "data-page-section=\"$page\"" index.html; done
-          for hook in studentTableBody attendanceTableBody violationTableBody rewardTableBody; do grep -q "id=\"$hook\"" index.html; done
-          ! grep -q 'data-page="comments"' index.html
-          ! grep -qF 'n\\n<a class="menu-item"' index.html
-          test "$(grep -o 'data-page=\"learning\"' index.html | wc -l | tr -d ' ')" -eq 1
-          test "$(grep -o 'id=\"page-learning\"' index.html | wc -l | tr -d ' ')" -eq 1
-          for file in google-api-bridge.js student-links-fix.js learning-smas-import.js behavior-records-ai-summary.js event-save-jsonp-fix.js; do
-            test "$(grep -o "$file" index.html | wc -l | tr -d ' ')" -eq 1
-          done
-          echo 'Core menu integrity OK'
+
+          python - <<'PY'
+          from pathlib import Path
+          from collections import Counter
+          import re
+          from html.parser import HTMLParser
+
+          html = Path('index.html').read_text(encoding='utf-8')
+          required = [
+              'dashboard','students','attendance','violations','rewards','learning',
+              'statistics','student-links','ai','lucky-wheel','settings'
+          ]
+
+          routes = re.findall(r'data-page=["\']([^"\']+)', html)
+          counts = Counter(routes)
+          missing = [x for x in required if counts[x] != 1]
+          extras = sorted(set(routes) - set(required))
+          if missing:
+              raise SystemExit(f'data-page missing/duplicate: {missing}')
+          if extras:
+              raise SystemExit(f'data-page invalid: {extras}')
+
+          sections = re.findall(r'data-page-section=["\']([^"\']+)', html)
+          section_ids = re.findall(r'id=["\']page-([^"\']+)["\']', html)
+          for page in required:
+              if sections.count(page) != 1:
+                  raise SystemExit(f'data-page-section missing/duplicate: {page}: {sections.count(page)}')
+              if section_ids.count(page) != 1:
+                  raise SystemExit(f'page section id missing/duplicate: {page}: {section_ids.count(page)}')
+
+          links = re.findall(r'data-page-link=["\']([^"\']+)', html)
+          bad_links = sorted(set(links) - set(required))
+          if bad_links:
+              raise SystemExit(f'data-page-link invalid: {bad_links}')
+
+          hrefs = re.findall(r'href=["\']([^"\']+)', html)
+          if 'tien-ich.html' not in hrefs:
+              raise SystemExit('Standalone Tiện ích link missing')
+          if not Path('tien-ich.html').is_file():
+              raise SystemExit('tien-ich.html missing')
+
+          # Canonical runtime/quick-pick loaders must exist and be wired once.
+          expected_scripts = [
+              'menu-runtime-fix.js','behavior-quick-options.js','home-class-logo.js',
+              'site-link-integrity.js'
+          ]
+          scripts = re.findall(r'<script[^>]+src=["\']([^"\']+)', html, flags=re.I)
+          for name in expected_scripts:
+              count = sum(1 for src in scripts if src.split('?')[0] == name)
+              if count != 1:
+                  raise SystemExit(f'Script wiring count for {name}: {count}')
+
+          # Detect duplicate exact JS/CSS includes in index.html.
+          for attr, label in [('script','JS'), ('link','CSS')]:
+              if attr == 'script':
+                  values = scripts
+              else:
+                  values = re.findall(r'<link[^>]+href=["\']([^"\']+)', html, flags=re.I)
+              normalized = [x.split('?')[0] for x in values]
+              dup = sorted(k for k,v in Counter(normalized).items() if k and v > 1)
+              if dup:
+                  raise SystemExit(f'Duplicate {label} includes in index.html: {dup}')
+
+          if re.search(r'data-page=["\']comments["\']', html):
+              raise SystemExit('Legacy comments menu found')
+          if '5C' in html or '5c' in html:
+              raise SystemExit('Legacy class 5C found in index.html')
+
+          print('Static menu/link/loader integrity OK')
+          PY
+
       - name: Validate HTML nesting
         shell: bash
         run: |
@@ -38,14 +99,22 @@ jobs:
           from pathlib import Path
           from html.parser import HTMLParser
           class P(HTMLParser):
-              def __init__(self): super().__init__(); self.stack=[]
+              def __init__(self):
+                  super().__init__()
+                  self.stack=[]
               def handle_starttag(self, tag, attrs):
-                  if tag not in {'meta','link','input','img','br','hr','source','area','base','embed','param','track','wbr'}: self.stack.append(tag)
+                  if tag not in {'meta','link','input','img','br','hr','source','area','base','embed','param','track','wbr'}:
+                      self.stack.append(tag)
               def handle_endtag(self, tag):
-                  if tag in {'meta','link','input','img','br','hr','source','area','base','embed','param','track','wbr'}: return
-                  if not self.stack or self.stack[-1] != tag: raise SystemExit(f'HTML nesting mismatch at </{tag}>')
+                  if tag in {'meta','link','input','img','br','hr','source','area','base','embed','param','track','wbr'}:
+                      return
+                  if not self.stack or self.stack[-1] != tag:
+                      raise SystemExit(f'HTML nesting mismatch at </{tag}>')
                   self.stack.pop()
-          p=P(); p.feed(Path('index.html').read_text(encoding='utf-8')); p.close()
-          if p.stack: raise SystemExit(f'Unclosed HTML tags: {p.stack[-10:]}')
+          p=P()
+          p.feed(Path('index.html').read_text(encoding='utf-8'))
+          p.close()
+          if p.stack:
+              raise SystemExit(f'Unclosed HTML tags: {p.stack[-10:]}')
           print('HTML integrity OK')
           PY
