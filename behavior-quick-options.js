@@ -1,12 +1,13 @@
-/* BEHAVIOR QUICK OPTIONS 2.3
+/* BEHAVIOR QUICK OPTIONS 2.4
  * Canonical quick-pick catalogs for Vi phạm + Khen thưởng.
  * Chỉ thay danh sách lựa chọn trong 2 form.
  * Không thay đổi router, Data Engine hay cấu trúc bản ghi.
+ * Theo dõi riêng rewardModal/violationModal để chống module khác reset options.
  */
 (function(){
   'use strict';
-  if(window.__LH_BEHAVIOR_QUICK_OPTIONS_23__) return;
-  window.__LH_BEHAVIOR_QUICK_OPTIONS_23__=true;
+  if(window.__LH_BEHAVIOR_QUICK_OPTIONS_24__) return;
+  window.__LH_BEHAVIOR_QUICK_OPTIONS_24__=true;
 
   const VIOLATIONS = [
     ['talking-disorder','Nói chuyện riêng, gây mất trật tự trong lớp học'],
@@ -58,26 +59,49 @@
     const el=document.getElementById(selectId);
     if(!el) return false;
     const current=el.value;
-    el.replaceChildren(new Option('Chọn nội dung',''));
-    items.forEach(([value,label])=>el.add(new Option(label,value)));
+    const labels=items.map(([,label])=>label);
+    const options=[...el.options].slice(1).map(o=>o.textContent.trim());
+    const alreadyCorrect=el.options.length===items.length+1 && options.every((v,i)=>v===labels[i]);
+    if(!alreadyCorrect){
+      el.replaceChildren(new Option('Chọn nội dung',''));
+      items.forEach(([value,label])=>el.add(new Option(label,value)));
+    }
     if(items.some(([value])=>value===current)) el.value=current;
     return true;
   }
 
   function applyViolationOptions(){ return apply('violationType',VIOLATIONS); }
   function applyRewardOptions(){ return apply('rewardType',REWARDS); }
-  function reinforce(){ applyViolationOptions(); applyRewardOptions(); requestAnimationFrame(()=>{applyViolationOptions();applyRewardOptions();}); }
+  function reinforce(){ applyViolationOptions(); applyRewardOptions(); }
 
-  window.LH_BEHAVIOR_QUICK_OPTIONS={VIOLATIONS,REWARDS,applyViolationOptions,applyRewardOptions,reinforce};
+  function watchModal(id, applyFn){
+    const modal=document.getElementById(id);
+    if(!modal || modal.dataset.lhQuickWatch==='1') return;
+    modal.dataset.lhQuickWatch='1';
+    const observer=new MutationObserver(()=>{
+      const select=modal.querySelector(id==='rewardModal'?'#rewardType':'#violationType');
+      if(select && select.options.length!==21) applyFn();
+    });
+    observer.observe(modal,{childList:true,subtree:true});
+    applyFn();
+  }
+
+  function setup(){
+    reinforce();
+    watchModal('rewardModal',applyRewardOptions);
+    watchModal('violationModal',applyViolationOptions);
+  }
+
+  window.LH_BEHAVIOR_QUICK_OPTIONS={VIOLATIONS,REWARDS,applyViolationOptions,applyRewardOptions,reinforce,setup};
 
   document.addEventListener('click',function(event){
-    if(event.target.closest?.('[data-action="add-violation"]') || event.target.closest?.('[data-action="add-reward"]')) setTimeout(reinforce,0);
+    if(event.target.closest?.('[data-action="add-violation"]') || event.target.closest?.('[data-action="add-reward"]')) setTimeout(setup,0);
   },true);
 
   document.addEventListener('focusin',function(event){
     if(event.target?.id==='violationType' || event.target?.id==='rewardType') reinforce();
   },true);
 
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',reinforce,{once:true});
-  else reinforce();
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',setup,{once:true});
+  else setup();
 })();
