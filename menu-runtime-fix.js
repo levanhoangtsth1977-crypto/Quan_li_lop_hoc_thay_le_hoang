@@ -1,4 +1,4 @@
-/* MENU RUNTIME FIX 8.35 — lean + idempotent runtime
+/* MENU RUNTIME FIX 8.36 — lean + idempotent runtime
    Navigation remains owned by script.js.
    Attendance remains owned by script.js.
    Core feature modules load once by canonical filename.
@@ -6,8 +6,8 @@
 */
 (function(){
 'use strict';
-if(window.__MENU_RUNTIME_FIX_835__)return;
-window.__MENU_RUNTIME_FIX_835__=true;
+if(window.__MENU_RUNTIME_FIX_836__)return;
+window.__MENU_RUNTIME_FIX_836__=true;
 function canonicalFile(src){try{return new URL(src,document.baseURI).pathname.split('/').pop().toLowerCase()}catch(_){return String(src||'').split('?')[0].split('#')[0].split('/').pop().toLowerCase()}}
 function loadOnce(src,attr){const target=canonicalFile(src);if(document.querySelector('script['+attr+']'))return false;for(const s of document.querySelectorAll('script[src]'))if(canonicalFile(s.getAttribute('src'))===target)return false;const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(attr,'1');document.head.appendChild(s);return true}
 function loadViolationDesktop(){if(window.innerWidth<1024)return;if(document.querySelector('link[data-lh-violation-desktop-ui]'))return;const l=document.createElement('link');l.rel='stylesheet';l.href='violation-desktop-ui.css?v=1.0.0';l.setAttribute('data-lh-violation-desktop-ui','1');document.head.appendChild(l)}
@@ -30,7 +30,7 @@ loadOnce('behavior-page-cleanup.js?v=1.1.0','data-lh-behavior-page-cleanup-v11')
 loadOnce('violation-reset-sync.js?v=1.0.0','data-lh-violation-reset-sync-v10');
 loadOnce('site-integrity-guard.js?v=1.0.0','data-lh-site-integrity-guard-v10');
 loadOnce('learning-smas-ui-clean.js?v=1.0.0','data-lh-learning-smas-ui-clean-v10');
-loadOnce('clear-current-violations-once.js?v=20260910.1','data-lh-clear-current-violations-once');
+loadOnce('clear-current-violations-once.js?v=20260912.1','data-lh-clear-current-violations-once-v20');
 loadOnce('behavior-records-dedupe.js?v=1.0.0','data-lh-behavior-records-dedupe-v10');
 loadOnce('behavior-render-lock.js?v=1.0.0','data-lh-behavior-render-lock-v10');
 loadViolationDesktop();
