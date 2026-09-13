@@ -28,6 +28,7 @@
     loadOnce('behavior-form-select-repair.js?v=20260913.1','data-lh-behavior-form-select-repair-v10');
     loadOnce('behavior-multi-student-ui.js?v=20260913.1','data-lh-behavior-multi-student-ui-v10');
     loadOnce('student-links-fast-fix.js?v=2.0.0','data-lh-student-links-fast-fix-v20');
+    loadOnce('violation-display-live-fix.js?v=20260913.1','data-lh-violation-display-live-fix-v10');
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
