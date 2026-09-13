@@ -1,8 +1,8 @@
-/* MENU RUNTIME FIX 8.31 — lean runtime */
+/* MENU RUNTIME FIX 8.32 — lean runtime */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_831__) return;
-  window.__MENU_RUNTIME_FIX_831__=true;
+  if(window.__MENU_RUNTIME_FIX_832__) return;
+  window.__MENU_RUNTIME_FIX_832__=true;
   const loadOnce=(src,attr)=>{
     if(document.querySelector('script['+attr+']')) return;
     const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(attr,'1');document.head.appendChild(s);
@@ -26,6 +26,8 @@
     loadOnce('site-link-integrity.js?v=2.0.0','data-lh-site-link-integrity-v20');
     /* Restore the standalone Triệu Phú Học Đường entry without changing core page routing. */
     loadOnce('trieu-phu-menu-fix.js?v=20260913.1','data-lh-trieu-phu-menu-fix');
+    /* Khen thưởng: hide legacy duplicate table and keep one canonical six-column table. */
+    loadOnce('reward-ui-cleanup-20260913.js?v=1.0.0','data-lh-reward-ui-cleanup-v10');
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true});
   else boot();
