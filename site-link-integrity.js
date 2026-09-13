@@ -1,15 +1,16 @@
-/* SITE LINK INTEGRITY 2.0
+/* SITE LINK INTEGRITY 2.1
  * Chuẩn hóa toàn bộ liên kết/menu chính của trang quản lý lớp học.
  * - Mỗi menu chính chỉ có đúng 1 mục.
  * - Mỗi data-page phải trỏ tới đúng 1 section.
  * - Tự bổ sung menu bị thiếu theo danh mục chuẩn.
  * - Loại bỏ menu data-page dư/không hợp lệ.
+ * - Bảo vệ menu game động Triệu Phú Học Đường.
  * - Không đụng Data Engine, dữ liệu học sinh hoặc các form.
  */
 (function(){
   'use strict';
-  if(window.__LH_SITE_LINK_INTEGRITY_20__) return;
-  window.__LH_SITE_LINK_INTEGRITY_20__=true;
+  if(window.__LH_SITE_LINK_INTEGRITY_21__) return;
+  window.__LH_SITE_LINK_INTEGRITY_21__=true;
 
   const MENU=[
     ['dashboard','Trang chủ','fa-house'],
@@ -21,6 +22,7 @@
     ['statistics','Thống kê','fa-chart-column'],
     ['student-links','Link học sinh','fa-link'],
     ['ai','AI giáo viên','fa-robot'],
+    ['game','Triệu Phú Học Đường','fa-gamepad'],
     ['lucky-wheel','Vòng quay may mắn','fa-dharmachakra'],
     ['settings','Cài đặt','fa-gear']
   ];
@@ -82,7 +84,7 @@
       }
     });
 
-    /* Chuẩn hóa thứ tự 11 mục trước divider. */
+    /* Chuẩn hóa thứ tự các mục trước divider. */
     const firstItems=MENU.map(([page])=>qs('[data-page="'+CSS.escape(page)+'"]',nav)).filter(Boolean);
     const anchor=divider||nav.lastElementChild;
     firstItems.forEach(el=>nav.insertBefore(el,anchor));
@@ -97,9 +99,7 @@
     /* Không để mục data-page không có section tồn tại như liên kết chết. */
     qsa('[data-page]',nav).forEach(el=>{
       const page=(el.getAttribute('data-page')||'').trim();
-      if(!pageExists(page)){
-        el.remove();
-      }
+      if(!pageExists(page)) el.remove();
     });
   }
 
@@ -124,7 +124,7 @@
         missing:MENU.filter(x=>!pageExists(x[0])).map(x=>x[0])
       };
     }catch(error){
-      console.warn('[SITE LINK INTEGRITY 2.0]',error);
+      console.warn('[SITE LINK INTEGRITY 2.1]',error);
     }
   }
 
