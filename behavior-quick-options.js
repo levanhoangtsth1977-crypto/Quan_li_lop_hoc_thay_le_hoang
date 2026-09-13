@@ -1,11 +1,11 @@
-/* BEHAVIOR QUICK OPTIONS 2.5
+/* BEHAVIOR QUICK OPTIONS 2.6
  * Danh muc chuan hoa cho 2 form Vi pham / Khen thuong.
  * Chi thay danh sach lua chon; giu nguyen router, Data Engine va cau truc ban ghi.
  */
 (function(){
   'use strict';
-  if(window.__LH_BEHAVIOR_QUICK_OPTIONS_25__) return;
-  window.__LH_BEHAVIOR_QUICK_OPTIONS_25__=true;
+  if(window.__LH_BEHAVIOR_QUICK_OPTIONS_26__) return;
+  window.__LH_BEHAVIOR_QUICK_OPTIONS_26__=true;
 
   const VIOLATIONS = [
     ['talking-disorder','Nói chuyện riêng, gây mất trật tự trong lớp học'],
@@ -14,10 +14,10 @@
     ['preparation','Chưa chuẩn bị bài trước khi đến lớp'],
     ['assignment','Chưa hoàn thành bài tập được giao'],
     ['focus','Chưa chú ý, tập trung trong giờ học'],
-    ['late-submit','Quên nộp bài hoặc nộp bài chưa đúng yêu cầu'],
+    ['late-submit','Đánh nhau với bạn'],
     ['assigned-task-late','Chưa hoàn thành phần việc được phân công đúng thời hạn'],
     ['leave-seat','Ra khỏi chỗ ngồi khi chưa được phép'],
-    ['change-seat','Tự ý đổi chỗ ngồi'],
+    ['change-seat','Đánh bạn'],
     ['incomplete-learning-task','Chưa thực hiện đầy đủ nhiệm vụ học tập trên lớp'],
     ['passive-learning','Chưa chủ động tham gia hoạt động học tập'],
     ['class-rules','Chưa thực hiện đúng nội quy lớp học'],
