@@ -1,20 +1,20 @@
-/* BEHAVIOR SAVE HARD FIX 1.1 — authoritative save handler */
+/* BEHAVIOR SAVE HARD FIX 1.2 — proven save_event contract */
 (function(){
   'use strict';
-  if(window.__LH_BEHAVIOR_SAVE_HARDFIX_11__) return;
-  window.__LH_BEHAVIOR_SAVE_HARDFIX_11__=true;
+  if(window.__LH_BEHAVIOR_SAVE_HARDFIX_12__) return;
+  window.__LH_BEHAVIOR_SAVE_HARDFIX_12__=true;
 
   const API='https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
   const S=v=>String(v??'').trim();
   const Q=(root,id)=>root?.querySelector?.('#'+id)||document.getElementById(id);
   function toast(msg,type){
-    if(typeof window.showToast==='function') window.showToast(msg,type||'info');
-    else if(typeof window.toast==='function') window.toast(msg,type||'info');
+    if(typeof window.showToast==='function')window.showToast(msg,type||'info');
+    else if(typeof window.toast==='function')window.toast(msg,type||'info');
     else window.alert(msg);
   }
   function jsonp(action,params){
     return new Promise((resolve,reject)=>{
-      const cb='__LH_BHV_SAVE11_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const cb='__LH_BHV_SAVE12_'+Date.now()+'_'+Math.random().toString(36).slice(2);
       const s=document.createElement('script');let done=false;
       const finish=(err,data)=>{if(done)return;done=true;clearTimeout(timer);try{delete window[cb]}catch(_){window[cb]=undefined}s.remove();err?reject(err):resolve(data)};
       const timer=setTimeout(()=>finish(new Error('Google Apps Script không phản hồi sau 20 giây.')),20000);
@@ -48,12 +48,17 @@
     if(!type){toast('Vui lòng chọn nội dung.','warning');return;}
     const isV=!!Q(root,'eLevel')||!!Q(root,'violationLevel');
     const base={studentId:'',date,type,note};
-    if(isV){base.level=S(Q(root,'eLevel')?.value||Q(root,'violationLevel')?.value)||'light';base.status=S(Q(root,'eStatus')?.value||Q(root,'violationStatus')?.value)||'monitoring';base.action=S(Q(root,'eAction')?.value||Q(root,'violationAction')?.value)}
-    else base.formType=S(Q(root,'eForm')?.value||Q(root,'rewardForm')?.value)||'praise';
-    const sheet=isV?'VI_PHAM':'KHEN_THUONG';const old=btn.innerHTML;btn.dataset.lhSaving='1';btn.disabled=true;btn.innerHTML='Đang lưu...';
+    if(isV){
+      base.level=S(Q(root,'eLevel')?.value||Q(root,'violationLevel')?.value)||'light';
+      base.status=S(Q(root,'eStatus')?.value||Q(root,'violationStatus')?.value)||'monitoring';
+      base.action=S(Q(root,'eAction')?.value||Q(root,'violationAction')?.value);
+    }else base.formType=S(Q(root,'eForm')?.value||Q(root,'rewardForm')?.value)||'praise';
+    const sheet=isV?'VI_PHAM':'KHEN_THUONG';
+    const old=btn.innerHTML;btn.dataset.lhSaving='1';btn.disabled=true;btn.innerHTML='Đang lưu...';
     try{
       for(const studentId of ids){
-        const r=await jsonp('save_event',{payload:JSON.stringify({sheet,record:{...base,studentId}})});
+        const record={...base,studentId};
+        const r=await jsonp('save_event',{sheet,record:JSON.stringify(record)});
         if(!r?.ok||!(r.saved===true||r.stored===true))throw new Error(r?.error||`Google Sheets chưa xác nhận lưu cho ${studentId}.`);
       }
       if(root!==document&&typeof root.remove==='function')root.remove();
