@@ -1,12 +1,13 @@
-/* KHEN THUONG UI CLEANUP 1.0
+/* KHEN THUONG UI CLEANUP 1.1
  * Chỉ sắp xếp giao diện trang Khen thưởng.
  * Không thay đổi router/menu khác, không xóa dữ liệu Google Sheets.
  * Ẩn bảng legacy 5 cột nếu có, giữ bảng canonical #rewardTable 6 cột.
+ * Không dùng MutationObserver toàn trang để tránh vòng lặp render và làm treo menu.
  */
 (function(){
   'use strict';
-  if(window.__LH_REWARD_UI_CLEANUP_10__) return;
-  window.__LH_REWARD_UI_CLEANUP_10__=true;
+  if(window.__LH_REWARD_UI_CLEANUP_11__) return;
+  window.__LH_REWARD_UI_CLEANUP_11__=true;
 
   const page=()=>document.getElementById('page-rewards');
 
@@ -54,13 +55,12 @@
     tables.forEach((t)=>{
       if(canonical && t===canonical)return;
       const cells=[...t.querySelectorAll('thead th')].map(x=>String(x.textContent||'').trim()).join('|');
-      const text=String(t.textContent||'');
       const looksReward=/Ngày/.test(cells)&&/Học sinh/.test(cells)&&(/Thành tích/.test(cells)||/Hình thức/.test(cells));
       const looksFive=/Ghi chú/.test(cells)&&!canonical;
       if(looksReward||looksFive){
-        t.setAttribute('data-lh-legacy-reward-table','1');
+        if(t.getAttribute('data-lh-legacy-reward-table')!=='1') t.setAttribute('data-lh-legacy-reward-table','1');
         const wrap=t.closest('.table-container');
-        if(wrap)wrap.setAttribute('data-lh-legacy-reward-table','1');
+        if(wrap && wrap.getAttribute('data-lh-legacy-reward-table')!=='1') wrap.setAttribute('data-lh-legacy-reward-table','1');
       }
     });
   }
@@ -70,19 +70,20 @@
     const table=p.querySelector('#rewardTable');
     if(!table)return;
     const wrap=table.closest('.table-container');
-    if(wrap)wrap.setAttribute('data-lh-reward-canonical','1');
+    if(wrap && wrap.getAttribute('data-lh-reward-canonical')!=='1') wrap.setAttribute('data-lh-reward-canonical','1');
     const head=table.querySelector('thead');
-    if(head){head.innerHTML='<tr><th>STT</th><th>Họ tên học sinh</th><th>Ngày khen thưởng</th><th>Nội dung khen thưởng</th><th>Hình thức khen thưởng</th><th>Thao tác</th></tr>'}
+    const target='<tr><th>STT</th><th>Họ tên học sinh</th><th>Ngày khen thưởng</th><th>Nội dung khen thưởng</th><th>Hình thức khen thưởng</th><th>Thao tác</th></tr>';
+    if(head && head.innerHTML!==target) head.innerHTML=target;
   }
 
   function cleanText(){
     const p=page();if(!p)return;
     const title=p.querySelector('.page-header h1');
-    if(title)title.textContent='Khen thưởng';
+    if(title && title.textContent.trim()!=='Khen thưởng') title.textContent='Khen thưởng';
     const desc=p.querySelector('.page-header p');
-    if(desc)desc.textContent='Ghi nhận những thành tích, việc tốt và sự tiến bộ của học sinh.';
+    if(desc && desc.textContent.trim()!=='Ghi nhận những thành tích, việc tốt và sự tiến bộ của học sinh.') desc.textContent='Ghi nhận những thành tích, việc tốt và sự tiến bộ của học sinh.';
     const add=[...p.querySelectorAll('[data-action="add-reward"],button')].find(x=>/Ghi nhận khen thưởng/i.test(x.textContent||''));
-    if(add){add.innerHTML='<i class="fa-solid fa-trophy"></i> Ghi nhận khen thưởng';}
+    if(add && add.innerHTML!=='<i class="fa-solid fa-trophy"></i> Ghi nhận khen thưởng') add.innerHTML='<i class="fa-solid fa-trophy"></i> Ghi nhận khen thưởng';
   }
 
   function run(){
@@ -93,7 +94,7 @@
     cleanText();
   }
 
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',run,{once:true});
+  else run();
   [150,500,1000,2000].forEach(ms=>setTimeout(run,ms));
-  new MutationObserver(()=>run()).observe(document.documentElement,{childList:true,subtree:true});
 })();
