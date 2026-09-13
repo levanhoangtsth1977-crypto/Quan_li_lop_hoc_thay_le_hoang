@@ -1,8 +1,8 @@
-/* MENU RUNTIME FIX 8.36 — safe menu rescue + isolated form/link fixes */
+/* MENU RUNTIME FIX 8.37 — safe menu rescue + isolated form/link fixes */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_836__) return;
-  window.__MENU_RUNTIME_FIX_836__=true;
+  if(window.__MENU_RUNTIME_FIX_837__)return;
+  window.__MENU_RUNTIME_FIX_837__=true;
   const TITLES={dashboard:'Trang chủ',students:'Học sinh',attendance:'Điểm danh',violations:'Vi phạm',rewards:'Khen thưởng',learning:'Học tập',statistics:'Thống kê','student-links':'Link học sinh',ai:'AI giáo viên',game:'Triệu Phú Học Đường','lucky-wheel':'Vòng quay may mắn',settings:'Cài đặt'};
   function closeMobile(){const s=document.getElementById('sidebar'),o=document.getElementById('sidebarOverlay');if(window.innerWidth<=900||s?.classList.contains('open')){s?.classList.remove('open');o?.classList.remove('active');if(o){o.hidden=true;o.setAttribute('aria-hidden','true')}document.body.classList.remove('sidebar-open')}}
   function showPageFallback(page){const target=document.querySelector('[data-page-section="'+CSS.escape(String(page))+'"]')||document.getElementById('page-'+String(page));if(!target)return false;document.querySelectorAll('[data-page-section]').forEach(section=>{const active=section===target;section.hidden=!active;section.classList.toggle('active',active)});document.querySelectorAll('.main-menu .menu-item[data-page]').forEach(item=>item.classList.toggle('active',item.getAttribute('data-page')===String(page)));const title=document.getElementById('pageTitle');if(title)title.textContent=TITLES[page]||String(page);closeMobile();if(page==='lucky-wheel'){try{window.dispatchEvent(new Event('pagechange'))}catch(_){}}return true}
@@ -24,8 +24,9 @@
     loadOnce('site-link-integrity.js?v=2.0.0','data-lh-site-link-integrity-v20');
     loadOnce('trieu-phu-menu-fix.js?v=20260913.1','data-lh-trieu-phu-menu-fix');
     loadOnce('reward-ui-cleanup-20260913.js?v=1.1.0','data-lh-reward-ui-cleanup-v11');
-    loadOnce('events-save-jsonp-v2.js?v=20260913.1','data-lh-events-save-jsonp-v21');
+    loadOnce('events-save-jsonp-v2.js?v=20260913.2','data-lh-events-save-jsonp-v22');
     loadOnce('behavior-form-select-repair.js?v=20260913.1','data-lh-behavior-form-select-repair-v10');
+    loadOnce('behavior-multi-student-ui.js?v=20260913.1','data-lh-behavior-multi-student-ui-v10');
     loadOnce('student-links-fast-fix.js?v=2.0.0','data-lh-student-links-fast-fix-v20');
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
