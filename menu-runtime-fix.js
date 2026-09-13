@@ -22,6 +22,8 @@
     loadOnce('home-class-logo.js?v=1.9.0','data-lh-home-class-logo-v190');
     /* Canonical navigation/link integrity: one menu item per page, no orphan links. */
     loadOnce('site-link-integrity.js?v=2.0.0','data-lh-site-link-integrity-v20');
+    /* Restore the standalone Triệu Phú Học Đường entry without changing core page routing. */
+    loadOnce('trieu-phu-menu-fix.js?v=20260913.1','data-lh-trieu-phu-menu-fix');
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true});
   else boot();
