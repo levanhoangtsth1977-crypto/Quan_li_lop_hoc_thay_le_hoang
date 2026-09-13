@@ -20,6 +20,8 @@
     /* behavior-records-ai-summary.js is already a canonical static index include. */
     loadOnce('behavior-quick-options.js?v=2.5.0','data-lh-behavior-quick-options-v25');
     loadOnce('home-class-logo.js?v=1.9.0','data-lh-home-class-logo-v190');
+    /* Targeted one-time cleanup: only the specified Vi phạm records dated 08/09/2026. */
+    loadOnce('clear-targeted-violations-20260908.js?v=1.0.0','data-lh-targeted-violation-cleanup-20260908');
     /* Canonical navigation/link integrity: one menu item per page, no orphan links. */
     loadOnce('site-link-integrity.js?v=2.0.0','data-lh-site-link-integrity-v20');
     /* Restore the standalone Triệu Phú Học Đường entry without changing core page routing. */
