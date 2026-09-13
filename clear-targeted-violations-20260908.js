@@ -1,44 +1,38 @@
-/* CLEAR VI_PHAM ONCE — 2026-09-13
- * Dọn sạch toàn bộ bản ghi hiện có trong VI_PHAM.
- * Chỉ tác động VI_PHAM; không đụng các sheet/menu khác.
- * Sau khi dọn, dữ liệu mới chỉ được tạo khi giáo viên thực sự ghi nhận.
+/* VI PHAM STALE-UI CLEANER 1.0
+ * Retired the previous automatic deletion job.
+ * This module NEVER deletes Google Sheets data and NEVER touches other menus.
+ * It only removes stale/phantom rows from the Vi phạm table when the synced
+ * canonical data source is empty. This prevents legacy renderers from leaving
+ * old local rows visible after the data was cleared.
  */
 (function(){
   'use strict';
-  const FLAG='LH_VIOLATION_FULL_CLEAN_20260913_DONE';
-  if(localStorage.getItem(FLAG)==='done') return;
-  const clean=v=>String(v==null?'':v).trim();
+  if(window.__LH_VIOLATION_STALE_UI_CLEANER_10__) return;
+  window.__LH_VIOLATION_STALE_UI_CLEANER_10__=true;
 
-  async function run(){
-    const getter=window.getViolationRecords;
-    const deleter=window.deleteViolation;
-    if(typeof getter!=='function' || typeof deleter!=='function') return false;
-
-    const records=Array.isArray(getter())?[...getter()]:[];
-    let ok=0;
-    for(const r of records){
-      const id=clean(r&&r.id);
-      if(!id) continue;
-      try{ if(await deleter(id)) ok++; }catch(e){ console.warn('[CLEAR VI_PHAM]',id,e); }
-    }
-
-    const remaining=Array.isArray(getter())?getter():[];
-    if(remaining.length===0){
-      localStorage.setItem(FLAG,'done');
-      try{ if(typeof window.renderViolations==='function') window.renderViolations(); }catch(e){}
-      try{ if(typeof window.renderDashboard==='function') window.renderDashboard(); }catch(e){}
-      try{ if(typeof window.showToast==='function') window.showToast('Đã dọn sạch danh sách Vi phạm. Có thể bắt đầu ghi nhận lại từ đầu.','success'); }catch(e){}
-      return true;
-    }
-    return false;
+  function localViolations(){
+    return Array.isArray(window.violationRecords)?window.violationRecords:[];
   }
-
-  function schedule(){
-    setTimeout(()=>run().catch(e=>console.error('[CLEAR VI_PHAM]',e)),1500);
+  function hasRealRows(){
+    const body=document.getElementById('violationTableBody');
+    if(!body) return false;
+    return [...body.querySelectorAll('tr')].some(tr=>!tr.querySelector('.empty-state') && tr.querySelectorAll('td').length>0);
   }
-
-  window.addEventListener('google-sheets-data-ready',schedule,{once:true});
-  window.addEventListener('google-sheets-refresh',schedule,{once:true});
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>setTimeout(run,5000),{once:true});
-  else setTimeout(run,5000);
+  function clearStaleRows(){
+    if(localViolations().length!==0) return;
+    const body=document.getElementById('violationTableBody');
+    if(!body || !hasRealRows()) return;
+    body.innerHTML='<tr><td colspan="6"><div class="empty-state"><strong>Chưa có dữ liệu vi phạm</strong><p>Chỉ các bản ghi thực tế mới xuất hiện tại đây.</p></div></td></tr>';
+    const badge=document.getElementById('violationBadge');
+    if(badge) badge.textContent='0';
+    const cards=['statViolations'];
+    cards.forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='0'});
+  }
+  function schedule(){setTimeout(clearStaleRows,800)}
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',schedule,{once:true});
+  else schedule();
+  window.addEventListener('google-sheets-data-ready',schedule);
+  window.addEventListener('google-sheets-refresh',schedule);
+  new MutationObserver(()=>{if(localViolations().length===0) clearStaleRows()})
+    .observe(document.documentElement,{childList:true,subtree:true});
 })();
