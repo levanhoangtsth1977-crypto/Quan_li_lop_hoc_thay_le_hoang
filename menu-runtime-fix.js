@@ -28,6 +28,7 @@
     loadOnce('behavior-form-select-repair.js?v=20260913.1','data-lh-behavior-form-select-repair-v10');
     loadOnce('behavior-multi-student-ui.js?v=20260914.2','data-lh-behavior-multi-student-ui-v22');
     loadOnce('behavior-save-hardfix-21.js?v=20260914.22','data-lh-behavior-save-hardfix-v22');
+    loadOnce('static-save-hardfix-20260914.js?v=1.0.0','data-lh-static-save-hardfix-v10');
     loadOnce('student-links-fast-fix.js?v=2.0.0','data-lh-student-links-fast-fix-v20');
     loadOnce('violation-display-live-fix.js?v=20260914.1','data-lh-violation-display-live-fix-v12');
   }
