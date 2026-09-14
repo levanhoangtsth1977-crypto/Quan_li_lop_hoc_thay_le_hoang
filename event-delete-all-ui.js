@@ -1,174 +1,106 @@
-/* DELETE ALL — V5
-   Vi phạm: always read the live VI_PHAM sheet before deleting.
-   This avoids stale window.violationRecords causing "0 bản ghi" while rows are visible.
-   Khen thưởng keeps the existing V4 flow.
-   Does not intercept unrelated menus.
+/* CANONICAL BEHAVIOR DELETE — MASTER API
+   Vi phạm + Khen thưởng dùng đúng Master API:
+   GET  getViolations / getRewards
+   POST deleteRecord {sheet,id}
+   Không dùng get_events / delete_event.
 */
 (function(){
 'use strict';
-if(window.__LH_DELETE_ALL_V5__)return;
-window.__LH_DELETE_ALL_V5__=true;
+if(window.__LH_BEHAVIOR_DELETE_MASTER__)return;
+window.__LH_BEHAVIOR_DELETE_MASTER__=true;
 
-const API='https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrNWY5DCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
+const API=window.GOOGLE_API_CONFIG?.url||'https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
 const S=v=>String(v??'').trim();
-
-function pageOf(el){
-  return el?.closest?.('#page-violations,#page-rewards,[data-page-section="violations"],[data-page-section="rewards"]');
+function toast(m,t){try{window.showToast?window.showToast(m,t||'info'):console.log(m)}catch(_){console.log(m)}}
+function sheetAction(sheet){return sheet==='VI_PHAM'?'getViolations':'getRewards'}
+function getRows(sheet){
+  return new Promise((resolve,reject)=>{
+    const cb='LH_DEL_GET_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    const sc=document.createElement('script');let done=false;
+    const finish=(err,data)=>{if(done)return;done=true;clearTimeout(timer);try{delete window[cb]}catch(_){}sc.remove();err?reject(err):resolve(data)};
+    const timer=setTimeout(()=>finish(Error('Google Apps Script không phản hồi')),15000);
+    window[cb]=data=>finish(null,data);sc.onerror=()=>finish(Error('Không truy cập được Google Apps Script'));
+    const q=new URLSearchParams({action:sheetAction(sheet),callback:cb,_:Date.now()});
+    sc.src=API+'?'+q.toString();document.head.appendChild(sc);
+  }).then(r=>{if(!r?.ok)throw Error(r?.error||'Google trả lỗi');return Array.isArray(r.records)?r.records:[]});
 }
-function sheetOf(el){
-  const p=pageOf(el);
-  if(p?.id==='page-rewards'||p?.dataset.pageSection==='rewards')return'KHEN_THUONG';
-  if(p?.id==='page-violations'||p?.dataset.pageSection==='violations')return'VI_PHAM';
-  return'';
-}
-function isAll(el){
-  if(!el?.matches?.('button,[role="button"],a'))return false;
-  const t=S(el.textContent).toLowerCase();
-  return t.includes('xóa tất cả')||t.includes('xoá tất cả')||el.dataset.deleteAll==='true'||el.id==='lhDeleteAllViolations'||el.id==='lhDeleteAllRewards';
-}
-function toast(m,t){
-  if(typeof window.showToast==='function')window.showToast(m,t||'info');
-  else alert(m);
-}
-
-async function api(action,params={}){
-  const q=new URLSearchParams({action,...params});
-  const r=await fetch(API+'?'+q.toString(),{cache:'no-store'});
-  if(!r.ok)throw new Error('Máy chủ trả HTTP '+r.status);
-  const j=await r.json();
-  if(!j?.ok)throw new Error(j?.error||'Máy chủ trả lỗi');
-  return j;
-}
-
-function liveRows(sheet){
-  return api('get_events').then(j=>Array.isArray(j?.[sheet])?j[sheet]:[]);
-}
-function stableId(r){return S(r?.id||r?.eventId||r?.recordId);}
-function isRealViolation(r){
-  return !!(stableId(r)&&S(r?.studentId)&&S(r?.type||r?.content||r?.noiDung));
-}
-
-async function verifyCleared(sheet){
-  const j=await api('get_events');
-  const rows=Array.isArray(j?.[sheet])?j[sheet]:[];
-  return rows.filter(sheet==='VI_PHAM'?isRealViolation:()=>true);
-}
-
-async function deleteOneLive(sheet,id){
-  if(!id)return;
-  await api('delete_event',{sheet,id,eventId:id,recordId:id});
-}
-
-async function runViolation(b){
-  let rows=[];
-  try{
-    rows=(await liveRows('VI_PHAM')).filter(isRealViolation);
-  }catch(e){
-    toast('Không đọc được dữ liệu Vi phạm từ Google Sheets: '+e.message,'error');
-    return;
-  }
-  if(!rows.length){
-    try{
-      if(typeof window.renderViolations==='function')window.renderViolations();
-      if(typeof window.updateBadges==='function')window.updateBadges();
-    }catch(_){ }
-    toast('Google Sheets hiện không có bản ghi Vi phạm để xóa.','info');
-    return;
-  }
-  if(!confirm('XÓA TOÀN BỘ VI PHẠM?\n\nSố bản ghi thực tế trên Google Sheets: '+rows.length+'\n\nChỉ xóa sheet VI_PHAM. Không xóa menu khác.'))return;
-
-  const old=b.innerHTML;
-  b.disabled=true;
-  b.dataset.lhDeleteAllBusy='1';
-  b.innerHTML='⏳ Đang xóa '+rows.length+' bản ghi...';
-
-  let ok=0;
-  const fail=[];
-  try{
-    for(const row of rows){
-      const id=stableId(row);
-      if(!id)continue;
-      try{
-        await deleteOneLive('VI_PHAM',id);
-        ok++;
-      }catch(e){
-        fail.push(id+': '+S(e.message));
-      }
-    }
-
-    const remaining=await verifyCleared('VI_PHAM');
-    if(remaining.length){
-      toast('Đã xóa '+ok+' bản ghi nhưng Google Sheets còn '+remaining.length+' bản ghi Vi phạm. Con không làm thay đổi menu khác.','warning');
-      console.warn('[LH DELETE ALL V5] remaining',remaining);
-    }else{
-      toast('Đã xóa sạch toàn bộ danh sách Vi phạm. Có thể ghi nhận mới từ đầu.','success');
-    }
-
-    try{
-      if(Array.isArray(window.violationRecords))window.violationRecords.splice(0);
-      if(typeof window.renderViolations==='function')window.renderViolations();
-      if(typeof window.updateBadges==='function')window.updateBadges();
-      window.dispatchEvent(new Event('google-sheets-refresh'));
-    }catch(_){ }
-  }catch(e){
-    toast('Xóa tất cả Vi phạm thất bại: '+e.message,'error');
-  }finally{
-    b.disabled=false;
-    b.removeAttribute('data-lh-delete-all-busy');
-    b.innerHTML=old;
-  }
-}
-
-async function runRewardV4(b){
-  const rows=Array.isArray(window.rewardRecords)?window.rewardRecords.filter(r=>S(r?.id)):[];
-  if(!rows.length){toast('Không có dữ liệu khen thưởng để xóa.','info');return;}
-  if(!confirm('XÓA TOÀN BỘ LƯỢT KHEN THƯỞNG?\n\nSố lượt sẽ xóa: '+rows.length+'\nChỉ xóa dữ liệu của mục này.'))return;
-  const old=b.innerHTML;b.disabled=true;b.dataset.lhDeleteAllBusy='1';b.innerHTML='⏳ Đang xóa...';
-  let ok=0;const fail=[];
-  try{
-    for(const row of rows){
-      const id=S(row.id);if(!id)continue;
-      try{const j=await api('delete_event',{sheet:'KHEN_THUONG',id,recordId:id,eventId:id});if(j?.ok)ok++;}catch(e){fail.push(id+': '+S(e.message));}
-    }
-    if(Array.isArray(window.rewardRecords))window.rewardRecords.splice(0);
-    try{if(typeof window.renderRewards==='function')window.renderRewards();if(typeof window.updateBadges==='function')window.updateBadges();}catch(_){ }
-    if(fail.length)toast('Đã xóa '+ok+' lượt; còn '+fail.length+' lượt chưa xóa.','warning');
-    else toast('Đã xóa toàn bộ lượt khen thưởng.','success');
-  }finally{
-    b.disabled=false;b.removeAttribute('data-lh-delete-all-busy');b.innerHTML=old;
-  }
-}
-
-function clickHandler(e){
-  const b=e.target.closest?.('button,[role="button"],a');
-  if(!isAll(b))return;
-  const sheet=b.dataset.lhDeleteAllSheet||sheetOf(b);
-  if(!sheet)return;
-  e.preventDefault();
-  e.stopPropagation();
-  if(b.dataset.lhDeleteAllBusy==='1')return;
-  if(sheet==='VI_PHAM')runViolation(b);
-  else runRewardV4(b);
-}
-
-document.addEventListener('click',clickHandler,true);
-
-function cleanAndTag(){
-  ['#page-violations','#page-rewards'].forEach(sel=>{
-    const p=document.querySelector(sel);if(!p)return;
-    const all=[...p.querySelectorAll('button,[role="button"],a')].filter(isAll);
-    if(!all.length)return;
-    all.slice(1).forEach(x=>x.remove());
-    const b=all[0];
-    b.dataset.lhDeleteAllSheet=sheetOf(b);
-    b.dataset.lhDeleteAllV5='1';
-    b.removeAttribute('onclick');
+function postDelete(sheet,id){
+  return new Promise((resolve,reject)=>{
+    if(!sheet||!id)return reject(Error('Thiếu sheet hoặc recordId'));
+    const iframe=document.createElement('iframe');
+    const form=document.createElement('form');
+    const target='LH_DELETE_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    iframe.name=target;iframe.style.display='none';
+    form.method='POST';form.action=API;form.target=target;form.style.display='none';
+    const add=(k,v)=>{const input=document.createElement('input');input.type='hidden';input.name=k;input.value=S(v);form.appendChild(input)};
+    add('action','deleteRecord');add('sheet',sheet);add('id',id);add('recordId',id);
+    document.body.appendChild(iframe);document.body.appendChild(form);
+    let done=false;
+    const cleanup=()=>{try{iframe.remove()}catch(_){}try{form.remove()}catch(_){} };
+    const timer=setTimeout(()=>{if(done)return;done=true;cleanup();reject(Error('Google không xác nhận được yêu cầu xóa'))},12000);
+    iframe.addEventListener('load',()=>{if(done)return;done=true;clearTimeout(timer);cleanup();resolve(true)},{once:true});
+    try{form.submit()}catch(e){done=true;clearTimeout(timer);cleanup();reject(e)}
   });
 }
-
-function install(){cleanAndTag();}
+async function deleteExact(sheet,id){
+  const wanted=S(id);if(!wanted)throw Error('Thiếu recordId');
+  await postDelete(sheet,wanted);
+  const remaining=(await getRows(sheet)).some(r=>S(r?.id)===wanted);
+  if(remaining)throw Error('Google Sheets vẫn còn bản ghi có ID '+wanted);
+  return true;
+}
+function removeLocal(sheet,id){
+  const name=sheet==='VI_PHAM'?'violationRecords':'rewardRecords';
+  const arr=window[name];if(!Array.isArray(arr))return;
+  for(let i=arr.length-1;i>=0;i--)if(S(arr[i]?.id)===S(id))arr.splice(i,1);
+  try{window.syncAppDataReferences?.()}catch(_){}
+}
+function rerender(sheet){
+  try{sheet==='VI_PHAM'?window.renderViolations?.():window.renderRewards?.()}catch(_){}
+  try{window.renderDashboard?.();window.updateBadges?.()}catch(_){}
+  try{window.dispatchEvent(new Event('google-sheets-refresh'))}catch(_){}
+}
+async function deleteOne(sheet,id){
+  const label=sheet==='VI_PHAM'?'Vi phạm':'Khen thưởng';
+  try{
+    await deleteExact(sheet,id);removeLocal(sheet,id);rerender(sheet);toast('Đã xóa bản ghi '+label.toLowerCase()+'.','success');return true;
+  }catch(e){toast('Không thể xóa '+label.toLowerCase()+': '+S(e?.message||e),'error');return false}
+}
+async function deleteAll(sheet,button){
+  let rows;
+  try{rows=await getRows(sheet)}catch(e){toast('Không đọc được dữ liệu '+(sheet==='VI_PHAM'?'Vi phạm':'Khen thưởng')+': '+e.message,'error');return}
+  rows=rows.filter(r=>S(r?.id));
+  const label=sheet==='VI_PHAM'?'VI PHẠM':'KHEN THƯỞNG';
+  if(!rows.length){toast('Google Sheets hiện không có bản ghi '+label+'.','info');return}
+  if(!confirm('XÓA TOÀN BỘ '+label+'?\n\nSố bản ghi trên Google Sheets: '+rows.length+'\n\nChỉ xóa sheet '+sheet+'.'))return;
+  const old=button?.innerHTML||'Xóa tất cả';if(button){button.disabled=true;button.innerHTML='⏳ Đang xóa...'}
+  let ok=0;
+  try{
+    for(const row of rows){try{await deleteExact(sheet,S(row.id));ok++}catch(e){console.warn('[LH DELETE MASTER]',sheet,row.id,e)}}
+    const remain=await getRows(sheet);
+    const remainCount=remain.filter(r=>S(r?.id)).length;
+    if(remainCount===0){
+      const name=sheet==='VI_PHAM'?'violationRecords':'rewardRecords';
+      if(Array.isArray(window[name]))window[name].splice(0);
+      rerender(sheet);
+      toast('Đã xóa sạch '+label+'.','success');
+    }else{
+      toast('Đã xóa '+ok+'/'+rows.length+' bản ghi; Google Sheets còn '+remainCount+' bản ghi.','warning');
+      removeLocal(sheet,'__never_match__');rerender(sheet);
+    }
+  }catch(e){toast('Xóa '+label+' thất bại: '+S(e?.message||e),'error')}
+  finally{if(button){button.disabled=false;button.innerHTML=old}}
+}
+function pageOf(el){return el?.closest?.('#page-violations,#page-rewards,[data-page-section="violations"],[data-page-section="rewards"]')}
+function sheetOf(el){const p=pageOf(el);if(p?.id==='page-rewards'||p?.dataset.pageSection==='rewards')return'KHEN_THUONG';if(p?.id==='page-violations'||p?.dataset.pageSection==='violations')return'VI_PHAM';return''}
+function isAll(el){if(!el?.matches?.('button,[role="button"],a'))return false;const t=S(el.textContent).toLowerCase();return t.includes('xóa tất cả')||t.includes('xoá tất cả')||el.dataset.deleteAll==='true'||el.id==='lhDeleteAllViolations'||el.id==='lhDeleteAllRewards'}
+function clickHandler(e){const b=e.target.closest?.('button,[role="button"],a');if(!isAll(b))return;const sheet=b.dataset.lhDeleteAllSheet||sheetOf(b);if(!sheet)return;e.preventDefault();e.stopPropagation();if(b.dataset.lhDeleteAllBusy==='1')return;b.dataset.lhDeleteAllBusy='1';deleteAll(sheet,b).finally(()=>b.removeAttribute('data-lh-delete-all-busy'))}
+function cleanAndTag(){['#page-violations','#page-rewards'].forEach(sel=>{const p=document.querySelector(sel);if(!p)return;const all=[...p.querySelectorAll('button,[role="button"],a')].filter(isAll);if(!all.length)return;all.slice(1).forEach(x=>x.remove());const b=all[0];b.dataset.lhDeleteAllSheet=sheetOf(b);b.dataset.lhDeleteAllMaster='1';b.removeAttribute('onclick')})}
+function install(){cleanAndTag()}
+document.addEventListener('click',clickHandler,true);
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 new MutationObserver(install).observe(document.documentElement,{childList:true,subtree:true});
 [100,300,700,1500,3000].forEach(x=>setTimeout(install,x));
-window.LE_HOANG_DELETE_ALL_EVENTS_V5=runViolation;
+window.LE_HOANG_DELETE_ALL_EVENTS_V5=deleteAll;
+window.LE_HOANG_DELETE_RECORD_MASTER=deleteOne;
 })();
