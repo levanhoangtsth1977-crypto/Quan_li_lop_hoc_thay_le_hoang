@@ -1,11 +1,11 @@
-/* MENU RUNTIME FIX 8.45 — canonical behavior save/picker chain */
+/* MENU RUNTIME FIX 8.46 — canonical behavior save/picker chain */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_845__)return;
-  window.__MENU_RUNTIME_FIX_845__=true;
+  if(window.__MENU_RUNTIME_FIX_846__)return;
+  window.__MENU_RUNTIME_FIX_846__=true;
   const TITLES={dashboard:'Trang chủ',students:'Học sinh',attendance:'Điểm danh',violations:'Vi phạm',rewards:'Khen thưởng',learning:'Học tập',statistics:'Thống kê','student-links':'Link học sinh',ai:'AI giáo viên',game:'Triệu Phú Học Đường','lucky-wheel':'Vòng quay may mắn',settings:'Cài đặt'};
   function closeMobile(){const s=document.getElementById('sidebar'),o=document.getElementById('sidebarOverlay');if(window.innerWidth<=900||s?.classList.contains('open')){s?.classList.remove('open');o?.classList.remove('active');if(o){o.hidden=true;o.setAttribute('aria-hidden','true')}document.body.classList.remove('sidebar-open')}}
-  function signalPage(page){try{window.dispatchEvent(new CustomEvent('lh-page-change',{detail:{page}}));}catch(_){} if(page==='lucky-wheel'||page==='game'){try{window.dispatchEvent(new Event('pagechange'));}catch(_){} }}
+  function signalPage(page){try{window.dispatchEvent(new CustomEvent('lh-page-change',{detail:{page}}));}catch(_){}if(page==='lucky-wheel'||page==='game'){try{window.dispatchEvent(new Event('pagechange'));}catch(_){}}}
   function showPageFallback(page){const target=document.querySelector('[data-page-section="'+CSS.escape(String(page))+'"]')||document.getElementById('page-'+String(page));if(!target)return false;document.querySelectorAll('[data-page-section]').forEach(section=>{const active=section===target;section.hidden=!active;section.classList.toggle('active',active)});document.querySelectorAll('.main-menu .menu-item[data-page]').forEach(item=>item.classList.toggle('active',item.getAttribute('data-page')===String(page)));const title=document.getElementById('pageTitle');if(title)title.textContent=TITLES[page]||String(page);closeMobile();signalPage(page);return true}
   function menuRescue(event){const t=event.target instanceof Element?event.target:null;if(!t)return;const menu=t.closest('.main-menu .menu-item[data-page]');if(!menu)return;const page=menu.getAttribute('data-page');if(!page)return;const router=typeof window.navigateToPage==='function'?window.navigateToPage:(window.LopHocApp&&typeof window.LopHocApp.navigateToPage==='function'?window.LopHocApp.navigateToPage:null);if(router){try{const ok=router(page);if(ok!==false){closeMobile();signalPage(page);event.preventDefault();event.stopImmediatePropagation()}return}catch(_){} }if(showPageFallback(page)){event.preventDefault();event.stopImmediatePropagation()}}
   window.addEventListener('click',menuRescue,true);
@@ -28,7 +28,8 @@
     loadOnce('events-save-jsonp-v2.js?v=20260914.3','data-lh-events-save-jsonp-v25');
     loadOnce('behavior-form-select-repair.js?v=20260913.1','data-lh-behavior-form-select-repair-v10');
     loadOnce('behavior-multi-student-ui.js?v=20260914.1','data-lh-behavior-multi-student-ui-v21');
-    loadOnce('behavior-save-hardfix.js?v=20260914.5','data-lh-behavior-save-hardfix-v14');
+    // Canonical save owner. The same global guard prevents a duplicate load from index.html.
+    loadOnce('behavior-save-hardfix.js?v=20260914.6','data-lh-behavior-save-hardfix-v16');
     loadOnce('student-links-fast-fix.js?v=2.0.0','data-lh-student-links-fast-fix-v20');
     loadOnce('violation-display-live-fix.js?v=20260914.1','data-lh-violation-display-live-fix-v12');
   }
