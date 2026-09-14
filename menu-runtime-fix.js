@@ -1,13 +1,8 @@
-/* MENU RUNTIME FIX 8.42 — safe menu rescue + isolated form/link fixes
- * - Không bypass router chính.
- * - Không chặn liên kết Tiện ích dạng standalone.
- * - Đồng bộ pagechange cho Vòng quay / Game sau điều hướng.
- * - Nạp link-integrity sau khi menu động đã được tạo.
- */
+/* MENU RUNTIME FIX 8.43 — safe menu rescue + isolated form/link fixes */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_842__)return;
-  window.__MENU_RUNTIME_FIX_842__=true;
+  if(window.__MENU_RUNTIME_FIX_843__)return;
+  window.__MENU_RUNTIME_FIX_843__=true;
   const TITLES={dashboard:'Trang chủ',students:'Học sinh',attendance:'Điểm danh',violations:'Vi phạm',rewards:'Khen thưởng',learning:'Học tập',statistics:'Thống kê','student-links':'Link học sinh',ai:'AI giáo viên',game:'Triệu Phú Học Đường','lucky-wheel':'Vòng quay may mắn',settings:'Cài đặt'};
   function closeMobile(){const s=document.getElementById('sidebar'),o=document.getElementById('sidebarOverlay');if(window.innerWidth<=900||s?.classList.contains('open')){s?.classList.remove('open');o?.classList.remove('active');if(o){o.hidden=true;o.setAttribute('aria-hidden','true')}document.body.classList.remove('sidebar-open')}}
   function signalPage(page){try{window.dispatchEvent(new CustomEvent('lh-page-change',{detail:{page}}));}catch(_){} if(page==='lucky-wheel'||page==='game'){try{window.dispatchEvent(new Event('pagechange'));}catch(_){} }}
@@ -33,7 +28,7 @@
     loadOnce('events-save-jsonp-v2.js?v=20260914.2','data-lh-events-save-jsonp-v24');
     loadOnce('behavior-form-select-repair.js?v=20260913.1','data-lh-behavior-form-select-repair-v10');
     loadOnce('behavior-multi-student-ui.js?v=20260913.1','data-lh-behavior-multi-student-ui-v10');
-    loadOnce('behavior-save-hardfix.js?v=20260914.4','data-lh-behavior-save-hardfix-v13');
+    loadOnce('behavior-save-hardfix.js?v=20260914.5','data-lh-behavior-save-hardfix-v14');
     loadOnce('student-links-fast-fix.js?v=2.0.0','data-lh-student-links-fast-fix-v20');
     loadOnce('violation-display-live-fix.js?v=20260913.1','data-lh-violation-display-live-fix-v10');
   }
