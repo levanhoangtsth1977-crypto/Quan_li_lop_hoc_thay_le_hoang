@@ -25,22 +25,23 @@ function jsonp(action,params={},timeout=15000){
     sc.src=API()+'?'+q.toString();document.head.appendChild(sc);
   });
 }
+
+/*
+ * Apps Script Web App POST cannot expose its response to browser JS because
+ * the endpoint is cross-origin. A no-cors POST is therefore treated as the
+ * transport step; authoritative success is determined only by the following
+ * GET verification against the Master API.
+ */
 function post(action,payload){
-  return new Promise((resolve,reject)=>{
-    const iframe=document.createElement('iframe');
-    const form=document.createElement('form');
-    const target='LH_MASTER_POST_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-    iframe.name=target;iframe.hidden=true;
-    form.method='POST';form.action=API();form.target=target;form.hidden=true;
-    const add=(k,v)=>{const input=document.createElement('input');input.type='hidden';input.name=k;input.value=S(v);form.appendChild(input)};
-    add('action',action);Object.entries(payload||{}).forEach(([k,v])=>add(k,v));
-    document.body.appendChild(iframe);document.body.appendChild(form);
-    let done=false;const clean=()=>{try{iframe.remove()}catch(_){}try{form.remove()}catch(_){} };
-    const timer=setTimeout(()=>{if(done)return;done=true;clean();reject(Error('Google không xác nhận được yêu cầu POST'))},12000);
-    iframe.addEventListener('load',()=>{if(done)return;done=true;clearTimeout(timer);clean();resolve(true)},{once:true});
-    try{form.submit()}catch(e){done=true;clearTimeout(timer);clean();reject(e)}
-  });
+  const body=new URLSearchParams();
+  body.set('action',action);
+  Object.entries(payload||{}).forEach(([k,v])=>body.set(k,S(v)));
+  return fetch(API(),{method:'POST',mode:'no-cors',body,cache:'no-store',keepalive:true})
+    .then(()=>true)
+    .catch(e=>{throw Error('Không gửi được yêu cầu tới Google Apps Script: '+S(e?.message||e))});
 }
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
 const ARR={DIEM_DANH:'attendanceRecords',VI_PHAM:'violationRecords',KHEN_THUONG:'rewardRecords',HOC_TAP:'learningRecords',TIEN_BO:'progressRecords',NHAN_XET:'commentRecords'};
 const GET={DIEM_DANH:'getAttendance',VI_PHAM:'getViolations',KHEN_THUONG:'getRewards',HOC_TAP:'getLearning',TIEN_BO:'getProgress',NHAN_XET:'getComments'};
 const SAVE={DIEM_DANH:'saveAttendance',VI_PHAM:'saveViolation',KHEN_THUONG:'saveReward',HOC_TAP:'saveLearning',TIEN_BO:'saveProgress',NHAN_XET:'saveComment'};
@@ -51,8 +52,10 @@ function localRemove(sheet,id){const a=localArr(sheet);for(let i=a.length-1;i>=0
 }
 function render(sheet){try{if(sheet==='VI_PHAM')window.renderViolations?.();if(sheet==='KHEN_THUONG')window.renderRewards?.();if(sheet==='DIEM_DANH')window.renderAttendance?.();if(sheet==='HOC_TAP')window.renderLearning?.();if(sheet==='TIEN_BO')window.renderProgress?.();if(sheet==='NHAN_XET')window.renderComments?.();window.renderDashboard?.();window.updateBadges?.();window.refreshAll?.()}catch(_){}
 }
-async function saveMaster(sheet,record){const action=SAVE[sheet];if(!action)throw Error('Master chưa khai báo action lưu cho '+sheet);await post(action,record);const r=await jsonp(GET[sheet],{studentId:S(record.studentId)});const rows=Array.isArray(r?.records)?r.records:[];const remote=rows.find(x=>S(x?.id)===S(record.id));if(!remote)throw Error('Không xác minh được recordId '+S(record.id));return remote}
-async function deleteMaster(sheet,id){const wanted=S(id);if(!wanted)throw Error('Thiếu recordId');await post('deleteRecord',{sheet,id:wanted,recordId:wanted});const r=await jsonp(GET[sheet],{});const rows=Array.isArray(r?.records)?r.records:[];if(rows.some(x=>S(x?.id)===wanted))throw Error('Google Sheets vẫn còn recordId '+wanted);return true}
+async function fetchRecords(sheet,studentId){const r=await jsonp(GET[sheet],studentId?{studentId:S(studentId)}:{});if(!r?.ok)throw Error(r?.error||'Google Apps Script trả lỗi khi đọc dữ liệu');return Array.isArray(r.records)?r.records:[]}
+async function findSavedRecord(sheet,record,tries=4){for(let i=0;i<tries;i++){const rows=await fetchRecords(sheet,record.studentId);const hit=rows.find(x=>S(x?.id)===S(record.id));if(hit)return hit;if(i<tries-1)await sleep(1000)}throw Error('Google chưa xác minh được bản ghi vừa lưu (recordId '+S(record.id)+').')}
+async function saveMaster(sheet,record){const action=SAVE[sheet];if(!action)throw Error('Master chưa khai báo action lưu cho '+sheet);await post(action,record);return findSavedRecord(sheet,record,5)}
+async function deleteMaster(sheet,id){const wanted=S(id);if(!wanted)throw Error('Thiếu recordId');await post('deleteRecord',{sheet,id:wanted,recordId:wanted});for(let i=0;i<5;i++){const rows=await fetchRecords(sheet,'');if(!rows.some(x=>S(x?.id)===wanted))return true;if(i<4)await sleep(1000)}throw Error('Google Sheets vẫn còn recordId '+wanted)}
 function wrapSave(name,sheet,builder){const install=()=>{const old=window[name];if(typeof old!=='function')return false;if(old.__lhMasterWrapped)return true;const fn=function(...args){let record;try{record=builder(...args)}catch(e){toast('Lưu thất bại: '+S(e?.message||e),'error');return {success:false,message:S(e?.message||e)}}if(!record||!S(record.studentId))return old.apply(this,args);record={...record,id:S(record.id)||makeId(sheet==='VI_PHAM'?'VIO':sheet==='KHEN_THUONG'?'REW':sheet==='DIEM_DANH'?'ATT':sheet==='HOC_TAP'?'LRN':sheet==='TIEN_BO'?'PRO':'COM'),createdAt:S(record.createdAt)||new Date().toISOString(),updatedAt:new Date().toISOString()};localUpsert(sheet,record);render(sheet);saveMaster(sheet,record).then(remote=>{localUpsert(sheet,remote);render(sheet)}).catch(e=>{localRemove(sheet,record.id);render(sheet);toast('Google Sheets không lưu được: '+S(e?.message||e),'error')});return{success:true,record}};fn.__lhMasterWrapped=true;fn.__lhMasterOriginal=old;window[name]=fn;return true};let n=0;const timer=setInterval(()=>{if(install()||++n>120)clearInterval(timer)},250);install()}
 function wrapDelete(name,sheet){const install=()=>{const old=window[name];if(typeof old!=='function')return false;if(old.__lhMasterWrapped)return true;const fn=function(id,...args){const wanted=S(id);if(!wanted)return old.apply(this,[id,...args]);const a=localArr(sheet),backup=a.filter(x=>S(x?.id)===wanted).map(x=>({...x}));localRemove(sheet,wanted);render(sheet);deleteMaster(sheet,wanted).then(()=>toast('Đã xóa bản ghi.','success')).catch(e=>{backup.forEach(x=>localUpsert(sheet,x));render(sheet);toast('Xóa thất bại: '+S(e?.message||e),'error')});return true};fn.__lhMasterWrapped=true;fn.__lhMasterOriginal=old;window[name]=fn;return true};let n=0;const timer=setInterval(()=>{if(install()||++n>120)clearInterval(timer)},250);install()}
 wrapSave('saveAttendanceRecord','DIEM_DANH',(studentId,date,status,note='')=>({studentId,date:date||today(),status,note}));
