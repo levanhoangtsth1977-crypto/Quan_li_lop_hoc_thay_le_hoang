@@ -1,8 +1,8 @@
-/* BEHAVIOR SAVE HARD FIX 1.3 — canonical Vi phạm/Khen thưởng forms */
+/* BEHAVIOR SAVE HARD FIX 1.4 — canonical Vi phạm/Khen thưởng forms */
 (function(){
   'use strict';
-  if(window.__LH_BEHAVIOR_SAVE_HARDFIX_13__) return;
-  window.__LH_BEHAVIOR_SAVE_HARDFIX_13__=true;
+  if(window.__LH_BEHAVIOR_SAVE_HARDFIX_14__) return;
+  window.__LH_BEHAVIOR_SAVE_HARDFIX_14__=true;
 
   const API='https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
   const S=v=>String(v??'').trim();
@@ -15,7 +15,7 @@
   }
   function jsonp(action,params){
     return new Promise((resolve,reject)=>{
-      const cb='__LH_BHV_SAVE13_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const cb='__LH_BHV_SAVE14_'+Date.now()+'_'+Math.random().toString(36).slice(2);
       const s=document.createElement('script');let done=false;
       const finish=(err,data)=>{if(done)return;done=true;clearTimeout(timer);try{delete window[cb]}catch(_){window[cb]=undefined}s.remove();err?reject(err):resolve(data)};
       const timer=setTimeout(()=>finish(new Error('Google Apps Script không phản hồi sau 20 giây.')),20000);
@@ -24,6 +24,9 @@
       Object.entries(params||{}).forEach(([k,v])=>q.set(k,S(v)));
       s.src=API+'?'+q.toString();document.head.appendChild(s);
     });
+  }
+  function savePayload(sheet,record){
+    return jsonp('save_event',{payload:JSON.stringify({sheet,record})});
   }
   function idsFromSelect(sel){
     if(!sel)return [];
@@ -63,7 +66,7 @@
     try{
       for(const studentId of ids){
         const record={...base,studentId};
-        const r=await jsonp('save_event',{sheet,record:JSON.stringify(record)});
+        const r=await savePayload(sheet,record);
         if(!r?.ok||!(r.saved===true||r.stored===true))throw new Error(r?.error||`Google Sheets chưa xác nhận lưu cho ${studentId}.`);
       }
       try{form.closest('.modal')?.setAttribute('hidden','true');}catch(_){ }
@@ -110,7 +113,7 @@
       const base={studentId:'',date:S(root.querySelector('#eDate')?.value)||new Date().toISOString().slice(0,10),type,note:S(root.querySelector('#eNote')?.value)};
       if(isV){base.level=S(root.querySelector('#eLevel')?.value)||'light';base.status=S(root.querySelector('#eStatus')?.value)||'monitoring';base.action=S(root.querySelector('#eAction')?.value)}else base.formType=S(root.querySelector('#eForm')?.value)||'praise';
       btn.disabled=true;btn.innerHTML='Đang lưu...';
-      (async()=>{try{for(const studentId of unique){const r=await jsonp('save_event',{sheet:isV?'VI_PHAM':'KHEN_THUONG',record:JSON.stringify({...base,studentId})});if(!r?.ok||!(r.saved===true||r.stored===true))throw new Error(r?.error||'Google Sheets chưa xác nhận lưu.');}root.remove();toast(isV?'Đã lưu vi phạm thành công.':'Đã lưu khen thưởng thành công.','success');try{if(typeof window.syncGoogleSheetsNow==='function')await window.syncGoogleSheetsNow()}catch(_){ }try{if(typeof window.refreshAll==='function')window.refreshAll()}catch(_){ }}catch(err){btn.disabled=false;btn.innerHTML='Lưu';toast('Lưu thất bại: '+S(err?.message||err),'error')}})();
+      (async()=>{try{for(const studentId of unique){const r=await savePayload(isV?'VI_PHAM':'KHEN_THUONG',{...base,studentId});if(!r?.ok||!(r.saved===true||r.stored===true))throw new Error(r?.error||'Google Sheets chưa xác nhận lưu.');}root.remove();toast(isV?'Đã lưu vi phạm thành công.':'Đã lưu khen thưởng thành công.','success');try{if(typeof window.syncGoogleSheetsNow==='function')await window.syncGoogleSheetsNow()}catch(_){ }try{if(typeof window.refreshAll==='function')window.refreshAll()}catch(_){ }}catch(err){btn.disabled=false;btn.innerHTML='Lưu';toast('Lưu thất bại: '+S(err?.message||err),'error')}})();
     }
   },true);
 })();
