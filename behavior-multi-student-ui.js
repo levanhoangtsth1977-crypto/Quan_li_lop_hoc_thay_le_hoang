@@ -1,8 +1,8 @@
-/* BEHAVIOR MULTI-STUDENT UI 2.0 — COMPACT DROPDOWN MULTI-SELECT */
+/* BEHAVIOR MULTI-STUDENT UI 2.1 — SINGLE CANONICAL PICKER */
 (function(){
   'use strict';
-  if(window.__LH_BEHAVIOR_MULTI_STUDENT_UI_20__)return;
-  window.__LH_BEHAVIOR_MULTI_STUDENT_UI_20__=true;
+  if(window.__LH_BEHAVIOR_MULTI_STUDENT_UI_21__)return;
+  window.__LH_BEHAVIOR_MULTI_STUDENT_UI_21__=true;
 
   const S=v=>String(v??'').trim();
   const E=v=>S(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
@@ -71,8 +71,9 @@
         const cb=label.querySelector('input');
         cb.checked=option.selected;
         label.addEventListener('click',function(ev){
-          if(ev.target!==cb)cb.checked=!cb.checked;
+          ev.preventDefault();
           ev.stopPropagation();
+          cb.checked=!cb.checked;
           const opt=Array.from(select.options).find(o=>o.value===option.value);
           if(opt){opt.selected=cb.checked;select.dispatchEvent(new Event('change',{bubbles:true}));}
           sync();
