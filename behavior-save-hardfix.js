@@ -1,19 +1,19 @@
-/* BEHAVIOR SAVE HARD FIX 1.7 — CANONICAL SAVE OWNER */
+/* BEHAVIOR SAVE HARD FIX 1.8 — CANONICAL SAVE OWNER */
 (function(){
   'use strict';
-  if(window.__LH_BEHAVIOR_SAVE_HARDFIX_17__) return;
-  window.__LH_BEHAVIOR_SAVE_HARDFIX_17__=true;
+  if(window.__LH_BEHAVIOR_SAVE_HARDFIX_18__) return;
+  window.__LH_BEHAVIOR_SAVE_HARDFIX_18__=true;
   const API='https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
   const S=v=>String(v??'').trim();
   const $=(root,sel)=>root?.querySelector?.(sel)||document.querySelector(sel);
   function toast(msg,type){if(typeof window.showToast==='function')window.showToast(msg,type||'info');else if(typeof window.toast==='function')window.toast(msg,type||'info');else window.alert(msg)}
-  function jsonp(action,params){return new Promise((resolve,reject)=>{const cb='__LH_BHV_SAVE17_'+Date.now()+'_'+Math.random().toString(36).slice(2);const script=document.createElement('script');let done=false;const finish=(err,data)=>{if(done)return;done=true;clearTimeout(timer);try{delete window[cb]}catch(_){window[cb]=undefined}script.remove();err?reject(err):resolve(data)};const timer=setTimeout(()=>finish(new Error('Google Apps Script không phản hồi sau 20 giây.')),20000);window[cb]=data=>finish(null,data);script.onerror=()=>finish(new Error('Không thể kết nối Google Apps Script.'));const q=new URLSearchParams({action,callback:cb,_:String(Date.now())});Object.entries(params||{}).forEach(([k,v])=>q.set(k,S(v)));script.src=API+'?'+q.toString();document.head.appendChild(script)})}
+  function jsonp(action,params){return new Promise((resolve,reject)=>{const cb='__LH_BHV_SAVE18_'+Date.now()+'_'+Math.random().toString(36).slice(2);const script=document.createElement('script');let done=false;const finish=(err,data)=>{if(done)return;done=true;clearTimeout(timer);try{delete window[cb]}catch(_){window[cb]=undefined}script.remove();err?reject(err):resolve(data)};const timer=setTimeout(()=>finish(new Error('Google Apps Script không phản hồi sau 20 giây.')),20000);window[cb]=data=>finish(null,data);script.onerror=()=>finish(new Error('Không thể kết nối Google Apps Script.'));const q=new URLSearchParams({action,callback:cb,_:String(Date.now())});Object.entries(params||{}).forEach(([k,v])=>q.set(k,S(v)));script.src=API+'?'+q.toString();document.head.appendChild(script)})}
   function idsFromSelect(sel){if(!sel)return[];const values=sel.multiple?Array.from(sel.options||[]).filter(o=>o.selected&&S(o.value)).map(o=>S(o.value)):[S(sel.value)].filter(Boolean);return[...new Set(values)]}
   function idsFromPicker(form){return[...new Set(Array.from(form.querySelectorAll('.lh-csp-list input[type="checkbox"]:checked')).map(x=>S(x.value)).filter(Boolean))]}
   function studentIds(form,kind){const sel=form.querySelector(kind==='V'?'#violationStudent':'#rewardStudent');const picker=idsFromPicker(form);return picker.length?picker:idsFromSelect(sel)}
   function setBusy(btn,busy){if(!btn)return;if(busy){if(btn.dataset.lhOldHtml==null)btn.dataset.lhOldHtml=btn.innerHTML;btn.disabled=true;btn.innerHTML='Đang lưu...'}else{btn.disabled=false;if(btn.dataset.lhOldHtml!=null){btn.innerHTML=btn.dataset.lhOldHtml;delete btn.dataset.lhOldHtml}}}
-  function rowMatches(r,record){const text=v=>S(v).toLowerCase();return S(r?.studentId)===S(record.studentId)&&S(r?.date).slice(0,10)===S(record.date).slice(0,10)&&text(r?.type||r?.content||r?.noiDung)===text(record.type)&&text(r?.note||r?.description)===text(record.note)}
-  async function verifySaved(sheet,record){const data=await jsonp('get_events',{});if(!data?.ok)throw new Error(data?.error||'Không đọc lại được Google Sheets để xác minh.');const rows=Array.isArray(data?.[sheet])?data[sheet]:[];return {data,rows,found:rows.some(r=>rowMatches(r,record))}}
+  function formatResponseError(response){if(!response)return'Google Apps Script không trả về dữ liệu.';return S(response.error||response.message||response.status||'Google Apps Script từ chối lưu.')}
+  async function bestEffortVerify(sheet,record){try{const data=await jsonp('get_events',{});if(!data?.ok)return null;const rows=Array.isArray(data?.[sheet])?data[sheet]:[];return rows.some(r=>S(r?.studentId)===S(record.studentId)&&S(r?.date).slice(0,10)===S(record.date).slice(0,10)&&S(r?.type||r?.content||r?.noiDung).toLowerCase()===S(record.type).toLowerCase()&&S(r?.note||r?.description).toLowerCase()===S(record.note).toLowerCase())}catch(_){return null}}
   async function saveOne(sheet,record){
     const wrapper=JSON.stringify({sheet,record});
     const variants=[
@@ -22,14 +22,15 @@
       {sheet,record:JSON.stringify(record)},
       {sheet,record:wrapper}
     ];
-    let last='Google Apps Script từ chối lưu.';
+    const errors=[];
     for(let i=0;i<variants.length;i++){
-      let response;
-      try{response=await jsonp('save_event',variants[i]);last=S(response?.error||last)}catch(e){last=S(e?.message||e);continue}
-      try{const check=await verifySaved(sheet,record);if(check.found)return check.data;}catch(e){last=S(e?.message||e)}
-      if(response?.ok===true){last=S(response?.message||response?.error||last)}
+      try{
+        const response=await jsonp('save_event',variants[i]);
+        if(response?.ok===true){bestEffortVerify(sheet,record);return response;}
+        errors.push(`Lần ${i+1}: ${formatResponseError(response)}`);
+      }catch(e){errors.push(`Lần ${i+1}: ${S(e?.message||e)}`)}
     }
-    throw new Error(last);
+    throw new Error(errors.join(' | ')||'Google Apps Script từ chối lưu.');
   }
   async function saveForm(form,kind,button){
     if(!form||form.dataset.lhSaving==='1')return;
@@ -49,6 +50,7 @@
       const d=$(form,kind==='V'?'#violationDate':'#rewardDate');if(d)d.value=new Date().toISOString().slice(0,10);
       try{form.closest('.modal')?.setAttribute('hidden','true')}catch(_){ }
       toast(kind==='V'?`Đã lưu ${ids.length} học sinh vi phạm thành công.`:`Đã lưu ${ids.length} học sinh khen thưởng thành công.`,'success');
+      setBusy(button,false);
       try{if(typeof window.syncGoogleSheetsNow==='function')await window.syncGoogleSheetsNow()}catch(_){ }
       try{if(typeof window.refreshAll==='function')window.refreshAll()}catch(_){ }
       try{if(typeof window.renderViolations==='function')window.renderViolations()}catch(_){ }
