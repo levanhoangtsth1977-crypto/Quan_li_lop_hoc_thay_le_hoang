@@ -1,17 +1,13 @@
-/* BEHAVIOR SAVE CANONICAL 2.4 — single owner for Vi phạm/Khen thưởng */
+/* BEHAVIOR SAVE CANONICAL 2.5 — single owner for Vi phạm/Khen thưởng */
 (function(){
 'use strict';
-if(window.__LH_BEHAVIOR_SAVE_CANONICAL_24__)return;
-window.__LH_BEHAVIOR_SAVE_CANONICAL_24__=true;
+if(window.__LH_BEHAVIOR_SAVE_CANONICAL_25__)return;
+window.__LH_BEHAVIOR_SAVE_CANONICAL_25__=true;
 
-const APIS=[
-  'https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec',
-  'https://script.google.com/macros/s/AKfycbynklm7SobnkcEZKfAUGdMIBugA4lQ2kA3yOThHVjNoiJzCK7veuwO2vE1tR1QKI-nkIQ/exec'
-];
-const TIMEOUT=10000;
+const API='https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
+const VERIFY_DELAY=900;
 const S=v=>String(v??'').trim();
-const esc=v=>S(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
-const toast=(m,t='info')=>{try{window.showToast?window.showToast(m,t):console.log(m)}catch(_) {console.log(m)}};
+const toast=(m,t='info')=>{try{window.showToast?window.showToast(m,t):console.log(m)}catch(_){console.log(m)}};
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const makeId=p=>`${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,9)}`;
 
@@ -38,29 +34,17 @@ function selectedStudents(form){
   return[...new Map(vals.map(resolve).filter(Boolean).map(s=>[S(s.id),s])).values()];
 }
 function field(form,ids){for(const id of ids){const el=form.querySelector(id);if(el)return el}return null}
-function jsonp(url,action,params){
-  return new Promise((resolve,reject)=>{
-    const cb='LH24_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-    const sc=document.createElement('script');let done=false;
-    const finish=(err,data)=>{if(done)return;done=true;clearTimeout(timer);try{delete window[cb]}catch(_){}sc.remove();err?reject(err):resolve(data)};
-    const timer=setTimeout(()=>finish(Error('Google Sheets không phản hồi trong 10 giây.')),TIMEOUT);
-    window[cb]=data=>finish(null,data);sc.onerror=()=>finish(Error('Không truy cập được Google Apps Script.'));
-    const q=new URLSearchParams({action,callback:cb,_:String(Date.now())});
-    Object.entries(params||{}).forEach(([k,v])=>q.set(k,S(typeof v==='string'?v:JSON.stringify(v))));
-    sc.src=url+'?'+q.toString();document.head.appendChild(sc);
-  });
-}
-function responseOk(r){return !!(r?.ok===true||r?.success===true||r?.saved===true||r?.stored===true)}
-async function cloudSave(sheet,record){
-  let last='';
-  for(const url of APIS){
-    try{
-      const r=await jsonp(url,'save_event',{payload:JSON.stringify({sheet,record})});
-      if(responseOk(r))return r;
-      last=S(r?.error||r?.message||'Google Sheets từ chối bản ghi.');
-    }catch(e){last=S(e?.message||e)}
-  }
-  throw Error(last||'Không kết nối được Google Sheets.');
+function values(form,isV){
+  const type=field(form,isV?['#violationType','select[name="violationType"]']:['#rewardType','select[name="rewardType"]']);
+  const date=field(form,isV?['#violationDate','input[name="violationDate"]']:['#rewardDate','input[name="rewardDate"]']);
+  const note=field(form,isV?['#violationNote','textarea[name="violationNote"]']:['#rewardNote','textarea[name="rewardNote"]']);
+  const out={type:S(type?.value),date:S(date?.value)||today(),note:S(note?.value)};
+  if(isV)out.extra={
+    level:S(field(form,['#violationLevel','select[name="violationLevel"]'])?.value)||'light',
+    status:S(field(form,['#violationStatus','select[name="violationStatus"]'])?.value)||'monitoring',
+    action:S(field(form,['#violationAction','select[name="violationAction"]'])?.value)
+  };else out.extra={formType:S(field(form,['#rewardFormType','select[name="rewardFormType"]'])?.value)||'praise'};
+  return out;
 }
 function localPush(sheet,record){
   const name=sheet==='VI_PHAM'?'violationRecords':'rewardRecords';
@@ -76,39 +60,69 @@ function rerender(){
   try{window.renderViolations?.()}catch(_){}
   try{window.renderRewards?.()}catch(_){}
 }
-function values(form,isV){
-  const type=field(form,isV?['#violationType','select[name="violationType"]']:['#rewardType','select[name="rewardType"]']);
-  const date=field(form,isV?['#violationDate','input[name="violationDate"]']:['#rewardDate','input[name="rewardDate"]']);
-  const note=field(form,isV?['#violationNote','textarea[name="violationNote"]']:['#rewardNote','textarea[name="rewardNote"]']);
-  const out={type:S(type?.value),date:S(date?.value)||today(),note:S(note?.value)};
-  if(isV)out.extra={
-    level:S(field(form,['#violationLevel','select[name="violationLevel"]'])?.value)||'light',
-    status:S(field(form,['#violationStatus','select[name="violationStatus"]'])?.value)||'monitoring',
-    action:S(field(form,['#violationAction','select[name="violationAction"]'])?.value)
-  };else out.extra={formType:S(field(form,['#rewardFormType','select[name="rewardFormType"]'])?.value)||'praise'};
-  return out;
+function postSave(sheet,record){
+  /*
+   * IMPORTANT: the active Apps Script MASTER API saves records in doPost()
+   * using actions saveViolation/saveReward. It does NOT expose save_event
+   * through GET/JSONP. Send a simple form-encoded POST, which is CORS-safe
+   * for a browser, and let Apps Script parse the fields from e.postData.
+   * The response is intentionally opaque (no CORS dependency).
+   */
+  const action=sheet==='VI_PHAM'?'saveViolation':'saveReward';
+  const body=new URLSearchParams();
+  body.set('action',action);
+  Object.entries(record).forEach(([k,v])=>body.set(k,S(v)));
+  return fetch(API,{method:'POST',mode:'no-cors',body,cache:'no-store',keepalive:true})
+    .then(()=>true)
+    .catch(err=>{throw Error('Google Apps Script không nhận được yêu cầu lưu: '+S(err?.message||err))});
+}
+function jsonp(action,params,timeout=8000){
+  return new Promise((resolve,reject)=>{
+    const cb='LH25_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    const sc=document.createElement('script');let done=false;
+    const finish=(err,data)=>{if(done)return;done=true;clearTimeout(timer);try{delete window[cb]}catch(_){}sc.remove();err?reject(err):resolve(data)};
+    const timer=setTimeout(()=>finish(Error('Google không trả kết quả xác minh.')),timeout);
+    window[cb]=data=>finish(null,data);sc.onerror=()=>finish(Error('Không truy cập được Google Apps Script để xác minh.'));
+    const q=new URLSearchParams({action,callback:cb,_:String(Date.now()),...(params||{})});
+    sc.src=API+'?'+q.toString();document.head.appendChild(sc);
+  });
+}
+async function verifyCloud(sheet,record){
+  await new Promise(r=>setTimeout(r,VERIFY_DELAY));
+  try{
+    const action=sheet==='VI_PHAM'?'getViolations':'getRewards';
+    const r=await jsonp(action,{studentId:S(record.studentId)});
+    if(!r?.ok)return false;
+    const rows=Array.isArray(r.records)?r.records:(Array.isArray(r.data)?r.data:[]);
+    return rows.some(x=>S(x?.id)===S(record.id));
+  }catch(_){return false}
 }
 async function save(form,isV,button){
-  if(!form||form.dataset.lhCanonicalSaving24==='1')return;
-  form.dataset.lhCanonicalSaving24='1';
+  if(!form||form.dataset.lhCanonicalSaving25==='1')return;
+  form.dataset.lhCanonicalSaving25='1';
   const old=button?.innerHTML||'Lưu';if(button){button.disabled=true;button.innerHTML='Đang lưu...'}
   try{
     const chosen=selectedStudents(form);if(!chosen.length)throw Error('Vui lòng chọn ít nhất một học sinh.');
     const v=values(form,isV);if(!v.type)throw Error(isV?'Vui lòng chọn nội dung vi phạm.':'Vui lòng chọn nội dung khen thưởng.');
     const sheet=isV?'VI_PHAM':'KHEN_THUONG';
-    let cloud=0;
+    let accepted=0,verified=0;
     for(const student of chosen){
       const rec={id:makeId(isV?'VIO':'REW'),studentId:S(student.id),studentName:S(student.name),date:v.date,type:v.type,note:v.note,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),...v.extra};
-      localPush(sheet,rec);cloud=await cloudSave(sheet,rec).then(()=>cloud+1).catch(e=>{console.warn('[LH24] cloud',e);return cloud});
+      localPush(sheet,rec);
+      try{await postSave(sheet,rec);accepted++}catch(e){console.warn('[LH25] post',e)}
+      if(accepted>0){
+        try{if(await verifyCloud(sheet,rec))verified++}catch(_){}
+      }
     }
     rerender();
-    if(cloud===chosen.length)toast(`Đã lưu ${cloud} học sinh ${isV?'vi phạm':'khen thưởng'}.`,'success');
-    else toast(`Đã lưu ${chosen.length} học sinh trên thiết bị; Google Sheets lưu ${cloud}/${chosen.length}.`,'warning');
-    try{await window.syncGoogleSheetsNow?.();rerender()}catch(_){}
+    if(accepted===chosen.length && verified===chosen.length)toast(`Đã lưu ${accepted} học sinh vào Google Sheets.`,'success');
+    else if(accepted===chosen.length)toast(`Đã gửi ${accepted} học sinh lên Google Sheets. Chưa lấy được phản hồi xác minh; dữ liệu vẫn được giữ trên giao diện.`,'success');
+    else if(accepted>0)toast(`Đã gửi ${accepted}/${chosen.length} học sinh lên Google Sheets.`,'warning');
+    else throw Error('Google Apps Script không nhận được yêu cầu lưu.');
     try{form.reset()}catch(_){}
     const d=form.querySelector(isV?'#violationDate':'#rewardDate');if(d)d.value=today();
   }catch(e){toast('Lưu thất bại: '+S(e?.message||e),'error')}
-  finally{form.dataset.lhCanonicalSaving24='';if(button){button.disabled=false;button.innerHTML=old}}
+  finally{form.dataset.lhCanonicalSaving25='';if(button){button.disabled=false;button.innerHTML=old}}
 }
 function isSaveButton(button,form){
   if(!button||!form.contains(button))return false;
