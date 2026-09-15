@@ -3,6 +3,8 @@ name: Verify core menu integrity
 on:
   push:
     branches: [master]
+  pull_request:
+    branches: [master]
   workflow_dispatch:
 
 permissions:
@@ -26,7 +28,6 @@ jobs:
           from pathlib import Path
           from collections import Counter
           import re
-          from html.parser import HTMLParser
 
           html = Path('index.html').read_text(encoding='utf-8')
           runtime = Path('menu-runtime-fix.js').read_text(encoding='utf-8')
@@ -67,7 +68,7 @@ jobs:
           if not Path('tien-ich.html').is_file():
               raise SystemExit('tien-ich.html missing')
 
-          # Static script includes: no duplicate exact JS/CSS paths in index.html.
+          # Static script/style includes must be unique.
           scripts = re.findall(r'<script[^>]+src=["\']([^"\']+)', html, flags=re.I)
           for label, values in [
               ('JS', scripts),
@@ -78,24 +79,41 @@ jobs:
               if dup:
                   raise SystemExit(f'Duplicate {label} includes in index.html: {dup}')
 
-          # Static modules below are intentionally owned by index.html.
+          # Static modules must have one owner only.
           for name in ('learning-smas-import.js','behavior-records-ai-summary.js'):
               count = sum(1 for src in scripts if src.split('?')[0] == name)
               if count != 1:
                   raise SystemExit(f'Static module include count for {name}: {count}')
+              if "loadOnce('" + name + "'" in runtime:
+                  raise SystemExit(f'Duplicate runtime/static ownership for {name}')
 
-          # Runtime-only modules must be loaded by one canonical loadOnce entry.
+          # Runtime-only modules must be loaded exactly once.
           for name in ('behavior-quick-options.js','home-class-logo.js','site-link-integrity.js'):
               count = runtime.count("loadOnce('" + name + "'")
               if count != 1:
                   raise SystemExit(f'Runtime loader count for {name}: {count}')
 
-          # The two static modules above must NOT also be runtime loaded.
-          for name in ('learning-smas-import.js','behavior-records-ai-summary.js'):
-              if "loadOnce('" + name + "'" in runtime:
-                  raise SystemExit(f'Duplicate runtime/static ownership for {name}')
+          # Runtime loader must stay loader-only: no global event interception.
+          for forbidden in ("addEventListener('click'", 'addEventListener("click"',
+                             "addEventListener('submit'", 'addEventListener("submit"',
+                             'preventDefault('):
+              if forbidden in runtime:
+                  raise SystemExit(f'Global interaction hook found in menu runtime: {forbidden}')
 
-          # No obsolete menu entry or legacy class in index.html.
+          # Retired modules must not return to the active graph.
+          retired = (
+              'clear-targeted-violations-20260908.js',
+              'ui-action-patch.js',
+              'ui-complete-fix.js',
+              'site-integrity-guard.js'
+          )
+          for name in retired:
+              if name in html or name in runtime:
+                  raise SystemExit(f'Retired module referenced by active graph: {name}')
+              if Path(name).exists():
+                  raise SystemExit(f'Retired module still present: {name}')
+
+          # No obsolete classroom menu entry or legacy class in index.html.
           if re.search(r'data-page=["\']comments["\']', html):
               raise SystemExit('Legacy comments menu found')
           if '5C' in html or '5c' in html:
