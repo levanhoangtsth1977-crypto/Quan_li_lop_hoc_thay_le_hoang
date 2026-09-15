@@ -1,14 +1,13 @@
-/* MENU RUNTIME 9.3 — LOADER ONLY
- * The main classroom menu/router stays in script.js.
- * This file only loads required feature modules once.
+/* MENU RUNTIME 9.4 — LOADER ONLY
+ * script.js is the sole permanent classroom UI/event router.
+ * ui-complete-fix.js, loaded immediately after script.js, owns the temporary
+ * startup activation guard. This loader must not install another click guard.
  * No global click/submit interception and no page rendering here.
- * The early activation guard is temporary startup protection only and
- * automatically removes itself when script.js binds its canonical router.
  */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_930__) return;
-  window.__MENU_RUNTIME_FIX_930__ = true;
+  if(window.__MENU_RUNTIME_FIX_940__) return;
+  window.__MENU_RUNTIME_FIX_940__ = true;
 
   const loadOnce=(src,attr)=>{
     try{
@@ -18,11 +17,10 @@
       s.async=false;
       s.setAttribute(attr,'1');
       document.head.appendChild(s);
-    }catch(e){ console.warn('[MENU RUNTIME 9.3]',e); }
+    }catch(e){ console.warn('[MENU RUNTIME 9.4]',e); }
   };
 
   function boot(){
-    loadOnce('ui-early-activation.js?v=20260916.1','data-lh-ui-early-activation-v10');
     loadOnce('student-profile-repair.js?v=20260826.2','data-lh-profile-repair');
     loadOnce('menu-badge-sync-fix.js?v=20260826.1','data-lh-menu-badge-sync');
     loadOnce('home-data-sync-fix.js?v=20260826.1','data-lh-home-data-sync');
