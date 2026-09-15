@@ -1,9 +1,9 @@
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
 
-function copyHeaders(res) {
-  const type = res.headers.get('content-type');
-  if (type) res.setHeader('content-type', type);
-  res.setHeader('cache-control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+function copyHeaders(target, upstream) {
+  const type = upstream.headers.get('content-type');
+  if (type) target.setHeader('content-type', type);
+  target.setHeader('cache-control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
 }
 
 module.exports = async function handler(req, res) {
