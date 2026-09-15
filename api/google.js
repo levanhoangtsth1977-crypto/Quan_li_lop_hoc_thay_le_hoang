@@ -2,6 +2,9 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOo
 
 function copyHeaders(target, upstream) {
   target.setHeader('cache-control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  target.setHeader('access-control-allow-origin', '*');
+  target.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS');
+  target.setHeader('access-control-allow-headers', 'content-type');
   const type = upstream.headers.get('content-type');
   if (type) target.setHeader('x-google-content-type', type);
   target.setHeader('content-type', 'application/json; charset=utf-8');
@@ -12,7 +15,6 @@ function parseUpstream(text) {
   if (!raw) return null;
   try { return JSON.parse(raw); } catch (_) {}
 
-  // Accept accidental JSONP wrappers such as callback({...}).
   const a = raw.indexOf('{');
   const b = raw.lastIndexOf('}');
   if (a >= 0 && b > a) {
@@ -22,9 +24,18 @@ function parseUpstream(text) {
 }
 
 module.exports = async function handler(req, res) {
+  res.setHeader('access-control-allow-origin', '*');
+  res.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS');
+  res.setHeader('access-control-allow-headers', 'content-type');
+  res.setHeader('cache-control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
   try {
     if (req.method !== 'GET' && req.method !== 'POST') {
-      res.setHeader('allow', 'GET, POST');
+      res.setHeader('allow', 'GET, POST, OPTIONS');
       return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
     }
 
