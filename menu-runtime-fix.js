@@ -1,10 +1,13 @@
-/* MENU RUNTIME 8.71 — stable loader + isolated menu fallback */
+/* MENU RUNTIME 9.0 — LOADER ONLY
+ * script.js owns the single SPA/menu event router.
+ * master-crud-ui.js owns the canonical Google Sheets CRUD wrappers.
+ * This file only loads isolated feature modules once; it does not intercept
+ * click/submit events and does not render/replace pages.
+ */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_871__) return;
-  window.__MENU_RUNTIME_FIX_871__ = true;
-
-  const TITLES={dashboard:'Trang chủ',students:'Học sinh',attendance:'Điểm danh',violations:'Vi phạm',rewards:'Khen thưởng',learning:'Học tập',statistics:'Thống kê','student-links':'Link học sinh',ai:'AI giáo viên','lucky-wheel':'Vòng quay may mắn',settings:'Cài đặt'};
+  if(window.__MENU_RUNTIME_FIX_900__) return;
+  window.__MENU_RUNTIME_FIX_900__ = true;
   const loadOnce=(src,attr)=>{
     try{
       if(document.querySelector('script['+attr+']')) return;
@@ -13,40 +16,8 @@
       s.async=false;
       s.setAttribute(attr,'1');
       document.head.appendChild(s);
-    }catch(e){ console.warn('[MENU RUNTIME 8.71]',e); }
+    }catch(e){ console.warn('[MENU RUNTIME 9.0]',e); }
   };
-  const showPage=(page)=>{
-    const target=document.querySelector('[data-page-section="'+String(page).replace(/"/g,'&quot;')+'"]')||document.getElementById('page-'+String(page));
-    if(!target) return false;
-    document.querySelectorAll('[data-page-section]').forEach(x=>{x.hidden=x!==target;x.classList.toggle('active',x===target)});
-    document.querySelectorAll('.main-menu .menu-item[data-page]').forEach(x=>x.classList.toggle('active',x.getAttribute('data-page')===String(page)));
-    const title=document.getElementById('pageTitle'); if(title) title.textContent=TITLES[page]||String(page);
-    const sidebar=document.getElementById('sidebar'),overlay=document.getElementById('sidebarOverlay');
-    if(window.innerWidth<=900||sidebar?.classList.contains('open')){sidebar?.classList.remove('open');overlay?.classList.remove('active');if(overlay){overlay.hidden=true;overlay.setAttribute('aria-hidden','true')}document.body.classList.remove('sidebar-open');}
-    try{window.dispatchEvent(new CustomEvent('lh-page-change',{detail:{page}}));}catch(_){ }
-    if(page==='lucky-wheel') try{window.dispatchEvent(new Event('pagechange'));}catch(_){ }
-    try{window.renderDashboard?.();window.updateBadges?.();}catch(_){ }
-    try{
-      if(page==='students') window.renderStudents?.();
-      if(page==='attendance') window.renderAttendance?.();
-      if(page==='violations') window.renderViolations?.();
-      if(page==='rewards') window.renderRewards?.();
-      if(page==='learning') window.renderLearning?.();
-      if(page==='statistics') window.renderStatistics?.();
-    }catch(_){ }
-    return true;
-  };
-  /* Only sidebar menu items are handled here. No global form interception. */
-  document.addEventListener('click',e=>{
-    try{
-      const t=e.target instanceof Element?e.target:null;
-      const item=t?.closest('.main-menu .menu-item[data-page]');
-      if(!item) return;
-      const page=item.getAttribute('data-page');
-      if(showPage(page)) e.preventDefault();
-    }catch(err){console.warn('[MENU RUNTIME 8.71]',err)}
-  },true);
-
   function boot(){
     loadOnce('student-profile-repair.js?v=20260826.2','data-lh-profile-repair');
     loadOnce('menu-badge-sync-fix.js?v=20260826.1','data-lh-menu-badge-sync');
@@ -64,6 +35,8 @@
     loadOnce('behavior-multi-student-ui.js?v=20260914.2','data-lh-behavior-multi-student-ui-v22');
     loadOnce('master-crud-ui.js?v=20260915.13','data-lh-master-crud-ui-v13');
     loadOnce('student-links-fast-fix.js?v=2.0.0','data-lh-student-links-fast-fix-v20');
+    loadOnce('lucky-wheel-final.js?v=20260915.1','data-lh-lucky-wheel-final-v21');
   }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true}); else boot();
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true});
+  else boot();
 })();
