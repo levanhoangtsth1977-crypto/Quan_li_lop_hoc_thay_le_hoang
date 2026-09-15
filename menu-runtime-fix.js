@@ -1,8 +1,8 @@
-/* MENU RUNTIME 8.67 — one canonical SAVE path; legacy form handlers blocked */
+/* MENU RUNTIME 8.68 — canonical menu/router + Master CRUD v12 */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_867__)return;
-  window.__MENU_RUNTIME_FIX_867__=true;
+  if(window.__MENU_RUNTIME_FIX_868__)return;
+  window.__MENU_RUNTIME_FIX_868__=true;
   const TITLES={dashboard:'Trang chủ',students:'Học sinh',attendance:'Điểm danh',violations:'Vi phạm',rewards:'Khen thưởng',learning:'Học tập',statistics:'Thống kê','student-links':'Link học sinh',ai:'AI giáo viên',game:'Triệu Phú Học Đường','lucky-wheel':'Vòng quay may mắn',settings:'Cài đặt'};
   const S=v=>String(v??'').trim();
   const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
@@ -25,7 +25,7 @@
     if(!type){toast('Vui lòng chọn nội dung.','warning');return}
     const record={id:`${isV?'VIO':'REW'}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`,studentId,studentName:S(student?.name),date,type,note:S(form.querySelector(isV?'#violationNote':'#rewardNote')?.value),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
     if(isV){record.level=S(form.querySelector('#violationLevel')?.value)||'light';record.status=S(form.querySelector('#violationStatus')?.value)||'monitoring';record.action=S(form.querySelector('#violationAction')?.value)}else record.formType=S(form.querySelector('#rewardFormType')?.value)||'praise';
-    try{if(typeof window.LH_MASTER_CRUD?.saveMaster!=='function')throw Error('Bộ lưu Master chưa sẵn sàng. Vui lòng thử lại sau.');const sheet=isV?'VI_PHAM':'KHEN_THUONG';const saved=await window.LH_MASTER_CRUD.saveMaster(sheet,record);try{window.LH_MASTER_CRUD.render(sheet)}catch(_){}try{form.reset()}catch(_){}const modal=form.closest('.modal');if(modal)modal.hidden=true;toast(isV?'Đã lưu vi phạm vào Google Sheets.':'Đã lưu khen thưởng vào Google Sheets.','success')}catch(e){toast('Lưu thất bại: '+S(e?.message||e),'error')}}
+    try{if(typeof window.LH_MASTER_CRUD?.saveMaster!=='function')throw Error('Bộ lưu Master chưa sẵn sàng. Vui lòng thử lại sau.');const sheet=isV?'VI_PHAM':'KHEN_THUONG';await window.LH_MASTER_CRUD.saveMaster(sheet,record);try{window.LH_MASTER_CRUD.render(sheet)}catch(_){}try{form.reset()}catch(_){}const modal=form.closest('.modal');if(modal)modal.hidden=true;toast(isV?'Đã lưu vi phạm vào Google Sheets.':'Đã lưu khen thưởng vào Google Sheets.','success')}catch(e){toast('Lưu thất bại: '+S(e?.message||e),'error')}}
   function formSaveGate(e){const f=e.target instanceof HTMLFormElement?e.target:null;if(!f||!['violationForm','rewardForm'].includes(S(f.id)))return;e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();canonicalFormSave(f)}
   window.addEventListener('submit',formSaveGate,true);
   const loadOnce=(src,attr)=>{if(document.querySelector('script['+attr+']'))return;const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(attr,'1');document.head.appendChild(s)};
@@ -45,7 +45,6 @@
     loadOnce('behavior-form-select-repair.js?v=20260913.1','data-lh-behavior-form-select-repair-v10');
     loadOnce('behavior-multi-student-ui.js?v=20260914.2','data-lh-behavior-multi-student-ui-v22');
     loadOnce('master-crud-ui.js?v=20260915.12','data-lh-master-crud-ui-v12');
-    loadOnce('violation-display-final.js?v=20260915.10','data-lh-violation-display-final-v10');
     loadOnce('student-links-fast-fix.js?v=2.0.0','data-lh-student-links-fast-fix-v20');
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
