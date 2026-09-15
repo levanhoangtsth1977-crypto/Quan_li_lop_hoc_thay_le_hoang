@@ -1,8 +1,8 @@
-/* MENU RUNTIME 8.60 — single canonical Master CRUD path */
+/* MENU RUNTIME 8.61 — single canonical Master CRUD path */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_860__)return;
-  window.__MENU_RUNTIME_FIX_860__=true;
+  if(window.__MENU_RUNTIME_FIX_861__)return;
+  window.__MENU_RUNTIME_FIX_861__=true;
   const TITLES={dashboard:'Trang chủ',students:'Học sinh',attendance:'Điểm danh',violations:'Vi phạm',rewards:'Khen thưởng',learning:'Học tập',statistics:'Thống kê','student-links':'Link học sinh',ai:'AI giáo viên',game:'Triệu Phú Học Đường','lucky-wheel':'Vòng quay may mắn',settings:'Cài đặt'};
   function closeMobile(){const s=document.getElementById('sidebar'),o=document.getElementById('sidebarOverlay');if(window.innerWidth<=900||s?.classList.contains('open')){s?.classList.remove('open');o?.classList.remove('active');if(o){o.hidden=true;o.setAttribute('aria-hidden','true')}document.body.classList.remove('sidebar-open')}}
   function signalPage(page){try{window.dispatchEvent(new CustomEvent('lh-page-change',{detail:{page}}));}catch(_){} if(page==='lucky-wheel'||page==='game'){try{window.dispatchEvent(new Event('pagechange'));}catch(_){} }}
@@ -26,9 +26,8 @@
     loadOnce('behavior-form-select-repair.js?v=20260913.1','data-lh-behavior-form-select-repair-v10');
     loadOnce('behavior-multi-student-ui.js?v=20260914.2','data-lh-behavior-multi-student-ui-v22');
     /* SINGLE CRUD OWNER: all business SAVE/UPDATE/DELETE routes. */
-    loadOnce('master-crud-ui.js?v=20260915.4','data-lh-master-crud-ui-v4');
+    loadOnce('master-crud-ui.js?v=20260915.5','data-lh-master-crud-ui-v5');
     loadOnce('student-links-fast-fix.js?v=2.0.0','data-lh-student-links-fast-fix-v20');
-    loadOnce('violation-display-live-fix.js?v=20260914.1','data-lh-violation-display-live-fix-v12');
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
