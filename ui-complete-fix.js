@@ -1,79 +1,86 @@
-/* UI EARLY ACTIVATION 1.2 — STARTUP ONLY
- * script.js remains the sole permanent router.
- * This guard is the only startup click bridge. It is active until
- * script.js reports UI.eventsBound === true, then removes itself.
+/* UI STARTUP COMPAT 1.3
+ * Canonical permanent router: script.js.
+ * This compatibility layer guarantees that the main menu and homepage quick
+ * actions remain clickable even when Data Engine startup is late/failed.
+ * It handles ONLY menu/page/quick-action targets and never handles save/submit.
  */
 (function(){
   'use strict';
-  if (window.__LH_UI_EARLY_ACTIVATION_12__) return;
-  window.__LH_UI_EARLY_ACTIVATION_12__ = true;
+  if(window.__LH_UI_EARLY_ACTIVATION_13__) return;
+  window.__LH_UI_EARLY_ACTIVATION_13__=true;
 
-  function ready(){
-    try { return typeof UI !== 'undefined' && UI && UI.eventsBound === true; }
-    catch(e){ return false; }
+  function canonicalReady(){
+    try{return typeof UI!=='undefined' && UI && UI.eventsBound===true;}catch(e){return false;}
   }
 
-  function hide(id){
-    const el=document.getElementById(id);
-    if(!el) return false;
-    el.hidden=false;
-    el.setAttribute('aria-hidden','false');
+  function setPage(page){
+    const value=String(page||'').trim();
+    if(!value) return false;
+    if(typeof window.navigateToPage==='function'){
+      try{return window.navigateToPage(value)!==false;}catch(e){}
+    }
+    const section=document.querySelector('[data-page-section="'+CSS.escape(value)+'"]');
+    if(!section) return false;
+    document.querySelectorAll('[data-page-section]').forEach(function(el){
+      const active=el===section;
+      el.classList.toggle('active',active);
+      el.hidden=!active;
+    });
+    document.querySelectorAll('.menu-item[data-page]').forEach(function(el){
+      el.classList.toggle('active',el.dataset.page===value);
+    });
+    const title=document.getElementById('pageTitle');
+    if(title){
+      const labels={dashboard:'Trang chủ',students:'Học sinh',attendance:'Điểm danh',violations:'Vi phạm',rewards:'Khen thưởng',learning:'Học tập',statistics:'Thống kê','student-links':'Link học sinh',ai:'AI giáo viên',settings:'Cài đặt'};
+      title.textContent=labels[value]||value;
+    }
+    return true;
+  }
+
+  function showModal(id){
+    const modal=document.getElementById(id);
+    if(!modal) return false;
+    modal.hidden=false;
+    modal.setAttribute('aria-hidden','false');
     document.body.classList.add('modal-open');
     return true;
   }
 
-  function closeSidebar(){
-    const s=document.getElementById('sidebar');
-    const o=document.getElementById('sidebarOverlay');
-    if(s) s.classList.remove('open');
-    if(o){ o.style.display=''; o.setAttribute('aria-hidden','true'); }
-  }
-
-  function navigate(page){
-    if (typeof window.navigateToPage === 'function') return window.navigateToPage(page);
-    const section=document.querySelector('[data-page-section="'+CSS.escape(String(page||''))+'"]');
-    if(!section) return false;
-    document.querySelectorAll('[data-page-section]').forEach(x=>{
-      const active=x===section;
-      x.classList.toggle('active',active);
-      x.hidden=!active;
-    });
-    document.querySelectorAll('.menu-item[data-page]').forEach(x=>{
-      x.classList.toggle('active',x.dataset.page===String(page||''));
-    });
-    closeSidebar();
-    return true;
-  }
-
-  function action(name){
+  function quickAction(name){
     const value=String(name||'').trim();
-    if(typeof window.openAddStudentModal==='function' && value==='add-student') return window.openAddStudentModal();
-    if(typeof window.openImportStudents==='function' && value==='import-students') return window.openImportStudents();
-    if(value==='attendance') return navigate('attendance');
-    if(value==='add-violation'){
-      if(typeof window.prepareViolationModal==='function') return window.prepareViolationModal();
-      return hide('violationModal');
-    }
-    if(value==='add-reward'){
-      if(typeof window.prepareRewardModal==='function') return window.prepareRewardModal();
-      return hide('rewardModal');
-    }
-    if(value==='statistics') return navigate('statistics');
-    if(value==='student-links') return navigate('student-links');
-    if(value==='learning' || value==='add-learning' || value==='progress' || value==='add-progress') return navigate('learning');
-    if(value==='ai' || value==='ai-teacher') return navigate('ai');
-    if(value==='settings') return navigate('settings');
-    if(value==='refresh' || value==='refresh-data') return typeof window.refreshAll==='function' ? window.refreshAll() : false;
-    if(value==='export-report' || value==='export' || value==='backup') return false;
+    try{
+      if(value==='add-student'){
+        if(typeof window.openAddStudentModal==='function') return window.openAddStudentModal()!==false;
+        return showModal('studentModal');
+      }
+      if(value==='import-students'){
+        if(typeof window.openImportStudents==='function') return window.openImportStudents()!==false;
+        return false;
+      }
+      if(value==='attendance') return setPage('attendance');
+      if(value==='add-violation'){
+        if(typeof window.prepareViolationModal==='function') return window.prepareViolationModal()!==false;
+        return showModal('violationModal');
+      }
+      if(value==='add-reward'){
+        if(typeof window.prepareRewardModal==='function') return window.prepareRewardModal()!==false;
+        return showModal('rewardModal');
+      }
+      if(value==='statistics') return setPage('statistics');
+      if(value==='student-links') return setPage('student-links');
+      if(value==='learning' || value==='add-learning' || value==='progress' || value==='add-progress') return setPage('learning');
+      if(value==='ai' || value==='ai-teacher') return setPage('ai');
+      if(value==='settings') return setPage('settings');
+      if(value==='refresh' || value==='refresh-data'){
+        if(typeof window.refreshAll==='function'){window.refreshAll();return true;}
+        window.location.reload();
+        return true;
+      }
+    }catch(e){console.warn('[UI STARTUP COMPAT 1.3]',e);}
     return false;
   }
 
   function handler(event){
-    if(ready()){
-      document.removeEventListener('click',handler,true);
-      window.__LH_UI_EARLY_ACTIVATION_12_READY__=true;
-      return;
-    }
     const target=event.target && event.target.closest ? event.target : null;
     if(!target) return;
 
@@ -81,26 +88,37 @@
     if(menu){
       event.preventDefault();
       event.stopImmediatePropagation();
-      navigate(menu.dataset.page);
+      setPage(menu.dataset.page);
       return;
     }
 
-    const link=target.closest('[data-page-link]');
-    if(link){
+    const pageLink=target.closest('[data-page-link]');
+    if(pageLink){
       event.preventDefault();
       event.stopImmediatePropagation();
-      navigate(link.dataset.pageLink);
+      setPage(pageLink.dataset.pageLink);
       return;
     }
 
-    const toggle=target.closest('#menuToggle,#sidebarToggle');
+    const action=target.closest('.quick-action[data-action], [data-action]');
+    if(action){
+      const name=action.dataset.action;
+      if(['add-student','attendance','add-violation','add-reward','statistics','student-links','learning','add-learning','progress','add-progress','ai','ai-teacher','settings','refresh','refresh-data'].includes(name)){
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        quickAction(name);
+        return;
+      }
+    }
+
+    const toggle=target.closest('#sidebarToggle,#menuToggle');
     if(toggle){
       event.preventDefault();
       event.stopImmediatePropagation();
       if(typeof window.openMobileSidebar==='function') window.openMobileSidebar();
-      else {
+      else{
         const s=document.getElementById('sidebar'),o=document.getElementById('sidebarOverlay');
-        if(s) s.classList.add('open');
+        if(s)s.classList.add('open');
         if(o){o.style.display='block';o.setAttribute('aria-hidden','false');}
       }
       return;
@@ -111,19 +129,16 @@
       event.preventDefault();
       event.stopImmediatePropagation();
       if(typeof window.closeMobileSidebar==='function') window.closeMobileSidebar();
-      else closeSidebar();
-      return;
-    }
-
-    const trigger=target.closest('[data-action]');
-    if(trigger){
-      const handled=action(trigger.dataset.action);
-      if(handled!==false){
-        event.preventDefault();
-        event.stopImmediatePropagation();
+      else{
+        const s=document.getElementById('sidebar'),o=document.getElementById('sidebarOverlay');
+        if(s)s.classList.remove('open');
+        if(o){o.style.display='';o.setAttribute('aria-hidden','true');}
       }
     }
   }
 
+  /* Capture phase ensures legacy document-level click handlers cannot swallow
+     homepage/menu actions. This layer never handles forms or data writes. */
   document.addEventListener('click',handler,true);
+  window.__LH_UI_EARLY_ACTIVATION_13_READY__=function(){return canonicalReady();};
 })();
