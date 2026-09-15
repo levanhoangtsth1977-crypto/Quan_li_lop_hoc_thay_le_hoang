@@ -1,1 +1,1 @@
-/* restore handled by branch reset */
+/* restored via branch ref below */
