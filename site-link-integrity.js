@@ -1,16 +1,12 @@
-/* SITE LINK INTEGRITY 2.1
- * Chuẩn hóa toàn bộ liên kết/menu chính của trang quản lý lớp học.
- * - Mỗi menu chính chỉ có đúng 1 mục.
- * - Mỗi data-page phải trỏ tới đúng 1 section.
- * - Tự bổ sung menu bị thiếu theo danh mục chuẩn.
- * - Loại bỏ menu data-page dư/không hợp lệ.
- * - Bảo vệ menu game động Triệu Phú Học Đường.
- * - Không đụng Data Engine, dữ liệu học sinh hoặc các form.
+/* SITE LINK INTEGRITY 2.2
+ * Chỉ quản lý menu của hệ thống QUẢN LÝ LỚP HỌC.
+ * TRIỆU PHÚ HỌC ĐƯỜNG là ứng dụng độc lập tại /game/index.html và tuyệt đối
+ * không thuộc MENU chính, không được thêm/xóa/sắp xếp bởi module này.
  */
 (function(){
   'use strict';
-  if(window.__LH_SITE_LINK_INTEGRITY_21__) return;
-  window.__LH_SITE_LINK_INTEGRITY_21__=true;
+  if(window.__LH_SITE_LINK_INTEGRITY_22__) return;
+  window.__LH_SITE_LINK_INTEGRITY_22__=true;
 
   const MENU=[
     ['dashboard','Trang chủ','fa-house'],
@@ -22,12 +18,10 @@
     ['statistics','Thống kê','fa-chart-column'],
     ['student-links','Link học sinh','fa-link'],
     ['ai','AI giáo viên','fa-robot'],
-    ['game','Triệu Phú Học Đường','fa-gamepad'],
     ['lucky-wheel','Vòng quay may mắn','fa-dharmachakra'],
     ['settings','Cài đặt','fa-gear']
   ];
   const REQUIRED=new Set(MENU.map(x=>x[0]));
-
   const qs=(s,r=document)=>r.querySelector(s);
   const qsa=(s,r=document)=>Array.from(r.querySelectorAll(s));
   const pageExists=page=>!!qs('#page-'+CSS.escape(page)+', [data-page-section="'+CSS.escape(page)+'"]');
@@ -61,13 +55,13 @@
     const nav=qs('.main-menu');
     if(!nav) return;
 
-    /* Xóa các mục data-page không thuộc menu chuẩn. */
+    /* Chỉ xóa data-page không thuộc menu QUẢN LÝ LỚP HỌC. */
     qsa('[data-page]',nav).forEach(el=>{
       const page=(el.getAttribute('data-page')||'').trim();
       if(!REQUIRED.has(page)) el.remove();
     });
 
-    /* Chỉ giữ một menu item cho mỗi page. */
+    /* Mỗi page chỉ có một mục menu. */
     const seen=new Set();
     qsa('[data-page]',nav).forEach(el=>{
       const page=(el.getAttribute('data-page')||'').trim();
@@ -75,7 +69,7 @@
       else seen.add(page);
     });
 
-    /* Bổ sung menu bị thiếu nếu section tồn tại. */
+    /* Bổ sung menu chính bị thiếu nếu section tương ứng tồn tại. */
     const divider=qs('.menu-divider',nav);
     MENU.forEach(([page,label,icon])=>{
       if(!pageExists(page)) return;
@@ -84,23 +78,25 @@
       }
     });
 
-    /* Chuẩn hóa thứ tự các mục trước divider. */
+    /* Sắp đúng thứ tự 11 mục của hệ thống lớp học. */
     const firstItems=MENU.map(([page])=>qs('[data-page="'+CSS.escape(page)+'"]',nav)).filter(Boolean);
     const anchor=divider||nav.lastElementChild;
     firstItems.forEach(el=>nav.insertBefore(el,anchor));
 
-    /* Tiện ích là liên kết trang riêng, không phải data-page. */
     const utility=qs('#lhUtilitiesStandalone',nav);
     if(utility){
       utility.setAttribute('href','tien-ich.html');
       utility.setAttribute('data-link-kind','standalone');
     }
 
-    /* Không để mục data-page không có section tồn tại như liên kết chết. */
+    /* Không để mục nội bộ không có section tồn tại như liên kết chết. */
     qsa('[data-page]',nav).forEach(el=>{
       const page=(el.getAttribute('data-page')||'').trim();
       if(!pageExists(page)) el.remove();
     });
+
+    /* Dọn mục game cũ nếu còn sót từ phiên bản trước; KHÔNG tạo lại mục này. */
+    qsa('#lhTrieuPhuMenu,[data-page="game"]',nav).forEach(el=>el.remove());
   }
 
   function normalizeInternalLinks(){
@@ -124,7 +120,7 @@
         missing:MENU.filter(x=>!pageExists(x[0])).map(x=>x[0])
       };
     }catch(error){
-      console.warn('[SITE LINK INTEGRITY 2.1]',error);
+      console.warn('[SITE LINK INTEGRITY 2.2]',error);
     }
   }
 
