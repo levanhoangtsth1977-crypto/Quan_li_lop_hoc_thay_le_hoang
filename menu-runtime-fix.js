@@ -1,13 +1,15 @@
-/* MENU RUNTIME 9.2 — LOADER ONLY
+/* MENU RUNTIME 9.3 — LOADER ONLY
  * The main classroom menu/router stays in script.js.
- * Triệu Phú Học Đường is an independent app and MUST NOT be injected into
- * or modify the classroom menu DOM. This loader intentionally does not load
- * trieu-phu-menu-fix.js.
+ * This file only loads required feature modules once.
+ * No global click/submit interception and no page rendering here.
+ * The early activation guard is temporary startup protection only and
+ * automatically removes itself when script.js binds its canonical router.
  */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_920__) return;
-  window.__MENU_RUNTIME_FIX_920__ = true;
+  if(window.__MENU_RUNTIME_FIX_930__) return;
+  window.__MENU_RUNTIME_FIX_930__ = true;
+
   const loadOnce=(src,attr)=>{
     try{
       if(document.querySelector('script['+attr+']')) return;
@@ -16,9 +18,11 @@
       s.async=false;
       s.setAttribute(attr,'1');
       document.head.appendChild(s);
-    }catch(e){ console.warn('[MENU RUNTIME 9.2]',e); }
+    }catch(e){ console.warn('[MENU RUNTIME 9.3]',e); }
   };
+
   function boot(){
+    loadOnce('ui-early-activation.js?v=20260916.1','data-lh-ui-early-activation-v10');
     loadOnce('student-profile-repair.js?v=20260826.2','data-lh-profile-repair');
     loadOnce('menu-badge-sync-fix.js?v=20260826.1','data-lh-menu-badge-sync');
     loadOnce('home-data-sync-fix.js?v=20260826.1','data-lh-home-data-sync');
@@ -28,15 +32,14 @@
     loadOnce('events-student-roster-sync.js?v=1.0.0','data-lh-events-student-roster-sync');
     loadOnce('behavior-quick-options.js?v=2.6.0','data-lh-behavior-quick-options-v26');
     loadOnce('home-class-logo.js?v=1.9.0','data-lh-home-class-logo-v190');
-    loadOnce('clear-targeted-violations-20260908.js?v=20260915.1','data-lh-violation-stale-ui-cleaner-retired');
-    loadOnce('site-link-integrity.js?v=2.1.0','data-lh-site-link-integrity-v21');
-    /* Triệu Phú Học Đường is independent; do not load its menu injector here. */
+    loadOnce('site-link-integrity.js?v=2.2.0','data-lh-site-link-integrity-v22');
     loadOnce('behavior-form-select-repair.js?v=20260913.1','data-lh-behavior-form-select-repair-v10');
     loadOnce('behavior-multi-student-ui.js?v=20260914.2','data-lh-behavior-multi-student-ui-v22');
     loadOnce('master-crud-ui.js?v=20260915.14','data-lh-master-crud-ui-v14');
     loadOnce('student-links-fast-fix.js?v=2.0.0','data-lh-student-links-fast-fix-v20');
     loadOnce('lucky-wheel-final.js?v=20260915.1','data-lh-lucky-wheel-final-v21');
   }
+
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true});
   else boot();
 })();
