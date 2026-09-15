@@ -1,5 +1,7 @@
-/* MASTER CRUD UI — SINGLE SOURCE OF TRUTH v3
- * Same-origin Vercel proxy -> Master Apps Script.
+/* MASTER CRUD UI — SINGLE SOURCE OF TRUTH v4
+ * Dual transport:
+ * - Vercel: same-origin /api/google proxy.
+ * - GitHub Pages/static: direct Apps Script GET via JSONP + POST via hidden form iframe.
  * All business SAVE/UPDATE/DELETE calls use one transport and verify against Master.
  * HOC_SINH deletion remains local because Master forbids it.
  */
@@ -8,44 +10,85 @@
 if(window.__LH_MASTER_CRUD_UI__)return;
 window.__LH_MASTER_CRUD_UI__=true;
 
-const API=()=>'/api/google';
+const DIRECT_API='https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
+const apiBase=()=>String(window.GOOGLE_API_CONFIG?.url||DIRECT_API).trim();
+const useProxy=()=>/^([a-z0-9-]+\.)*vercel\.app$/i.test(location.hostname)||/\.vercel\.app$/i.test(location.hostname);
 const S=v=>String(v??'').trim();
 const toast=(m,t='info')=>{try{window.showToast?window.showToast(m,t):console.log(m)}catch(_){console.log(m)}};
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 const makeId=p=>`${p}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,9)}`;
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
 
-async function getJSON(action,params={}){
+async function getJSONProxy(action,params={}){
   const q=new URLSearchParams({action,_:String(Date.now())});
   Object.entries(params||{}).forEach(([k,v])=>{if(v!==undefined&&v!==null)q.set(k,S(v))});
-  const r=await fetch(API()+'?'+q.toString(),{method:'GET',cache:'no-store',credentials:'same-origin'});
-  const text=await r.text();
-  let data;
-  try{data=JSON.parse(text)}catch(_){throw Error('Phản hồi Google không phải JSON hợp lệ.')}
-  if(!r.ok||!data?.ok)throw Error(S(data?.error)||`Google API HTTP ${r.status}`);
-  return data;
-}
-
-async function post(action,payload={}){
-  const body=new URLSearchParams();body.set('action',action);
-  Object.entries(payload||{}).forEach(([k,v])=>{if(v===undefined||v===null)return;body.set(k,typeof v==='object'?JSON.stringify(v):S(v))});
-  const r=await fetch(API(),{method:'POST',body,cache:'no-store',credentials:'same-origin',headers:{'content-type':'application/x-www-form-urlencoded;charset=UTF-8'}});
+  const r=await fetch('/api/google?'+q.toString(),{method:'GET',cache:'no-store',credentials:'same-origin'});
   const text=await r.text();let data;
   try{data=JSON.parse(text)}catch(_){throw Error('Google API trả phản hồi không hợp lệ.')}
   if(!r.ok||!data?.ok)throw Error(S(data?.error)||`Google API HTTP ${r.status}`);
   return data;
 }
-function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
+function jsonp(action,params={}){
+  return new Promise((resolve,reject)=>{
+    const cb='__lhMasterJsonp_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);
+    const q=new URLSearchParams({action,callback:cb,_:String(Date.now())});
+    Object.entries(params||{}).forEach(([k,v])=>{if(v!==undefined&&v!==null)q.set(k,S(v))});
+    const script=document.createElement('script');
+    let done=false;
+    const cleanup=()=>{try{delete window[cb]}catch(_){};script.remove()};
+    const fail=(msg)=>{if(done)return;done=true;cleanup();reject(Error(msg||'Google API không phản hồi.'))};
+    const timer=setTimeout(()=>fail('Google API không phản hồi sau 15 giây.'),15000);
+    window[cb]=(data)=>{if(done)return;done=true;clearTimeout(timer);cleanup();if(!data||data.ok===false)reject(Error(S(data?.error)||'Google API trả phản hồi không hợp lệ.'));else resolve(data)};
+    script.onerror=()=>{clearTimeout(timer);fail('Không kết nối được Google Apps Script.')};
+    script.src=apiBase()+'?'+q.toString();
+    document.head.appendChild(script);
+  });
+}
+
+async function getJSON(action,params={}){
+  if(useProxy())return getJSONProxy(action,params);
+  return jsonp(action,params);
+}
+
+async function postProxy(action,payload={}){
+  const body=new URLSearchParams();body.set('action',action);
+  Object.entries(payload||{}).forEach(([k,v])=>{if(v===undefined||v===null)return;body.set(k,typeof v==='object'?JSON.stringify(v):S(v))});
+  const r=await fetch('/api/google',{method:'POST',body,cache:'no-store',credentials:'same-origin',headers:{'content-type':'application/x-www-form-urlencoded;charset=UTF-8'}});
+  const text=await r.text();let data;
+  try{data=JSON.parse(text)}catch(_){throw Error('Google API trả phản hồi không hợp lệ.')}
+  if(!r.ok||!data?.ok)throw Error(S(data?.error)||`Google API HTTP ${r.status}`);
+  return data;
+}
+
+function postDirect(action,payload={}){
+  return new Promise((resolve,reject)=>{
+    const token='lh_post_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8);
+    const iframe=document.createElement('iframe');iframe.name=token;iframe.style.display='none';iframe.setAttribute('aria-hidden','true');
+    const form=document.createElement('form');form.method='POST';form.action=apiBase();form.target=token;form.style.display='none';
+    const add=(name,value)=>{const i=document.createElement('input');i.type='hidden';i.name=name;i.value=String(value??'');form.appendChild(i)};
+    add('action',action);
+    Object.entries(payload||{}).forEach(([k,v])=>{if(v===undefined||v===null)return;add(k,typeof v==='object'?JSON.stringify(v):S(v))});
+    document.body.appendChild(iframe);document.body.appendChild(form);
+    let settled=false;
+    const finish=(err)=>{if(settled)return;settled=true;clearTimeout(timer);setTimeout(()=>{try{form.remove();iframe.remove()}catch(_){ }},100);if(err)reject(err);else resolve({ok:true,transport:'direct-form'})};
+    const timer=setTimeout(()=>finish(),8000);
+    try{form.submit()}catch(e){finish(Error('Không gửi được yêu cầu tới Google Apps Script.'))}
+  });
+}
+
+async function post(action,payload={}){
+  if(useProxy())return postProxy(action,payload);
+  return postDirect(action,payload);
+}
 
 const ARR={DIEM_DANH:'attendanceRecords',VI_PHAM:'violationRecords',KHEN_THUONG:'rewardRecords',HOC_TAP:'learningRecords',TIEN_BO:'progressRecords',NHAN_XET:'commentRecords'};
 const GET={DIEM_DANH:'getAttendance',VI_PHAM:'getViolations',KHEN_THUONG:'getRewards',HOC_TAP:'getLearning',TIEN_BO:'getProgress',NHAN_XET:'getComments'};
 const SAVE={DIEM_DANH:'saveAttendance',VI_PHAM:'saveViolation',KHEN_THUONG:'saveReward',HOC_TAP:'saveLearning',TIEN_BO:'saveProgress',NHAN_XET:'saveComment'};
 function localArr(sheet){const n=ARR[sheet];return n&&Array.isArray(window[n])?window[n]:[]}
-function localUpsert(sheet,r){const a=localArr(sheet),id=S(r?.id);if(!id)return;const i=a.findIndex(x=>S(x?.id)===id);if(i<0)a.push(r);else a[i]=r;try{window.syncAppDataReferences?.();window.saveClassData?.()}catch(_){}
-}
-function localRemove(sheet,id){const a=localArr(sheet);for(let i=a.length-1;i>=0;i--)if(S(a[i]?.id)===S(id))a.splice(i,1);try{window.syncAppDataReferences?.();window.saveClassData?.()}catch(_){}
-}
-function render(sheet){try{if(sheet==='VI_PHAM')window.renderViolations?.();if(sheet==='KHEN_THUONG')window.renderRewards?.();if(sheet==='DIEM_DANH')window.renderAttendance?.();if(sheet==='HOC_TAP')window.renderLearning?.();if(sheet==='TIEN_BO')window.renderProgress?.();if(sheet==='NHAN_XET')window.renderComments?.();window.renderDashboard?.();window.updateBadges?.();window.refreshAll?.()}catch(_){}
-}
+function localUpsert(sheet,r){const a=localArr(sheet),id=S(r?.id);if(!id)return;const i=a.findIndex(x=>S(x?.id)===id);if(i<0)a.push(r);else a[i]=r;try{window.syncAppDataReferences?.();window.saveClassData?.()}catch(_){} }
+function localRemove(sheet,id){const a=localArr(sheet);for(let i=a.length-1;i>=0;i--)if(S(a[i]?.id)===S(id))a.splice(i,1);try{window.syncAppDataReferences?.();window.saveClassData?.()}catch(_){} }
+function render(sheet){try{if(sheet==='VI_PHAM')window.renderViolations?.();if(sheet==='KHEN_THUONG')window.renderRewards?.();if(sheet==='DIEM_DANH')window.renderAttendance?.();if(sheet==='HOC_TAP')window.renderLearning?.();if(sheet==='TIEN_BO')window.renderProgress?.();if(sheet==='NHAN_XET')window.renderComments?.();window.renderDashboard?.();window.updateBadges?.();window.refreshAll?.()}catch(_){} }
 async function fetchRecords(sheet,studentId){const r=await getJSON(GET[sheet],studentId?{studentId:S(studentId)}:{});return Array.isArray(r.records)?r.records:[]}
 function nearMatch(record,row){
   if(S(row?.studentId)!==S(record?.studentId))return false;if(S(row?.date)!==S(record?.date))return false;if(S(row?.type)!==S(record?.type))return false;if(S(record?.note)!==S(row?.note))return false;
