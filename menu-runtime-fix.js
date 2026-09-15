@@ -1,8 +1,8 @@
-/* MENU RUNTIME 8.66 — one canonical SAVE path; legacy form handlers blocked */
+/* MENU RUNTIME 8.67 — one canonical SAVE path; legacy form handlers blocked */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_866__)return;
-  window.__MENU_RUNTIME_FIX_866__=true;
+  if(window.__MENU_RUNTIME_FIX_867__)return;
+  window.__MENU_RUNTIME_FIX_867__=true;
   const TITLES={dashboard:'Trang chủ',students:'Học sinh',attendance:'Điểm danh',violations:'Vi phạm',rewards:'Khen thưởng',learning:'Học tập',statistics:'Thống kê','student-links':'Link học sinh',ai:'AI giáo viên',game:'Triệu Phú Học Đường','lucky-wheel':'Vòng quay may mắn',settings:'Cài đặt'};
   const S=v=>String(v??'').trim();
   const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
@@ -45,6 +45,7 @@
     loadOnce('behavior-form-select-repair.js?v=20260913.1','data-lh-behavior-form-select-repair-v10');
     loadOnce('behavior-multi-student-ui.js?v=20260914.2','data-lh-behavior-multi-student-ui-v22');
     loadOnce('master-crud-ui.js?v=20260915.12','data-lh-master-crud-ui-v12');
+    loadOnce('violation-display-final.js?v=20260915.10','data-lh-violation-display-final-v10');
     loadOnce('student-links-fast-fix.js?v=2.0.0','data-lh-student-links-fast-fix-v20');
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
