@@ -1,12 +1,12 @@
-/* SITE LINK INTEGRITY 2.2
- * Chỉ quản lý menu của hệ thống QUẢN LÝ LỚP HỌC.
- * TRIỆU PHÚ HỌC ĐƯỜNG là ứng dụng độc lập tại /game/index.html và tuyệt đối
- * không thuộc MENU chính, không được thêm/xóa/sắp xếp bởi module này.
+/* SITE LINK INTEGRITY 2.3
+ * Chỉ quản lý menu/liên kết của hệ thống QUẢN LÝ LỚP HỌC.
+ * TRIỆU PHÚ HỌC ĐƯỜNG là ứng dụng độc lập tại /game/index.html và không thuộc menu chính.
+ * Sidebar fallback chỉ xử lý nút mở/đóng menu trên màn hình nhỏ; không đụng router dữ liệu.
  */
 (function(){
   'use strict';
-  if(window.__LH_SITE_LINK_INTEGRITY_22__) return;
-  window.__LH_SITE_LINK_INTEGRITY_22__=true;
+  if(window.__LH_SITE_LINK_INTEGRITY_23__) return;
+  window.__LH_SITE_LINK_INTEGRITY_23__=true;
 
   const MENU=[
     ['dashboard','Trang chủ','fa-house'],
@@ -55,13 +55,11 @@
     const nav=qs('.main-menu');
     if(!nav) return;
 
-    /* Chỉ xóa data-page không thuộc menu QUẢN LÝ LỚP HỌC. */
     qsa('[data-page]',nav).forEach(el=>{
       const page=(el.getAttribute('data-page')||'').trim();
       if(!REQUIRED.has(page)) el.remove();
     });
 
-    /* Mỗi page chỉ có một mục menu. */
     const seen=new Set();
     qsa('[data-page]',nav).forEach(el=>{
       const page=(el.getAttribute('data-page')||'').trim();
@@ -69,7 +67,6 @@
       else seen.add(page);
     });
 
-    /* Bổ sung menu chính bị thiếu nếu section tương ứng tồn tại. */
     const divider=qs('.menu-divider',nav);
     MENU.forEach(([page,label,icon])=>{
       if(!pageExists(page)) return;
@@ -78,7 +75,6 @@
       }
     });
 
-    /* Sắp đúng thứ tự 11 mục của hệ thống lớp học. */
     const firstItems=MENU.map(([page])=>qs('[data-page="'+CSS.escape(page)+'"]',nav)).filter(Boolean);
     const anchor=divider||nav.lastElementChild;
     firstItems.forEach(el=>nav.insertBefore(el,anchor));
@@ -89,13 +85,11 @@
       utility.setAttribute('data-link-kind','standalone');
     }
 
-    /* Không để mục nội bộ không có section tồn tại như liên kết chết. */
     qsa('[data-page]',nav).forEach(el=>{
       const page=(el.getAttribute('data-page')||'').trim();
       if(!pageExists(page)) el.remove();
     });
 
-    /* Dọn mục game cũ nếu còn sót từ phiên bản trước; KHÔNG tạo lại mục này. */
     qsa('#lhTrieuPhuMenu,[data-page="game"]',nav).forEach(el=>el.remove());
   }
 
@@ -109,18 +103,70 @@
     });
   }
 
+  /* Fallback độc lập: chỉ dùng khi nút 3 gạch chưa được router chính bind. */
+  function bindSidebarFallback(){
+    const toggle=qs('#sidebarToggle');
+    const close=qs('#sidebarClose');
+    const overlay=qs('#sidebarOverlay');
+    const sidebar=qs('#sidebar');
+
+    if(toggle && toggle.dataset.sidebarFallback23!=='1'){
+      toggle.dataset.sidebarFallback23='1';
+      toggle.addEventListener('click',function(e){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        const isOpen=sidebar?.classList.contains('open');
+        if(isOpen){
+          sidebar?.classList.remove('open');
+          document.body.classList.remove('sidebar-open');
+          if(overlay){overlay.classList.remove('active');overlay.hidden=true;overlay.style.display='';overlay.setAttribute('aria-hidden','true');}
+        }else{
+          sidebar?.classList.add('open');
+          document.body.classList.add('sidebar-open');
+          if(overlay){overlay.classList.add('active');overlay.hidden=false;overlay.style.display='block';overlay.setAttribute('aria-hidden','false');}
+        }
+      },true);
+    }
+
+    if(close && close.dataset.sidebarFallback23!=='1'){
+      close.dataset.sidebarFallback23='1';
+      close.addEventListener('click',function(e){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        sidebar?.classList.remove('open');
+        document.body.classList.remove('sidebar-open');
+        if(overlay){overlay.classList.remove('active');overlay.hidden=true;overlay.style.display='';overlay.setAttribute('aria-hidden','true');}
+      },true);
+    }
+
+    if(overlay && overlay.dataset.sidebarFallback23!=='1'){
+      overlay.dataset.sidebarFallback23='1';
+      overlay.addEventListener('click',function(e){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        sidebar?.classList.remove('open');
+        document.body.classList.remove('sidebar-open');
+        overlay.classList.remove('active');
+        overlay.hidden=true;
+        overlay.style.display='';
+        overlay.setAttribute('aria-hidden','true');
+      },true);
+    }
+  }
+
   function repair(){
     try{
       removeDuplicateSections();
       normalizeMenu();
       normalizeInternalLinks();
+      bindSidebarFallback();
       window.__LH_SITE_LINK_INTEGRITY_RESULT__={
         required:MENU.map(x=>x[0]),
         menu:qsa('.main-menu [data-page]').map(x=>x.dataset.page),
         missing:MENU.filter(x=>!pageExists(x[0])).map(x=>x[0])
       };
     }catch(error){
-      console.warn('[SITE LINK INTEGRITY 2.2]',error);
+      console.warn('[SITE LINK INTEGRITY 2.3]',error);
     }
   }
 
