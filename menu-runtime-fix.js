@@ -1,13 +1,13 @@
-/* MENU RUNTIME 8.62 — single canonical Master CRUD path */
+/* MENU RUNTIME 8.63 — canonical fast Master CRUD */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_862__)return;
-  window.__MENU_RUNTIME_FIX_862__=true;
+  if(window.__MENU_RUNTIME_FIX_863__)return;
+  window.__MENU_RUNTIME_FIX_863__=true;
   const TITLES={dashboard:'Trang chủ',students:'Học sinh',attendance:'Điểm danh',violations:'Vi phạm',rewards:'Khen thưởng',learning:'Học tập',statistics:'Thống kê','student-links':'Link học sinh',ai:'AI giáo viên',game:'Triệu Phú Học Đường','lucky-wheel':'Vòng quay may mắn',settings:'Cài đặt'};
   function closeMobile(){const s=document.getElementById('sidebar'),o=document.getElementById('sidebarOverlay');if(window.innerWidth<=900||s?.classList.contains('open')){s?.classList.remove('open');o?.classList.remove('active');if(o){o.hidden=true;o.setAttribute('aria-hidden','true')}document.body.classList.remove('sidebar-open')}}
-  function signalPage(page){try{window.dispatchEvent(new CustomEvent('lh-page-change',{detail:{page}}));}catch(_){} if(page==='lucky-wheel'||page==='game'){try{window.dispatchEvent(new Event('pagechange'));}catch(_){} }}
-  function showPageFallback(page){const target=document.querySelector('[data-page-section="'+CSS.escape(String(page))+'"]')||document.getElementById('page-'+String(page));if(!target)return false;document.querySelectorAll('[data-page-section]').forEach(section=>{const active=section===target;section.hidden=!active;section.classList.toggle('active',active)});document.querySelectorAll('.main-menu .menu-item[data-page]').forEach(item=>item.classList.toggle('active',item.getAttribute('data-page')===String(page)));const title=document.getElementById('pageTitle');if(title)title.textContent=TITLES[page]||String(page);closeMobile();signalPage(page);return true}
-  function menuRescue(event){const t=event.target instanceof Element?event.target:null;if(!t)return;const menu=t.closest('.main-menu .menu-item[data-page]');if(!menu)return;const page=menu.getAttribute('data-page');if(!page)return;const router=typeof window.navigateToPage==='function'?window.navigateToPage:(window.LopHocApp&&typeof window.LopHocApp.navigateToPage==='function'?window.LopHocApp.navigateToPage:null);if(router){try{const ok=router(page);if(ok!==false){closeMobile();signalPage(page);event.preventDefault();event.stopImmediatePropagation()}return}catch(_){} }if(showPageFallback(page)){event.preventDefault();event.stopImmediatePropagation()}}
+  function signalPage(page){try{window.dispatchEvent(new CustomEvent('lh-page-change',{detail:{page}}))}catch(_){}if(page==='lucky-wheel'||page==='game')try{window.dispatchEvent(new Event('pagechange'))}catch(_){}}
+  function showPageFallback(page){const target=document.querySelector('[data-page-section="'+CSS.escape(String(page))+'"]')||document.getElementById('page-'+String(page));if(!target)return false;document.querySelectorAll('[data-page-section]').forEach(x=>{x.hidden=x!==target;x.classList.toggle('active',x===target)});document.querySelectorAll('.main-menu .menu-item[data-page]').forEach(x=>x.classList.toggle('active',x.getAttribute('data-page')===String(page)));const title=document.getElementById('pageTitle');if(title)title.textContent=TITLES[page]||String(page);closeMobile();signalPage(page);return true}
+  function menuRescue(e){const t=e.target instanceof Element?e.target:null;if(!t)return;const m=t.closest('.main-menu .menu-item[data-page]');if(!m)return;const p=m.getAttribute('data-page');const r=typeof window.navigateToPage==='function'?window.navigateToPage:(window.LopHocApp&&typeof window.LopHocApp.navigateToPage==='function'?window.LopHocApp.navigateToPage:null);if(r){try{const ok=r(p);if(ok!==false){closeMobile();signalPage(p);e.preventDefault();e.stopImmediatePropagation()}return}catch(_){} }if(showPageFallback(p)){e.preventDefault();e.stopImmediatePropagation()}}
   window.addEventListener('click',menuRescue,true);
   const loadOnce=(src,attr)=>{if(document.querySelector('script['+attr+']'))return;const s=document.createElement('script');s.src=src;s.async=false;s.setAttribute(attr,'1');document.head.appendChild(s)};
   function boot(){
@@ -25,8 +25,7 @@
     loadOnce('trieu-phu-menu-fix.js?v=20260913.1','data-lh-trieu-phu-menu-fix');
     loadOnce('behavior-form-select-repair.js?v=20260913.1','data-lh-behavior-form-select-repair-v10');
     loadOnce('behavior-multi-student-ui.js?v=20260914.2','data-lh-behavior-multi-student-ui-v22');
-    /* SINGLE CRUD OWNER: all business SAVE/UPDATE/DELETE routes. */
-    loadOnce('master-crud-ui.js?v=20260915.6','data-lh-master-crud-ui-v6');
+    loadOnce('master-crud-ui.js?v=20260915.7','data-lh-master-crud-ui-v9');
     loadOnce('student-links-fast-fix.js?v=2.0.0','data-lh-student-links-fast-fix-v20');
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
