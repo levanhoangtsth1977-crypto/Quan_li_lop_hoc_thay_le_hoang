@@ -1,8 +1,8 @@
-/* MENU RUNTIME 8.69 — stable loader only; main SCRIPT.JS owns routing/forms */
+/* MENU RUNTIME 8.70 — stable loader only; main SCRIPT.JS owns routing/forms */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_869__) return;
-  window.__MENU_RUNTIME_FIX_869__ = true;
+  if(window.__MENU_RUNTIME_FIX_870__) return;
+  window.__MENU_RUNTIME_FIX_870__ = true;
 
   const loadOnce=(src,attr)=>{
     try{
@@ -12,11 +12,10 @@
       s.async=false;
       s.setAttribute(attr,'1');
       document.head.appendChild(s);
-    }catch(e){ console.warn('[MENU RUNTIME 8.69]',e); }
+    }catch(e){ console.warn('[MENU RUNTIME 8.70]',e); }
   };
 
   function boot(){
-    /* These modules provide isolated menu features. None owns SPA routing. */
     loadOnce('student-profile-repair.js?v=20260826.2','data-lh-profile-repair');
     loadOnce('menu-badge-sync-fix.js?v=20260826.1','data-lh-menu-badge-sync');
     loadOnce('home-data-sync-fix.js?v=20260826.1','data-lh-home-data-sync');
@@ -31,8 +30,7 @@
     loadOnce('trieu-phu-menu-fix.js?v=20260913.1','data-lh-trieu-phu-menu-fix');
     loadOnce('behavior-form-select-repair.js?v=20260913.1','data-lh-behavior-form-select-repair-v10');
     loadOnce('behavior-multi-student-ui.js?v=20260914.2','data-lh-behavior-multi-student-ui-v22');
-    /* Sole canonical CRUD loader. */
-    loadOnce('master-crud-ui.js?v=20260915.12','data-lh-master-crud-ui-v12');
+    loadOnce('master-crud-ui.js?v=20260915.13','data-lh-master-crud-ui-v13');
     loadOnce('student-links-fast-fix.js?v=2.0.0','data-lh-student-links-fast-fix-v20');
   }
 
