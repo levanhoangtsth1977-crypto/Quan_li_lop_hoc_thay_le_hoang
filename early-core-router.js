@@ -1,4 +1,4 @@
-/* EARLY CORE ROUTER 1.2
+/* EARLY CORE ROUTER 1.3
  * Emergency navigation path before the canonical app router is ready.
  * Also prevents the initial bulk renderer burst from locking the UI.
  */
@@ -67,13 +67,7 @@
     return false;
   }
 
-  /*
-   * STARTUP RENDER GUARD
-   * safeRender is defined by script.js after this file loads.
-   * Do not depend on top-level const UI being a window property.
-   * The first dashboard render runs normally; the following hidden-page
-   * renders are released one at a time, then the original function is used.
-   */
+  /* STARTUP RENDER GUARD: defer only the first hidden-page render burst. */
   (function installSafeRenderGuard(){
     var tries=0;
     var timer=setInterval(function(){
@@ -92,11 +86,7 @@
               }, Math.max(0, delay));
               return true;
             }
-            var result = original(name, renderer);
-            if(bootCalls === 10){
-              try{ delete window.safeRender; }catch(e){}
-            }
-            return result;
+            return original(name, renderer);
           };
           window.__LH_SAFE_RENDER_GUARD__=true;
           clearInterval(timer);
