@@ -1,7 +1,7 @@
-/* EARLY CORE ROUTER 1.0
+/* EARLY CORE ROUTER 1.1
  * Runs before the main application script.
- * It is deliberately tiny: navigation + modal opening only.
- * When the canonical router is ready, this layer gets out of the way.
+ * Owns the emergency navigation path and also throttles the
+ * first bulk safeRender calls so the main thread stays responsive.
  */
 (function(){
   'use strict';
@@ -66,6 +66,40 @@
     }catch(e){ console.warn('[EARLY CORE ROUTER]',e); }
     return false;
   }
+
+  /*
+   * MAIN THREAD SAFETY
+   * script.js calls safeRender() repeatedly during initializeApp().
+   * Defer only the first hidden-page batch; normal operation is untouched.
+   */
+  (function installSafeRenderGuard(){
+    var tries=0;
+    var timer=setInterval(function(){
+      tries++;
+      try{
+        if(window.safeRender && !window.__LH_SAFE_RENDER_GUARD__){
+          var original=window.safeRender;
+          var bootCalls=0;
+          window.safeRender=function(name, renderer){
+            var startup = !!(window.UI && UI.initialized === true && bootCalls < 9);
+            bootCalls++;
+            if(startup && name !== 'dashboard'){
+              var delay = Math.min((bootCalls-1)*50, 350);
+              setTimeout(function(){
+                try{ original(name, renderer); }
+                catch(e){ console.warn('[SAFE RENDER GUARD]',e); }
+              }, delay);
+              return true;
+            }
+            return original(name, renderer);
+          };
+          window.__LH_SAFE_RENDER_GUARD__=true;
+          clearInterval(timer);
+        }
+        if(tries>200) clearInterval(timer);
+      }catch(e){ if(tries>200) clearInterval(timer); }
+    },10);
+  })();
 
   function onClick(ev){
     if(canonicalReady()) return;
