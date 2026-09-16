@@ -1,13 +1,12 @@
-/* MENU RUNTIME 9.4 — LOADER ONLY
- * script.js is the sole permanent classroom UI/event router.
- * ui-complete-fix.js, loaded immediately after script.js, owns the temporary
- * startup activation guard. This loader must not install another click guard.
- * No global click/submit interception and no page rendering here.
+/* MENU RUNTIME 9.5 — LOADER ONLY
+ * script.js remains the permanent classroom UI/event controller.
+ * This loader only loads optional compatibility modules once.
+ * Navigation hardening is delegated to menu-unified-router-20260916.js.
  */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_940__) return;
-  window.__MENU_RUNTIME_FIX_940__ = true;
+  if(window.__MENU_RUNTIME_FIX_950__) return;
+  window.__MENU_RUNTIME_FIX_950__ = true;
 
   const loadOnce=(src,attr)=>{
     try{
@@ -17,7 +16,7 @@
       s.async=false;
       s.setAttribute(attr,'1');
       document.head.appendChild(s);
-    }catch(e){ console.warn('[MENU RUNTIME 9.4]',e); }
+    }catch(e){ console.warn('[MENU RUNTIME 9.5]',e); }
   };
 
   function boot(){
@@ -36,6 +35,7 @@
     loadOnce('master-crud-ui.js?v=20260915.14','data-lh-master-crud-ui-v14');
     loadOnce('student-links-fast-fix.js?v=2.0.0','data-lh-student-links-fast-fix-v20');
     loadOnce('lucky-wheel-final.js?v=20260915.1','data-lh-lucky-wheel-final-v21');
+    loadOnce('menu-unified-router-20260916.js?v=20260916.1','data-lh-menu-unified-router-v1');
   }
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true});
