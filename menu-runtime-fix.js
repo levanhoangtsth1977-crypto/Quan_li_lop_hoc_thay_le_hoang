@@ -1,27 +1,25 @@
-/* MENU RUNTIME 9.6 — LOADER ONLY
- * script.js remains the permanent classroom UI/event controller.
- * This loader only loads optional compatibility modules once.
- * Navigation hardening is delegated to menu-unified-router-20260916.js.
+/* MENU RUNTIME 10.0 — OPTIONAL MODULE LOADER ONLY
+ * script.js is the single canonical navigation/event controller.
+ * This loader must never install another menu/router/capture handler.
  */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_960__) return;
-  window.__MENU_RUNTIME_FIX_960__ = true;
+  if(window.__MENU_RUNTIME_FIX_1000__) return;
+  window.__MENU_RUNTIME_FIX_1000__=true;
 
-  const loadOnce=(src,attr)=>{
+  var loadOnce=function(src,attr){
     try{
       if(document.querySelector('script['+attr+']')) return;
-      const s=document.createElement('script');
+      var s=document.createElement('script');
       s.src=src;
       s.async=false;
       s.setAttribute(attr,'1');
       document.head.appendChild(s);
-    }catch(e){ console.warn('[MENU RUNTIME 9.6]',e); }
+    }catch(e){ console.warn('[MENU RUNTIME 10.0]',e); }
   };
 
   function boot(){
-    /* Input safety first: an invisible stale overlay must never own the screen. */
-    loadOnce('touch-interaction-guard.js?v=20260916.1','data-lh-touch-interaction-guard');
+    /* Intentionally no touch router and no navigation router here. */
     loadOnce('student-profile-repair.js?v=20260826.2','data-lh-profile-repair');
     loadOnce('menu-badge-sync-fix.js?v=20260826.1','data-lh-menu-badge-sync');
     loadOnce('home-data-sync-fix.js?v=20260826.1','data-lh-home-data-sync');
@@ -37,7 +35,6 @@
     loadOnce('master-crud-ui.js?v=20260915.14','data-lh-master-crud-ui-v14');
     loadOnce('student-links-fast-fix.js?v=2.0.0','data-lh-student-links-fast-fix-v20');
     loadOnce('lucky-wheel-final.js?v=20260915.1','data-lh-lucky-wheel-final-v21');
-    loadOnce('menu-unified-router-20260916.js?v=20260916.1','data-lh-menu-unified-router-v1');
   }
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true});
