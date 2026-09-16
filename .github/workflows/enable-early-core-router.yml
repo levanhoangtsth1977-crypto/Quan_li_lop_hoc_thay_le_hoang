@@ -1,0 +1,46 @@
+name: Enable preboot router
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+
+jobs:
+  enable-preboot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Insert preboot router once
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          marker = '<script src="early-core-router.js?v=1.0"></script>'
+          target = '<script src="script.js?v=4.1.1"></script>'
+          if marker not in s and target in s:
+              s = s.replace(target, marker + '\n' + target, 1)
+              p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Commit index change
+        shell: bash
+        run: |
+          set -e
+          if git diff --quiet -- index.html; then
+            echo 'No change needed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'fix: load early core router before main script'
+          git push
