@@ -1,16 +1,20 @@
-/* UI STARTUP COMPAT 1.3
- * Canonical permanent router: script.js.
- * This compatibility layer guarantees that the main menu and homepage quick
- * actions remain clickable even when Data Engine startup is late/failed.
- * It handles ONLY menu/page/quick-action targets and never handles save/submit.
+/* UI STARTUP COMPAT 1.4
+ * Canonical permanent router: script.js / LHUnifiedMenu.
+ * This compatibility layer is retained only for the startup window before
+ * the unified router becomes available. Once LHUnifiedMenu exists, this
+ * layer MUST stay out of the capture chain so it cannot swallow clicks.
  */
 (function(){
   'use strict';
-  if(window.__LH_UI_EARLY_ACTIVATION_13__) return;
-  window.__LH_UI_EARLY_ACTIVATION_13__=true;
+  if(window.__LH_UI_EARLY_ACTIVATION_14__) return;
+  window.__LH_UI_EARLY_ACTIVATION_14__=true;
 
   function canonicalReady(){
     try{return typeof UI!=='undefined' && UI && UI.eventsBound===true;}catch(e){return false;}
+  }
+
+  function unifiedReady(){
+    try{return !!(window.LHUnifiedMenu && typeof window.LHUnifiedMenu.navigate==='function');}catch(e){return false;}
   }
 
   function setPage(page){
@@ -31,7 +35,7 @@
     });
     const title=document.getElementById('pageTitle');
     if(title){
-      const labels={dashboard:'Trang chủ',students:'Học sinh',attendance:'Điểm danh',violations:'Vi phạm',rewards:'Khen thưởng',learning:'Học tập',statistics:'Thống kê','student-links':'Link học sinh',ai:'AI giáo viên',settings:'Cài đặt'};
+      const labels={dashboard:'Trang chủ',students:'Học sinh',attendance:'Điểm danh',violations:'Vi phạm',rewards:'Khen thưởng',learning:'Học tập',statistics:'Thống kê','student-links':'Link học sinh',ai:'AI giáo viên', 'lucky-wheel':'Vòng quay may mắn',settings:'Cài đặt'};
       title.textContent=labels[value]||value;
     }
     return true;
@@ -76,11 +80,14 @@
         window.location.reload();
         return true;
       }
-    }catch(e){console.warn('[UI STARTUP COMPAT 1.3]',e);}
+    }catch(e){console.warn('[UI STARTUP COMPAT 1.4]',e);}
     return false;
   }
 
   function handler(event){
+    /* Unified router owns all normal clicks once it is ready. */
+    if(unifiedReady()) return;
+
     const target=event.target && event.target.closest ? event.target : null;
     if(!target) return;
 
@@ -137,8 +144,6 @@
     }
   }
 
-  /* Capture phase ensures legacy document-level click handlers cannot swallow
-     homepage/menu actions. This layer never handles forms or data writes. */
   document.addEventListener('click',handler,true);
-  window.__LH_UI_EARLY_ACTIVATION_13_READY__=function(){return canonicalReady();};
+  window.__LH_UI_EARLY_ACTIVATION_14_READY__=function(){return canonicalReady() || unifiedReady();};
 })();
