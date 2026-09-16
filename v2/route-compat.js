@@ -5,11 +5,25 @@
   const qs = (s, r = document) => r.querySelector(s);
   const qsa = (s, r = document) => [...r.querySelectorAll(s)];
   const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+  const canon = v => String(v ?? "").replace(/\s+/g, " ").trim().toLocaleLowerCase("vi").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/[^a-z0-9]+/g, "");
   const setSelected = id => { if (id) sessionStorage.setItem(KEY, id); };
   const getSelected = () => sessionStorage.getItem(KEY) || "";
   const clearSelected = () => sessionStorage.removeItem(KEY);
   const readData = () => { try { return JSON.parse(localStorage.getItem(DATA_KEY) || "null"); } catch { return null; } };
   const getStudent = id => readData()?.students?.find(s => s.id === id) || null;
+
+  function markMatchingTableRows(student) {
+    if (!student?.name) return;
+    const wanted = canon(student.name);
+    qsa("#mainContent tbody tr").forEach(row => {
+      row.classList.remove("v2-selected-student");
+      const text = canon(row.cells?.[1]?.textContent || "");
+      if (text === wanted || text.includes(wanted)) {
+        row.classList.add("v2-selected-student");
+        row.dataset.studentRow = student.id;
+      }
+    });
+  }
 
   function flashStudentContext() {
     const id = getSelected();
@@ -28,6 +42,7 @@
     qsa('input[name="studentId"]').forEach(input => { if (!input.value) input.value = id; });
     qsa(`[data-student="${CSS.escape(id)}"]`).forEach(el => el.setAttribute("aria-current", "true"));
     if (!s) return;
+    markMatchingTableRows(s);
     const route = qs("#pageTitle")?.textContent?.trim() || "";
     const supported = ["Vi phạm", "Khen thưởng", "Tiến bộ", "Nhận xét", "Điểm danh", "Link học sinh"];
     if (!supported.includes(route)) return;
@@ -48,8 +63,7 @@
       btn.addEventListener("click", () => {
         const id = btn.dataset.v2OpenProfile;
         setSelected(id);
-        const profile = qs('[data-route="profiles"]');
-        profile?.click();
+        qs('[data-route="profiles"]')?.click();
         setTimeout(() => qs(`[data-action="profile"][data-student="${CSS.escape(id)}"]`)?.click(), 150);
       });
     });
