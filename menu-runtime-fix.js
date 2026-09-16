@@ -1,13 +1,14 @@
-/* MENU RUNTIME 9.5 — LOADER ONLY
- * script.js is the sole permanent classroom UI/event router.
- * master-crud-ui.js is loaded statically from index.html and owns the
- * classroom event write forms; this loader does not install click/submit guards.
- * No global click/submit interception and no page rendering here.
+/* MENU RUNTIME 9.6 — LOADER + STARTUP ACTIVATION
+ * script.js remains the permanent classroom UI/event router.
+ * ui-complete-fix.js is restored as a temporary startup activation fallback
+ * because the current runtime is showing static homepage HTML while menu events
+ * are not activating. It is loaded once and only handles menu/page/quick actions.
+ * master-crud-ui.js remains statically loaded from index.html for data writes.
  */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_950__) return;
-  window.__MENU_RUNTIME_FIX_950__ = true;
+  if(window.__MENU_RUNTIME_FIX_960__) return;
+  window.__MENU_RUNTIME_FIX_960__ = true;
 
   const loadOnce=(src,attr)=>{
     try{
@@ -17,10 +18,12 @@
       s.async=false;
       s.setAttribute(attr,'1');
       document.head.appendChild(s);
-    }catch(e){ console.warn('[MENU RUNTIME 9.5]',e); }
+    }catch(e){ console.warn('[MENU RUNTIME 9.6]',e); }
   };
 
   function boot(){
+    /* Emergency activation fallback: restores menu/page/quick-action clicks. */
+    loadOnce('ui-complete-fix.js?v=1.3','data-lh-ui-startup-compat');
     loadOnce('student-profile-repair.js?v=20260826.2','data-lh-profile-repair');
     loadOnce('menu-badge-sync-fix.js?v=20260826.1','data-lh-menu-badge-sync');
     loadOnce('home-data-sync-fix.js?v=20260826.1','data-lh-home-data-sync');
