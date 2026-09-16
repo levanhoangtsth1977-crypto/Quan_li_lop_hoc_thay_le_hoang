@@ -1,27 +1,9 @@
-/* GOOGLE API BRIDGE 9.7 — ACTIVE STUDENT DATA LOADER; canonical CRUD owned by menu-runtime-fix */
+/* GOOGLE API BRIDGE — TEMPORARILY DISABLED DURING TOUCH REGRESSION ISOLATION
+ * The main UI must remain responsive even when optional data modules are absent.
+ * Re-enable only after the touch pipeline is verified.
+ */
 'use strict';
 (function(){
-if(window.__LH_GOOGLE_BRIDGE_970__)return;
-window.__LH_GOOGLE_BRIDGE_970__=true;
-const CFG=Object.freeze({url:'https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec',key:'QL_LOP_HOC_LE_HOANG_2026_2027',sheetId:'1v9H6dReZiC_fCg6T9ISdfWOy1FN1HJQXXrKsABiCLI4',version:'MASTER-9.7-STUDENT-LOADER'});
-let loading=null,loadedOnce=false;
-function jsonp(action,params){return new Promise((resolve,reject)=>{const cb='__LH970_'+Date.now()+'_'+Math.random().toString(36).slice(2),s=document.createElement('script');let done=false;const finish=(e,d)=>{if(done)return;done=true;clearTimeout(t);try{delete window[cb]}catch(_){}s.remove();e?reject(e):resolve(d)};const t=setTimeout(()=>finish(Error('Google Apps Script không phản hồi sau 20 giây')),20000);window[cb]=d=>finish(null,d);s.onerror=()=>finish(Error('Không truy cập được Google Apps Script'));const q=Object.assign({action,callback:cb,_:Date.now()},params||{});s.src=CFG.url+'?'+Object.keys(q).map(k=>encodeURIComponent(k)+'='+encodeURIComponent(typeof q[k]==='string'?q[k]:JSON.stringify(q[k]))).join('&');document.head.appendChild(s)})}
-const clean=v=>String(v??'').trim();
-function normalizeStudent(s){return{id:clean(s?.id),name:clean(s?.name||s?.studentName),gender:clean(s?.gender),birthDate:clean(s?.birthDate),status:clean(s?.status)||'active',parentName:clean(s?.parentName),phone:clean(s?.phone),address:clean(s?.address),note:clean(s?.note),shareEnabled:s?.shareEnabled!==false,createdAt:s?.createdAt||'',updatedAt:s?.updatedAt||''}}
-function publish(list){const a=(Array.isArray(list)?list:[]).map(normalizeStudent).filter(s=>s.id&&s.name);if(!a.length)throw Error('Google không trả về học sinh hợp lệ');if(typeof window.replaceStudents==='function')window.replaceStudents(a,{source:'GOOGLE_APPS_SCRIPT',authoritative:true});else if(Array.isArray(window.students))window.students.splice(0,window.students.length,...a);window.GOOGLE_SHEETS_STUDENTS=a;return a}
-function replaceArray(name,list){if(Array.isArray(window[name]))window[name].splice(0,window[name].length,...(Array.isArray(list)?list:[]));else window[name]=Array.isArray(list)?list:[]}
-function applyData(r){const s=publish(r.HOC_SINH||[]),a=r.DIEM_DANH||[],v=r.VI_PHAM||[],k=r.KHEN_THUONG||[],h=r.HOC_TAP||[],p=r.TIEN_BO||[],c=r.NHAN_XET||[];replaceArray('attendanceRecords',a);replaceArray('violationRecords',v);replaceArray('rewardRecords',k);replaceArray('learningRecords',h);replaceArray('progressRecords',p);replaceArray('commentRecords',c);window.GOOGLE_SHEET_DATA={ok:true,version:CFG.version,sheetId:CFG.sheetId,webAppUrl:CFG.url,loadedAt:new Date().toISOString(),tabs:{HOC_SINH:s,DIEM_DANH:a,VI_PHAM:v,KHEN_THUONG:k,HOC_TAP:h,TIEN_BO:p,NHAN_XET:c},HOC_SINH:s,DIEM_DANH:a,VI_PHAM:v,KHEN_THUONG:k,HOC_TAP:h,TIEN_BO:p,NHAN_XET:c};try{window.dispatchEvent(new CustomEvent('google-sheets-data-ready',{detail:window.GOOGLE_SHEET_DATA}))}catch(_){}return window.GOOGLE_SHEET_DATA}
-function load(){if(loading)return loading;loading=jsonp('get_all').then(r=>{if(!r?.ok)throw Error(r?.error||'Web App không trả dữ liệu');loadedOnce=true;return applyData(r)}).catch(e=>{console.warn('[LH970]',e.message);return null}).finally(()=>{loading=null});return loading}
-async function init(){
-  await loadScript('./learning-menu.js?v=STABLE-20260826');
-  await loadScript('./ai-comments-engine.js?v=STABLE-20260826');
-  await loadScript('./learning-comments-repair.js?v=1.0');
-  await loadScript('./student-profile-menu.js?v=1.0');
-  /* student-links-fix.js is retired; student-links-fast-fix.js is the sole link renderer. */
-  await loadScript('./student-profile-violation-labels.js?v=20260914.1');
-  load();
-}
-function loadScript(src){return new Promise(resolve=>{const base=src.split('?')[0],existing=document.querySelector('script[src^="'+base+'"]');if(existing){resolve(true);return}const s=document.createElement('script');s.src=src;s.async=false;s.onload=()=>resolve(true);s.onerror=()=>resolve(false);document.head.appendChild(s)})}
-window.loadGoogleSheetsMenuData=load;window.syncGoogleSheetsNow=()=>{loadedOnce=false;loading=null;return load()};window.getGoogleStudentRoster=()=>Array.isArray(window.GOOGLE_SHEETS_STUDENTS)?window.GOOGLE_SHEETS_STUDENTS:(Array.isArray(window.students)?window.students:[]);window.getGoogleWebAppUrl=()=>CFG.url;window.getGoogleSpreadsheetId=()=>CFG.sheetId;window.GOOGLE_API_CONFIG=CFG;
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+  if(window.__LH_GOOGLE_BRIDGE_DISABLED__) return;
+  window.__LH_GOOGLE_BRIDGE_DISABLED__=true;
 })();
