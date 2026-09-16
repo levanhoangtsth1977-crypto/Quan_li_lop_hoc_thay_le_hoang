@@ -1,0 +1,63 @@
+name: System Integrity
+
+on:
+  push:
+    branches: [master, system-audit-cleanup-20260916]
+  pull_request:
+    branches: [master]
+
+jobs:
+  structural-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check canonical runtime graph
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -s index.html
+          test -s script.js
+          test -s master-crud-ui.js
+          test -s menu-runtime-fix.js
+
+          grep -q 'script.js?v=4.1.1' index.html
+          ! grep -q 'ui-complete-fix.js' index.html
+          test "$(grep -o 'master-crud-ui.js' index.html | wc -l)" -eq 1
+
+          ! grep -Eq "addEventListener\\(['\"]click|addEventListener\\(['\"]submit" menu-runtime-fix.js
+          grep -q 'script.js is the sole permanent classroom UI/event router' menu-runtime-fix.js
+          grep -q 'master-crud-ui.js is loaded statically from index.html' menu-runtime-fix.js
+
+          grep -q 'masterEventRouter' script.js
+          ! grep -Eq '^/\\* noop \\*/$|^/\\* noop \\*/' script.js
+
+          grep -q "CLASS_NAME:'5A3'" google-apps-script/Code.gs
+          grep -q "EXPECTED_STUDENTS:42" google-apps-script/Code.gs
+
+      - name: Check for retired module references
+        shell: bash
+        run: |
+          set -euo pipefail
+          for retired in \
+            'ui-action-patch.js' \
+            'student-sync-dedupe.js' \
+            'data-sync-vietnamese-fix.js' \
+            'google-sheets-records-bridge.js' \
+            'google-sheets-auto-sync.js' \
+            'google-sheets-bulk-reconcile.js' \
+            'statistics-excellent.js' \
+            'thong-ke-xuat-sac-final.js' \
+            'events-fixed-static.js' \
+            'vong-quay-may-man.js' \
+            'vong-quay-may-man-fix.js' \
+            'attendance-status-final-fix.js' \
+            'student-links-fix.js' \
+            'event-save-jsonp-fix.js' \
+            'violation-save-repair.js' \
+            'student-picker-v3.js' \
+            'behavior-save-hardfix.js'
+          do
+            ! grep -Rqs --exclude-dir=.git --exclude='system-integrity.yml' -- "$retired" .
+          done
