@@ -1,13 +1,13 @@
-/* MENU RUNTIME 9.4 — LOADER ONLY
+/* MENU RUNTIME 9.5 — LOADER ONLY
  * script.js is the sole permanent classroom UI/event router.
- * ui-complete-fix.js, loaded immediately after script.js, owns the temporary
- * startup activation guard. This loader must not install another click guard.
+ * master-crud-ui.js is loaded statically from index.html and owns the
+ * classroom event write forms; this loader does not install click/submit guards.
  * No global click/submit interception and no page rendering here.
  */
 (function(){
   'use strict';
-  if(window.__MENU_RUNTIME_FIX_940__) return;
-  window.__MENU_RUNTIME_FIX_940__ = true;
+  if(window.__MENU_RUNTIME_FIX_950__) return;
+  window.__MENU_RUNTIME_FIX_950__ = true;
 
   const loadOnce=(src,attr)=>{
     try{
@@ -17,7 +17,7 @@
       s.async=false;
       s.setAttribute(attr,'1');
       document.head.appendChild(s);
-    }catch(e){ console.warn('[MENU RUNTIME 9.4]',e); }
+    }catch(e){ console.warn('[MENU RUNTIME 9.5]',e); }
   };
 
   function boot(){
@@ -33,7 +33,6 @@
     loadOnce('site-link-integrity.js?v=2.2.0','data-lh-site-link-integrity-v22');
     loadOnce('behavior-form-select-repair.js?v=20260913.1','data-lh-behavior-form-select-repair-v10');
     loadOnce('behavior-multi-student-ui.js?v=20260914.2','data-lh-behavior-multi-student-ui-v22');
-    loadOnce('master-crud-ui.js?v=20260915.14','data-lh-master-crud-ui-v14');
     loadOnce('student-links-fast-fix.js?v=2.0.0','data-lh-student-links-fast-fix-v20');
     loadOnce('lucky-wheel-final.js?v=20260915.1','data-lh-lucky-wheel-final-v21');
   }
