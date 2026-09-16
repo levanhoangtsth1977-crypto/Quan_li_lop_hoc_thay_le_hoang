@@ -1,60 +1,87 @@
-/* TOUCH INTERACTION GUARD 1.0
- * Prevent stale/invisible mobile overlays from swallowing all taps/clicks.
- * This guard never handles application actions; it only enforces that hidden
- * overlays cannot intercept pointer/touch input.
+/* TOUCH INTERACTION GUARD 2.0
+ * Fixes invisible/stale overlays swallowing touch input on touch screens.
+ * No global MutationObserver. No application navigation. No data writes.
  */
 (function(){
   'use strict';
-  if(window.__LH_TOUCH_INTERACTION_GUARD_10__) return;
-  window.__LH_TOUCH_INTERACTION_GUARD_10__=true;
+  if(window.__LH_TOUCH_INTERACTION_GUARD_20__) return;
+  window.__LH_TOUCH_INTERACTION_GUARD_20__=true;
+
+  var OVERLAY_SELECTOR='#sidebarOverlay,.sidebar-overlay,.modal-backdrop,[data-overlay],.overlay,.loading-overlay';
 
   function isHidden(el){
     if(!el) return true;
-    const cs=getComputedStyle(el);
-    return el.hidden || el.getAttribute('aria-hidden')==='true' ||
-      cs.display==='none' || cs.visibility==='hidden' || cs.opacity==='0';
+    var cs=getComputedStyle(el);
+    return !!(el.hidden || el.getAttribute('aria-hidden')==='true' || cs.display==='none' || cs.visibility==='hidden' || cs.opacity==='0');
   }
 
-  function normalizeOverlay(el){
+  function disable(el){
     if(!el) return;
-    if(isHidden(el)){
-      el.style.pointerEvents='none';
-      el.style.touchAction='none';
-      if(el.classList.contains('active')) el.classList.remove('active');
-    }else{
-      el.style.pointerEvents='';
-      el.style.touchAction='';
-    }
+    el.style.setProperty('pointer-events','none','important');
+    el.style.setProperty('touch-action','none','important');
   }
 
-  function repair(){
+  function normalize(){
     try{
-      document.querySelectorAll('#sidebarOverlay,.sidebar-overlay,[data-sidebar-overlay],.modal-backdrop,.overlay').forEach(normalizeOverlay);
-      const sidebar=document.getElementById('sidebar');
-      const overlay=document.getElementById('sidebarOverlay');
-      if(overlay && sidebar && !sidebar.classList.contains('open')){
-        overlay.hidden=true;
-        overlay.setAttribute('aria-hidden','true');
-        overlay.classList.remove('active');
-        overlay.style.display='none';
-        overlay.style.pointerEvents='none';
+      document.querySelectorAll(OVERLAY_SELECTOR).forEach(function(el){ if(isHidden(el)) disable(el); });
+      var sidebar=document.getElementById('sidebar');
+      var sideOverlay=document.getElementById('sidebarOverlay');
+      if(sideOverlay && (!sidebar || !sidebar.classList.contains('open'))){
+        sideOverlay.hidden=true;
+        sideOverlay.setAttribute('aria-hidden','true');
+        disable(sideOverlay);
       }
-    }catch(e){ console.warn('[TOUCH GUARD]',e); }
+      var loading=document.getElementById('loadingOverlay');
+      if(loading && isHidden(loading)) disable(loading);
+    }catch(e){ console.warn('[TOUCH GUARD 2.0]',e); }
   }
 
-  function start(){
-    repair();
-    setTimeout(repair,0);
-    setTimeout(repair,150);
-    setTimeout(repair,500);
-    setTimeout(repair,1200);
+  function boot(){
+    normalize();
+    [0,120,400,900].forEach(function(ms){ setTimeout(normalize,ms); });
   }
 
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start,{once:true});
-  else start();
+  function isPassiveHiddenOverlay(el){
+    if(!el || !isHidden(el)) return false;
+    var id=el.id||'';
+    var cls=typeof el.className==='string' ? el.className : '';
+    return id==='sidebarOverlay' || cls.indexOf('sidebar-overlay')!==-1 || cls.indexOf('modal-backdrop')!==-1 || cls.indexOf('loading-overlay')!==-1 || (cls.indexOf('overlay')!==-1);
+  }
 
-  const observer=new MutationObserver(function(){ repair(); });
-  try{ observer.observe(document.documentElement,{subtree:true,attributes:true,attributeFilter:['class','style','hidden','aria-hidden']}); }catch(e){}
+  function passThroughPointer(ev){
+    try{
+      var hit=ev.target;
+      if(!isPassiveHiddenOverlay(hit)) return;
+      if(typeof ev.clientX!=='number' || typeof ev.clientY!=='number') return;
 
-  window.__LH_TOUCH_GUARD_API__={repair};
+      var changed=[];
+      document.querySelectorAll(OVERLAY_SELECTOR).forEach(function(el){
+        if(isHidden(el)){
+          changed.push([el,el.style.getPropertyValue('pointer-events'),el.style.getPropertyPriority('pointer-events')]);
+          el.style.setProperty('pointer-events','none','important');
+        }
+      });
+
+      var underlying=document.elementFromPoint(ev.clientX,ev.clientY);
+
+      changed.forEach(function(pair){
+        if(pair[1]) pair[0].style.setProperty('pointer-events',pair[1],pair[2]||'');
+        else pair[0].style.removeProperty('pointer-events');
+      });
+
+      if(underlying && underlying!==hit && underlying.closest){
+        var actionable=underlying.closest('button,a,[role="button"],[data-page],[data-action],[data-page-link]');
+        if(actionable){
+          ev.preventDefault();
+          ev.stopPropagation();
+          actionable.click();
+        }
+      }
+    }catch(e){ console.warn('[TOUCH PASS THROUGH]',e); }
+  }
+
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot,{once:true});
+  else boot();
+  document.addEventListener('pointerdown',passThroughPointer,true);
+  window.__LH_TOUCH_GUARD_API__={repair:normalize};
 })();
