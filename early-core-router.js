@@ -1,7 +1,6 @@
-/* EARLY CORE ROUTER 1.1
- * Runs before the main application script.
- * Owns the emergency navigation path and also throttles the
- * first bulk safeRender calls so the main thread stays responsive.
+/* EARLY CORE ROUTER 1.2
+ * Emergency navigation path before the canonical app router is ready.
+ * Also prevents the initial bulk renderer burst from locking the UI.
  */
 (function(){
   'use strict';
@@ -16,8 +15,9 @@
   };
 
   function canonicalReady(){
-    try { return !!(window.UI && UI.eventsBound === true && typeof window.navigateToPage === 'function'); }
-    catch(e){ return false; }
+    try {
+      return typeof window.navigateToPage === 'function' || !!window.LopHocApp;
+    } catch(e) { return false; }
   }
 
   function page(value){
@@ -50,7 +50,7 @@
 
   function action(name){
     try{
-      if(canonicalReady()) return true;
+      if(canonicalReady()) return false;
       switch(String(name||'')){
         case 'add-student': return modal('studentModal');
         case 'attendance': return page('attendance');
@@ -68,36 +68,41 @@
   }
 
   /*
-   * MAIN THREAD SAFETY
-   * script.js calls safeRender() repeatedly during initializeApp().
-   * Defer only the first hidden-page batch; normal operation is untouched.
+   * STARTUP RENDER GUARD
+   * safeRender is defined by script.js after this file loads.
+   * Do not depend on top-level const UI being a window property.
+   * The first dashboard render runs normally; the following hidden-page
+   * renders are released one at a time, then the original function is used.
    */
   (function installSafeRenderGuard(){
     var tries=0;
     var timer=setInterval(function(){
       tries++;
       try{
-        if(window.safeRender && !window.__LH_SAFE_RENDER_GUARD__){
+        if(typeof window.safeRender === 'function' && !window.__LH_SAFE_RENDER_GUARD__){
           var original=window.safeRender;
           var bootCalls=0;
           window.safeRender=function(name, renderer){
-            var startup = !!(window.UI && UI.initialized === true && bootCalls < 9);
             bootCalls++;
-            if(startup && name !== 'dashboard'){
-              var delay = Math.min((bootCalls-1)*50, 350);
+            if(bootCalls <= 9 && name !== 'dashboard'){
+              var delay = Math.min((bootCalls-2) * 45, 300);
               setTimeout(function(){
                 try{ original(name, renderer); }
                 catch(e){ console.warn('[SAFE RENDER GUARD]',e); }
-              }, delay);
+              }, Math.max(0, delay));
               return true;
             }
-            return original(name, renderer);
+            var result = original(name, renderer);
+            if(bootCalls === 10){
+              try{ delete window.safeRender; }catch(e){}
+            }
+            return result;
           };
           window.__LH_SAFE_RENDER_GUARD__=true;
           clearInterval(timer);
         }
-        if(tries>200) clearInterval(timer);
-      }catch(e){ if(tries>200) clearInterval(timer); }
+        if(tries>300) clearInterval(timer);
+      }catch(e){ if(tries>300) clearInterval(timer); }
     },10);
   })();
 
