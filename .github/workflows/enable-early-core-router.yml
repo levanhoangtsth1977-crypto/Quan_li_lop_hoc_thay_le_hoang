@@ -31,7 +31,7 @@ jobs:
               p.write_text(s, encoding='utf-8')
           PY
 
-      - name: Insert delete buttons for violations and rewards once
+      - name: Insert delete menu at canonical HTML boundary
         shell: bash
         run: |
           set -euo pipefail
@@ -40,49 +40,46 @@ jobs:
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
           marker = '<script src="/event-delete-menu-patch.js"></script>'
+          boundary = '</script>\n</body>\n</html>'
           if marker not in s:
-              anchor = '})();'
-              pos = s.rfind(anchor)
-              if pos < 0:
-                  raise SystemExit('Không tìm thấy điểm kết thúc ứng dụng trong index.html')
-              end = pos + len(anchor)
-              s = s[:end] + '\n' + marker + '\n</script>\n</body>\n</html>\n' + s[end:]
+              if boundary not in s:
+                  raise SystemExit('Không tìm thấy ranh giới HTML cuối index.html')
+              s = s.replace(boundary, '</script>\n' + marker + '\n</body>\n</html>', 1)
               p.write_text(s, encoding='utf-8')
           PY
 
-      - name: Normalize delete-menu script placement
+      - name: Validate delete menu include
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('index.html')
-          s = p.read_text(encoding='utf-8')
+          s = Path('index.html').read_text(encoding='utf-8')
           marker = '<script src="/event-delete-menu-patch.js"></script>'
-          bad = '\n' + marker + '\n</body>\n</html>\n</script>'
-          if bad in s:
-              s = s.replace(bad, '\n</script>\n' + marker + '\n</body>\n</html>', 1)
-              p.write_text(s, encoding='utf-8')
+          good = '</script>\n' + marker + '\n</body>\n</html>'
+          if s.count(marker) != 1:
+              raise SystemExit(f'Delete menu include count: {s.count(marker)}')
+          if good not in s:
+              raise SystemExit('Delete menu include không nằm ngoài script chính.')
+          print('Delete menu include placement OK')
           PY
 
-      - name: Remove temporary delete-menu injector
+      - name: Validate JavaScript syntax for delete module
         shell: bash
         run: |
           set -euo pipefail
-          if [ -f .github/workflows/inject-event-delete-menu.yml ]; then
-            git rm -f .github/workflows/inject-event-delete-menu.yml
-          fi
+          node --check event-delete-menu-patch.js
 
       - name: Commit index change
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add index.html
-          if ! git diff --cached --quiet -- index.html; then
-            git commit -m 'fix: normalize event delete script placement'
-            git push
-          elif git diff --cached --quiet; then
-            echo 'No change needed.'
+          if git diff --cached --quiet; then
+            echo 'No index change needed.'
+            exit 0
           fi
+          git commit -m 'fix: attach violation and reward delete menu'
+          git push origin HEAD:master
