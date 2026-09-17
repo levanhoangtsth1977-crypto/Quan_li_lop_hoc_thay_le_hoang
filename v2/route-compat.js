@@ -137,3 +137,13 @@
   observer.observe(document.documentElement, { childList: true, subtree: true });
   window.addEventListener("load", () => { flashStudentContext(); wireContextButton(); });
 })();
+
+// Load the independent mobile-menu guard through the already-loaded compatibility script.
+(() => {
+  if (document.querySelector('script[data-v2-mobile-menu-guard]')) return;
+  const s = document.createElement('script');
+  s.src = './mobile-menu-guard.js';
+  s.dataset.v2MobileMenuGuard = '1';
+  s.defer = true;
+  document.head.appendChild(s);
+})();
