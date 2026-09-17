@@ -100,6 +100,29 @@ async function __lhSyncNotice(sheet,recs,okText){
 }
 function migrateLegacyProfiles(force=false){let changed=0,matched=0;for(const s of D.students){const old=legacyMap.get(fold(s.name));if(!old)continue;matched++;const need=force||!clean(s.gender)||!clean(s.birthDate);if(need){if(!clean(s.gender))s.gender=old.gender;if(!clean(s.birthDate))s.birthDate=old.birthDate;changed++}}if(changed)write(D);return{matched,changed}}
 let D=read();const migration=migrateLegacyProfiles(false);
+const __LH_RECONCILE_MARK='LH_CANONICAL_GOOGLE_RECONCILED_2026_2027';
+async function __lhReconcileExisting(){
+  try{
+    if(localStorage.getItem(__LH_RECONCILE_MARK)==='1')return;
+    const jobs=[
+      ['VI_PHAM',D.violations||[]],
+      ['KHEN_THUONG',D.rewards||[]],
+      ['DIEM_DANH',D.attendance||[]],
+      ['TIEN_BO',D.progress||[]],
+      ['NHAN_XET',D.comments||[]],
+      ['HOC_TAP',Object.values(D.learning||{}).flat()]
+    ];
+    let total=0;
+    for(const [sheet,rows] of jobs){
+      if(!rows.length)continue;
+      await __lhSyncMany(sheet,rows);
+      total+=rows.length;
+    }
+    localStorage.setItem(__LH_RECONCILE_MARK,'1');
+    if(total)toast('Đã đồng bộ dữ liệu hồ sơ hiện có lên Google Sheets.');
+  }catch(e){console.warn('[canonical reconcile]',e?.message||e)}
+}
+void __lhReconcileExisting();
 let route=(location.hash||'#home').slice(1).split('?')[0]||'home';let params={};
 const TITLES={home:'Trang chủ',students:'Học sinh',profiles:'Hồ sơ học sinh',profile:'Hồ sơ học sinh',attendance:'Điểm danh',violations:'Vi phạm',rewards:'Khen thưởng',learning:'Học tập',progress:'Tiến bộ',comments:'Nhận xét',links:'Link học sinh',millionaire:'Triệu Phú Học Đường',ai:'AI giáo viên',settings:'Cấu hình'};
 function student(id){return D.students.find(s=>s&&s.id===id)}
