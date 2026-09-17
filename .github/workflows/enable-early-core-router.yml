@@ -31,7 +31,7 @@ jobs:
               p.write_text(s, encoding='utf-8')
           PY
 
-      - name: Insert delete menu at canonical HTML boundary
+      - name: Install canonical delete menu module
         shell: bash
         run: |
           set -euo pipefail
@@ -40,15 +40,18 @@ jobs:
           p = Path('index.html')
           s = p.read_text(encoding='utf-8')
           marker = '<script src="/event-delete-menu-patch.js"></script>'
-          boundary = '</script>\n</body>\n</html>'
-          if marker not in s:
-              if boundary not in s:
-                  raise SystemExit('Không tìm thấy ranh giới HTML cuối index.html')
-              s = s.replace(boundary, '</script>\n' + marker + '\n</body>\n</html>', 1)
-              p.write_text(s, encoding='utf-8')
+          # Remove every stale copy first, then place exactly one copy
+          # immediately after the final application </script> and before </body>.
+          s = s.replace(marker, '')
+          last_script = s.rfind('</script>')
+          body = s.rfind('</body>')
+          if last_script < 0 or body < 0 or last_script > body:
+              raise SystemExit('Không xác định được </script> cuối và </body> trong index.html')
+          s = s[:last_script + len('</script>')] + '\n' + marker + s[body:]
+          p.write_text(s, encoding='utf-8')
           PY
 
-      - name: Validate delete menu include
+      - name: Validate delete menu placement
         shell: bash
         run: |
           set -euo pipefail
@@ -56,11 +59,13 @@ jobs:
           from pathlib import Path
           s = Path('index.html').read_text(encoding='utf-8')
           marker = '<script src="/event-delete-menu-patch.js"></script>'
-          good = '</script>\n' + marker + '\n</body>\n</html>'
+          pos = s.find(marker)
           if s.count(marker) != 1:
               raise SystemExit(f'Delete menu include count: {s.count(marker)}')
-          if good not in s:
-              raise SystemExit('Delete menu include không nằm ngoài script chính.')
+          last_script = s.rfind('</script>', 0, pos + 1)
+          body = s.find('</body>', pos)
+          if last_script < 0 or body < 0 or not (last_script < pos < body):
+              raise SystemExit('Delete menu include không nằm sau script chính và trước </body>.')
           print('Delete menu include placement OK')
           PY
 
