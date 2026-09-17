@@ -1,14 +1,11 @@
 const { createHash } = require('node:crypto');
 
-const UPSTREAMS = [
-  'https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrNWY5DCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec',
-  'https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrNWY5DCEPpm2rkpXTn-sNPA/exec'
-];
+const UPSTREAM = 'https://script.google.com/macros/s/AKfycbxTPwf-jhrR8JOoKY5ZLuzlsDgcv3nWILtDPTrYNWZCEPpm2rkpXTn-sPAdFaUyy0z_uw/exec';
 const PREFIX = 'LH_STUDENT_PROFILE_V3|2026-2027|5A3|';
 const clean = value => String(value ?? '').trim().replace(/\s+/g, ' ');
 const tokenForStudent = id => createHash('sha256').update(PREFIX + clean(id), 'utf8').digest('hex');
 const pick = (obj, keys) => { const out = {}; for (const key of keys) if (obj?.[key] !== undefined && obj?.[key] !== null && obj?.[key] !== '') out[key] = obj[key]; return out; };
-const byStudent = (list, sid, keys) => (Array.isArray(list) ? list : []).filter(x => clean(x?.studentId) === sid).map(x => pick(x, keys));
+const byStudent = (list, sid, name, keys) => (Array.isArray(list) ? list : []).filter(x => clean(x?.studentId) === sid || clean(x?.studentName) === name).map(x => pick(x, keys));
 
 function parsePayload(text) {
   const value = String(text ?? '').trim().replace(/^\uFEFF/, '');
@@ -21,57 +18,16 @@ function parsePayload(text) {
   return null;
 }
 
-async function tryEndpoint(baseUrl) {
-  const headers = {
-    Accept: 'application/json,text/plain,*/*',
-    'User-Agent': 'Mozilla/5.0 (compatible; StudentProfileProxy/1.1)'
-  };
-  let lastError = null;
-
-  try {
-    const direct = await fetch(`${baseUrl}?action=get_all&_=${Date.now()}`, {
-      redirect: 'follow', cache: 'no-store', headers
-    });
-    const directText = await direct.text();
-    if (direct.ok) {
-      const directData = parsePayload(directText);
-      if (directData?.ok) return directData;
-    }
-    lastError = new Error(`direct HTTP ${direct.status}`);
-  } catch (error) {
-    lastError = error;
-  }
-
-  try {
-    const jsonp = await fetch(`${baseUrl}?action=get_all&callback=__LH_PROXY_CALLBACK&_=${Date.now()}`, {
-      redirect: 'follow', cache: 'no-store', headers
-    });
-    const jsonpText = await jsonp.text();
-    if (jsonp.ok) {
-      const jsonpData = parsePayload(jsonpText);
-      if (jsonpData?.ok) return jsonpData;
-      lastError = new Error('JSONP không trả dữ liệu hợp lệ');
-    } else {
-      lastError = new Error(`jsonp HTTP ${jsonp.status}`);
-    }
-  } catch (error) {
-    lastError = error;
-  }
-
-  throw lastError || new Error('Google Apps Script không phản hồi');
-}
-
 async function fetchUpstream() {
-  let lastError = null;
-  for (const endpoint of UPSTREAMS) {
-    try {
-      return await tryEndpoint(endpoint);
-    } catch (error) {
-      lastError = error;
-      console.warn('[student-data] upstream failed:', endpoint, error?.message || error);
-    }
-  }
-  throw lastError || new Error('Không có Google Apps Script endpoint hoạt động');
+  const response = await fetch(`${UPSTREAM}?action=get_all&_=${Date.now()}`, {
+    redirect: 'follow',
+    cache: 'no-store',
+    headers: { Accept: 'application/json,text/plain,*/*', 'User-Agent': 'Mozilla/5.0 (compatible; StudentProfileProxy/2.0)' }
+  });
+  const text = await response.text();
+  const data = parsePayload(text);
+  if (!response.ok || !data?.ok) throw new Error(`Google Apps Script HTTP ${response.status}`);
+  return data;
 }
 
 module.exports = async function handler(req, res) {
@@ -80,6 +36,7 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
   res.setHeader('Cache-Control', 'no-store, max-age=0');
   if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method !== 'GET') return res.status(405).json({ ok: false, error: 'Method Not Allowed' });
 
   const token = clean(req.query?.t || '');
   if (!token) return res.status(400).json({ ok: false, error: 'Thiếu mã truy cập cá nhân.' });
@@ -87,21 +44,21 @@ module.exports = async function handler(req, res) {
   try {
     const data = await fetchUpstream();
     const students = Array.isArray(data.HOC_SINH) ? data.HOC_SINH : [];
-    const rawStudent = students.find(s => clean(s?.id) && tokenForStudent(s.id) === token);
-    if (!rawStudent) return res.status(404).json({ ok: false, error: 'Mã truy cập không hợp lệ hoặc liên kết đã thay đổi.' });
-    if (rawStudent.shareEnabled === false) return res.status(403).json({ ok: false, error: 'Liên kết hồ sơ hiện đang được khóa.' });
+    const student = students.find(s => clean(s?.id) && tokenForStudent(s.id) === token);
+    if (!student) return res.status(404).json({ ok: false, error: 'Mã truy cập không hợp lệ hoặc liên kết đã thay đổi.' });
+    if (student.shareEnabled === false) return res.status(403).json({ ok: false, error: 'Liên kết hồ sơ hiện đang được khóa.' });
 
-    const sid = clean(rawStudent.id);
+    const sid = clean(student.id), name = clean(student.name);
     return res.status(200).json({
       ok: true,
-      student: pick(rawStudent, ['id','name','gender','birthDate']),
-      DIEM_DANH: byStudent(data.DIEM_DANH, sid, ['date','status','note']),
-      VI_PHAM: byStudent(data.VI_PHAM, sid, ['date','type','level','action','note','status']),
-      KHEN_THUONG: byStudent(data.KHEN_THUONG, sid, ['date','type','formType','note']),
-      HOC_TAP: byStudent(data.HOC_TAP, sid, ['date','subject','result','level','note']),
-      TIEN_BO: byStudent(data.TIEN_BO, sid, ['date','category','level','score','result','note']),
+      student: pick(student, ['id','name','gender','birthDate']),
+      DIEM_DANH: byStudent(data.DIEM_DANH, sid, name, ['date','status','note']),
+      VI_PHAM: byStudent(data.VI_PHAM, sid, name, ['date','type','level','action','note','status']),
+      KHEN_THUONG: byStudent(data.KHEN_THUONG, sid, name, ['date','type','formType','note']),
+      HOC_TAP: byStudent(data.HOC_TAP, sid, name, ['date','subject','result','level','note']),
+      TIEN_BO: byStudent(data.TIEN_BO, sid, name, ['date','category','level','score','result','note']),
       NHAN_XET: (Array.isArray(data.NHAN_XET) ? data.NHAN_XET : [])
-        .filter(x => clean(x?.studentId) === sid && x?.visibleToStudent !== false)
+        .filter(x => (clean(x?.studentId) === sid || clean(x?.studentName) === name) && x?.visibleToStudent !== false)
         .map(x => pick(x, ['date','subject','content','level','note']))
     });
   } catch (error) {
