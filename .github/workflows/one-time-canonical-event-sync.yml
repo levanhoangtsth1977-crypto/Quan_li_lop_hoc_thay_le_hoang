@@ -1,0 +1,96 @@
+name: one-time canonical event sync
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  patch:
+    if: "!contains(github.event.head_commit.message, '[canonical-sync]')"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch canonical index once
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          marker = "function write(d){try{localStorage.setItem(KEY,JSON.stringify(d))}catch(e){console.warn('localStorage unavailable',e)}}"
+          insert = r'''function write(d){try{localStorage.setItem(KEY,JSON.stringify(d))}catch(e){console.warn('localStorage unavailable',e)}}
+          const __LH_REMOTE_SYNC={students:null,at:0};
+          async function __lhRemoteStudents(){
+            if(__LH_REMOTE_SYNC.students&&Date.now()-__LH_REMOTE_SYNC.at<60000)return __LH_REMOTE_SYNC.students;
+            const u='/api/google?action=get_students&_='+Date.now();
+            const r=await fetch(u,{cache:'no-store',credentials:'same-origin'});
+            const d=await r.json().catch(()=>null);
+            if(!r.ok||!d?.ok||!Array.isArray(d.students))throw Error(d?.error||'Không lấy được danh sách học sinh Google Sheets.');
+            __LH_REMOTE_SYNC.students=d.students;__LH_REMOTE_SYNC.at=Date.now();return d.students;
+          }
+          async function __lhSyncOne(sheet,rec){
+            const local=student(rec?.studentId);
+            if(!local)throw Error('Không tìm thấy học sinh cục bộ để đồng bộ.');
+            const rems=await __lhRemoteStudents();
+            const remote=rems.find(x=>fold(x?.name)===fold(local.name));
+            if(!remote?.id)throw Error('Không ghép được học sinh với Google Sheets: '+local.name);
+            const record={...rec,studentId:String(remote.id),studentName:String(remote.name||local.name)};
+            const qs=new URLSearchParams({action:'save_event',payload:JSON.stringify({sheet,record}),tab:sheet,sheet,record:JSON.stringify(record),_:String(Date.now())});
+            const r=await fetch('/api/google?'+qs.toString(),{cache:'no-store',credentials:'same-origin'});
+            const d=await r.json().catch(()=>null);
+            if(!r.ok||!d?.ok||!(d.saved===true||d.stored===true||d.success===true))throw Error(d?.error||d?.message||('Google Sheets không xác nhận lưu '+sheet));
+            return d;
+          }
+          async function __lhSyncMany(sheet,recs){
+            const rows=Array.isArray(recs)?recs.filter(x=>x&&x.studentId):[];
+            const out=[];
+            for(let i=0;i<rows.length;i+=6){
+              const chunk=rows.slice(i,i+6);
+              const got=await Promise.all(chunk.map(x=>__lhSyncOne(sheet,x)));
+              out.push(...got);
+            }
+            return out;
+          }
+          async function __lhSyncNotice(sheet,recs,okText){
+            try{await __lhSyncMany(sheet,recs);toast(okText||'Đã đồng bộ Google Sheets')}catch(e){toast('Đã lưu trên máy giáo viên nhưng chưa đồng bộ Google Sheets: '+(e?.message||e))}
+          }'''
+          # normalize the indentation introduced by the raw string
+          insert='\n'.join(line[10:] if line.startswith('          ') else line for line in insert.splitlines())
+          if marker not in s:
+              raise SystemExit('ANCHOR_WRITE_NOT_FOUND')
+          s=s.replace(marker,insert,1)
+
+          old_att = "function saveAttendance(all){const date=$('attDate').value||today();D.attendance=D.attendance.filter(r=>r.date!==date);if(all){D.students.forEach(s=>D.attendance.push({id:uid(),studentId:s.id,date,status:'present',note:''}))}else{document.querySelectorAll('[data-att]').forEach(el=>D.attendance.push({id:uid(),studentId:el.dataset.att,date,status:el.value,note:document.querySelector(`[data-note=\"${CSS.escape(el.dataset.att)}\"]`)?.value||''}))}write(D);render();toast('Đã lưu điểm danh')}"
+          new_att = "function saveAttendance(all){const date=$('attDate').value||today();D.attendance=D.attendance.filter(r=>r.date!==date);const batch=[];if(all){D.students.forEach(s=>{const r={id:'ATT_'+date+'_'+s.id,studentId:s.id,date,status:'present',note:''};D.attendance.push(r);batch.push(r)})}else{document.querySelectorAll('[data-att]').forEach(el=>{const r={id:'ATT_'+date+'_'+el.dataset.att,studentId:el.dataset.att,date,status:el.value,note:document.querySelector(`[data-note=\"${CSS.escape(el.dataset.att)}\"]`)?.value||''};D.attendance.push(r);batch.push(r)})}write(D);render();toast('Đã lưu điểm danh · đang đồng bộ Google Sheets...');__lhSyncNotice('DIEM_DANH',batch,'Điểm danh đã đồng bộ Google Sheets')}"
+          if old_att not in s:
+              raise SystemExit('ANCHOR_ATTENDANCE_NOT_FOUND')
+          s=s.replace(old_att,new_att,1)
+
+          old_event = "if(x==='save-event'){const isV=a.dataset.kind==='violation',rec={id:uid(),studentId:$('mStudent').value,type:$('mType').value,note:$('mNote').value.trim(),date:$('mDate')?.value||today()};if(isV)rec.level=$('mLevel')?.value||'Trung bình';(isV?D.violations:D.rewards).push(rec);write(D);closeModal();render();toast(isV?'Đã lưu vi phạm':'Đã lưu khen thưởng');return}"
+          new_event = "if(x==='save-event'){const isV=a.dataset.kind==='violation',rec={id:uid(),studentId:$('mStudent').value,type:$('mType').value,note:$('mNote').value.trim(),date:$('mDate')?.value||today()};if(isV)rec.level=$('mLevel')?.value||'Trung bình';(isV?D.violations:D.rewards).push(rec);write(D);closeModal();render();toast((isV?'Đã lưu vi phạm':'Đã lưu khen thưởng')+' · đang đồng bộ Google Sheets...');__lhSyncNotice(isV?'VI_PHAM':'KHEN_THUONG',[rec],isV?'Vi phạm đã đồng bộ Google Sheets':'Khen thưởng đã đồng bộ Google Sheets');return}"
+          if old_event not in s:
+              raise SystemExit('ANCHOR_EVENT_NOT_FOUND')
+          s=s.replace(old_event,new_event,1)
+
+          old_simple = "if(x==='save-simple'){const t=$('mText').value.trim();if(!t)return toast('Nhập nội dung');D[a.dataset.type].push({id:uid(),studentId:$('mStudent').value,content:t,date:$('mSimpleDate')?.value||today()});write(D);closeModal();render();toast('Đã lưu');return}"
+          new_simple = "if(x==='save-simple'){const t=$('mText').value.trim();if(!t)return toast('Nhập nội dung');const sheet=a.dataset.type==='progress'?'TIEN_BO':'NHAN_XET',rec={id:uid(),studentId:$('mStudent').value,content:t,date:$('mSimpleDate')?.value||today()};D[a.dataset.type].push(rec);write(D);closeModal();render();toast('Đã lưu · đang đồng bộ Google Sheets...');__lhSyncNotice(sheet,[rec],'Bản ghi đã đồng bộ Google Sheets');return}"
+          if old_simple not in s:
+              raise SystemExit('ANCHOR_SIMPLE_NOT_FOUND')
+          s=s.replace(old_simple,new_simple,1)
+
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit canonical patch and remove one-time workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html .github/workflows/one-time-canonical-event-sync.yml
+          git diff --cached --quiet && exit 0
+          git rm .github/workflows/one-time-canonical-event-sync.yml
+          git add index.html
+          git commit -m "fix: canonical Google event sync [canonical-sync]"
+          git push
