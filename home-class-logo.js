@@ -18,11 +18,192 @@
     const s=document.createElement('style');
     s.id=STYLE_ID;
     s.textContent=`
-      #lhHomeClassLogo{display:flex!important;align-items:center!important;justify-content:center!important;flex:0 0 auto!important;width:190px!important;min-width:190px!important;margin-left:auto!important;position:relative!important;z-index:2!important;}
-      #lhHomeClassLogo img{display:block!important;width:170px!important;height:170px!important;min-width:170px!important;min-height:170px!important;max-width:170px!important;max-height:170px!important;object-fit:contain!important;border:0!important;border-radius:50%!important;box-shadow:0 16px 34px rgba(15,23,42,.18)!important;}
-      @media (max-width:900px){#lhHomeClassLogo{width:150px!important;min-width:150px!important}#lhHomeClassLogo img{width:132px!important;height:132px!important;min-width:132px!important;min-height:132px!important;max-width:132px!important;max-height:132px!important}}
-      @media (max-width:720px){#mainContent.lh-home-modern .hero{grid-template-columns:1fr!important}#lhHomeClassLogo{width:100%!important;min-width:0!important;margin:0!important;justify-self:center!important}#lhHomeClassLogo img{width:120px!important;height:120px!important;min-width:120px!important;min-height:120px!important;max-width:120px!important;max-height:120px!important}}
-      @media (max-width:420px){#lhHomeClassLogo img{width:104px!important;height:104px!important;min-width:104px!important;min-height:104px!important;max-width:104px!important;max-height:104px!important}}
+      /* ===== THANH MENU: XANH LAM ĐỒNG BỘ TỪ TRÊN XUỐNG DƯỚI ===== */
+      .sidebar{
+        background:#1559c7!important;
+        color:#fff!important;
+        border-right:1px solid rgba(255,255,255,.18)!important;
+      }
+      .sidebar .brand{
+        border-bottom-color:rgba(255,255,255,.24)!important;
+      }
+      .sidebar .brand b,
+      .sidebar .brand small{
+        color:#fff!important;
+      }
+      .sidebar .logo{
+        background:#0b3f91!important;
+        color:#fff!important;
+        box-shadow:0 6px 14px rgba(7,35,88,.24)!important;
+      }
+      .sidebar .context{
+        background:rgba(255,255,255,.10)!important;
+        border-color:rgba(255,255,255,.26)!important;
+      }
+      .sidebar .context label{
+        color:#eef5ff!important;
+        font-size:13px!important;
+        font-weight:700!important;
+      }
+      .sidebar .context select{
+        color:#172033!important;
+        background:#fff!important;
+        border-color:rgba(255,255,255,.56)!important;
+      }
+      .sidebar .menu{
+        gap:7px!important;
+      }
+      .sidebar .menu a{
+        min-height:46px!important;
+        padding:11px 12px!important;
+        border-radius:12px!important;
+        background:#1559c7!important;
+        color:#fff!important;
+        font-size:17px!important;
+        font-weight:700!important;
+        line-height:1.25!important;
+        box-shadow:0 3px 8px rgba(8,39,96,.14)!important;
+      }
+      .sidebar .menu a span{
+        font-size:17px!important;
+      }
+      .sidebar .menu a:hover{
+        background:#0f4da6!important;
+        color:#fff!important;
+        transform:translateX(2px);
+      }
+      .sidebar .menu a.active{
+        background:#0b3f91!important;
+        color:#fff!important;
+        font-weight:800!important;
+        box-shadow:0 5px 12px rgba(8,43,111,.30)!important;
+      }
+      .sidebar .menu .count{
+        margin-left:auto!important;
+        color:#fff!important;
+        background:rgba(255,255,255,.18)!important;
+        font-size:13px!important;
+        font-weight:800!important;
+        padding:2px 7px!important;
+        border-radius:999px!important;
+      }
+      .sidebar .teacher{
+        background:rgba(255,255,255,.10)!important;
+        border-color:rgba(255,255,255,.25)!important;
+      }
+      .sidebar .teacher b,
+      .sidebar .teacher small{
+        color:#fff!important;
+      }
+
+      /* ===== TRANG CHỦ: CHỮ TRÁI — LOGO 5A3 BÊN PHẢI ===== */
+      #page-dashboard .dashboard-hero,
+      #mainContent.lh-home-modern .hero{
+        position:relative!important;
+        display:grid!important;
+        grid-template-columns:minmax(0,1fr) 190px!important;
+        align-items:center!important;
+        gap:18px!important;
+        overflow:hidden!important;
+      }
+      #page-dashboard .dashboard-hero .hero-content{
+        min-width:0!important;
+        grid-column:1!important;
+        grid-row:1!important;
+      }
+      #page-dashboard .dashboard-hero #lhHomeClassLogo,
+      #mainContent.lh-home-modern .hero #lhHomeClassLogo{
+        grid-column:2!important;
+        grid-row:1!important;
+        justify-self:center!important;
+        align-self:center!important;
+        width:180px!important;
+        min-width:180px!important;
+        display:flex!important;
+        align-items:center!important;
+        justify-content:center!important;
+        margin:0!important;
+        position:relative!important;
+        z-index:3!important;
+      }
+      #lhHomeClassLogo img{
+        display:block!important;
+        width:170px!important;
+        height:170px!important;
+        min-width:170px!important;
+        min-height:170px!important;
+        max-width:170px!important;
+        max-height:170px!important;
+        object-fit:contain!important;
+        border:0!important;
+        border-radius:50%!important;
+        background:#fff!important;
+        box-shadow:0 12px 30px rgba(15,23,42,.20)!important;
+      }
+      #page-dashboard .dashboard-hero .hero-illustration,
+      #mainContent.lh-home-modern .hero .hero-illustration{
+        display:none!important;
+      }
+
+      /* Mobile: logo vẫn nằm BÊN PHẢI, không rơi xuống dưới chữ */
+      @media (max-width:720px){
+        #page-dashboard .dashboard-hero,
+        #mainContent.lh-home-modern .hero{
+          grid-template-columns:minmax(0,1fr) 112px!important;
+          gap:10px!important;
+          overflow:hidden!important;
+        }
+        #page-dashboard .dashboard-hero .hero-content{
+          grid-column:1!important;
+          grid-row:1!important;
+          min-width:0!important;
+        }
+        #page-dashboard .dashboard-hero #lhHomeClassLogo,
+        #mainContent.lh-home-modern .hero #lhHomeClassLogo{
+          grid-column:2!important;
+          grid-row:1!important;
+          width:112px!important;
+          min-width:112px!important;
+          margin:0!important;
+          justify-self:center!important;
+          align-self:center!important;
+        }
+        #lhHomeClassLogo img{
+          width:104px!important;
+          height:104px!important;
+          min-width:104px!important;
+          min-height:104px!important;
+          max-width:104px!important;
+          max-height:104px!important;
+        }
+      }
+      @media (max-width:380px){
+        #page-dashboard .dashboard-hero,
+        #mainContent.lh-home-modern .hero{
+          grid-template-columns:minmax(0,1fr) 96px!important;
+          gap:6px!important;
+        }
+        #page-dashboard .dashboard-hero #lhHomeClassLogo,
+        #mainContent.lh-home-modern .hero #lhHomeClassLogo{
+          width:96px!important;
+          min-width:96px!important;
+        }
+        #lhHomeClassLogo img{
+          width:88px!important;
+          height:88px!important;
+          min-width:88px!important;
+          min-height:88px!important;
+          max-width:88px!important;
+          max-height:88px!important;
+        }
+      }
+
+      @media (max-width:720px){
+        .sidebar .menu a,
+        .sidebar .menu a span{
+          font-size:16px!important;
+        }
+      }
     `;
     document.head.appendChild(s);
   }
@@ -46,33 +227,55 @@
     let sourceIndex=0;
     img.addEventListener('error',function(){
       sourceIndex++;
-      if(sourceIndex<LOGO_SOURCES.length)img.src=LOGO_SOURCES[sourceIndex];
+      if(sourceIndex<LOGO_SOURCES.length){
+        img.src=LOGO_SOURCES[sourceIndex];
+      }
     },false);
     img.src=LOGO_SOURCES[0];
     wrap.appendChild(img);
     return wrap;
   }
 
+  function currentHomeHero(){
+    return document.querySelector('#page-dashboard .dashboard-hero') ||
+           document.querySelector('#mainContent .dashboard-hero') ||
+           document.querySelector('#mainContent .hero');
+  }
+
   function apply(){
     applyQueued=false;
     const root=document.getElementById('mainContent');
     if(!root)return;
-    if(!(location.hash||'#home').slice(1).split('?')[0].startsWith('home'))return;
-    const hero=root.querySelector('.hero');
-    if(!hero)return;
+    const currentRoute=(location.hash||'#home').slice(1).split('?')[0]||'home';
+    if(currentRoute!=='home' && currentRoute!=='dashboard')return;
+
     ensureStyle();
+    const hero=currentHomeHero();
+    if(!hero)return;
 
-    const existing=document.getElementById('lhHomeClassLogo');
-    if(existing && existing.parentNode!==hero)existing.remove();
-    if(existing)return;
+    /* Chỉ xoá hình minh hoạ nhà/ảnh cũ trong chính Hero của Trang chủ. */
+    hero.querySelectorAll('.hero-illustration').forEach(el=>{
+      if(el.id!=='lhHomeClassLogo')el.remove();
+    });
 
-    const house=[...hero.children].find(el=>el.textContent.trim()==='🏫');
-    const wrap=ensureNode();
-    if(house && house.parentNode===hero){
-      house.replaceWith(wrap);
-    }else if(!wrap.parentNode){
-      hero.appendChild(wrap);
+    let wrap=document.getElementById('lhHomeClassLogo');
+    if(wrap && wrap.parentNode!==hero){
+      wrap.remove();
+      wrap=null;
     }
+    if(!wrap)wrap=ensureNode();
+
+    const directVisual=hero.querySelector(':scope > img, :scope > svg');
+    if(directVisual && directVisual!==wrap){
+      directVisual.replaceWith(wrap);
+    }else if(wrap.parentNode!==hero){
+      const content=hero.querySelector('.hero-content');
+      if(content && content.parentNode===hero)content.insertAdjacentElement('afterend',wrap);
+      else hero.appendChild(wrap);
+    }
+
+    const img=wrap.querySelector('img');
+    if(img && !img.getAttribute('src'))img.src=LOGO_SOURCES[0];
   }
 
   function queue(){
