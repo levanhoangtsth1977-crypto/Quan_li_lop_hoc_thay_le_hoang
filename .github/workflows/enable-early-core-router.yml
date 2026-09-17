@@ -31,16 +31,43 @@ jobs:
               p.write_text(s, encoding='utf-8')
           PY
 
+      - name: Insert delete buttons for violations and rewards once
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          marker = '<script src="/event-delete-menu-patch.js"></script>'
+          if marker not in s:
+              anchor = '})();'
+              pos = s.rfind(anchor)
+              if pos < 0:
+                  raise SystemExit('Không tìm thấy điểm kết thúc ứng dụng trong index.html')
+              end = pos + len(anchor)
+              s = s[:end] + '\n' + marker + '\n</body>\n</html>\n' + s[end:]
+              p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Remove temporary delete-menu injector
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f .github/workflows/inject-event-delete-menu.yml ]; then
+            git rm -f .github/workflows/inject-event-delete-menu.yml
+          fi
+
       - name: Commit index change
         shell: bash
         run: |
           set -e
-          if git diff --quiet -- index.html; then
-            echo 'No change needed.'
-            exit 0
-          fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add index.html
-          git commit -m 'fix: load early core router before main script'
-          git push
+          if ! git diff --cached --quiet -- index.html; then
+            git commit -m 'fix: load delete buttons for violations and rewards'
+            git push
+          elif git diff --cached --quiet; then
+            echo 'No change needed.'
+          fi
