@@ -1,16 +1,20 @@
 /* V2 mobile menu guard: keep a visible MENU control independent of app.js. */
 (() => {
   const boot = () => {
-    if (document.getElementById("v2MenuGuard")) return;
     const sidebar = document.getElementById("sidebar");
     const overlay = document.getElementById("overlay");
+    let btn = document.getElementById("v2MenuGuard");
     if (!sidebar) return;
 
-    const btn = document.createElement("button");
-    btn.id = "v2MenuGuard";
-    btn.type = "button";
-    btn.textContent = "☰ MENU";
-    btn.setAttribute("aria-label", "Mở menu chính");
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.id = "v2MenuGuard";
+      btn.type = "button";
+      btn.textContent = "☰ MENU";
+      btn.setAttribute("aria-label", "Mở menu chính");
+      document.body.appendChild(btn);
+    }
+
     btn.style.cssText = [
       "position:fixed",
       "left:12px",
@@ -30,20 +34,32 @@
     const sync = () => {
       const mobile = window.matchMedia("(max-width:800px)").matches;
       btn.style.display = mobile ? "block" : "none";
+      if (mobile) {
+        sidebar.classList.add("open");
+        overlay?.classList.add("active");
+      } else {
+        sidebar.classList.remove("open");
+        overlay?.classList.remove("active");
+      }
     };
 
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      sidebar.classList.add("open");
-      overlay?.classList.add("active");
-    });
+    if (btn.dataset.v2Bound !== "1") {
+      btn.dataset.v2Bound = "1";
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        sidebar.classList.add("open");
+        overlay?.classList.add("active");
+      });
+    }
 
-    overlay?.addEventListener("click", () => {
-      sidebar.classList.remove("open");
-      overlay.classList.remove("active");
-    });
+    if (overlay?.dataset.v2Bound !== "1") {
+      overlay.dataset.v2Bound = "1";
+      overlay.addEventListener("click", () => {
+        sidebar.classList.remove("open");
+        overlay.classList.remove("active");
+      });
+    }
 
-    document.body.appendChild(btn);
     window.addEventListener("resize", sync, { passive: true });
     sync();
   };
