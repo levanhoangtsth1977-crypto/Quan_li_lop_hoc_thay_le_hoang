@@ -205,7 +205,7 @@ const h=u.hash||'',m=h.match(/^#profile\?([^#]*)$/);if(m){const token=new URLSea
 }catch{}
 return '';
 }
-function canonicalStudentProfileUrl(token){return new URL('/v2/#profile?token='+encodeURIComponent(token),location.origin).href}
+function canonicalStudentProfileUrl(token){return new URL('/#profile?token='+encodeURIComponent(token),location.origin).href}
 function fillLinks(){
 const cached=Array.isArray(D.links)?new Map(D.links.map(x=>[x.studentId,x])):new Map();let changed=false;
 $('linkRows').innerHTML=D.students.map((s,i)=>{
