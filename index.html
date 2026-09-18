@@ -123,6 +123,42 @@ async function __lhReconcileExisting(){
   }catch(e){console.warn('[canonical reconcile]',e?.message||e)}
 }
 void __lhReconcileExisting();
+async function __lhPullRemoteViolations(){
+  try{
+    const rr=await fetch('/api/google?action=get_all&_='+Date.now(),{cache:'no-store',credentials:'same-origin'});
+    const data=await rr.json().catch(()=>null);
+    if(!rr.ok||!data?.ok||!Array.isArray(data.VI_PHAM))throw Error(data?.error||'Không lấy được dữ liệu vi phạm dùng chung.');
+    const remoteStudents=Array.isArray(data.HOC_SINH)?data.HOC_SINH:[];
+    const remoteNameById=new Map(remoteStudents.map(s=>[clean(s?.id),clean(s?.name)]).filter(([id,name])=>id&&name));
+    const localByName=new Map(D.students.map(s=>[fold(s.name),s.id]));
+    const localById=new Set(D.students.map(s=>s.id));
+    const existingIds=new Set(D.violations.map(x=>clean(x?.id)).filter(Boolean));
+    const existingKeys=new Set(D.violations.map(x=>[clean(x?.date),fold(x?.studentName||student(x?.studentId)?.name||''),fold(x?.type),fold(x?.level),clean(x?.note)].join('|')));
+    let added=0,updated=0;
+    for(const x of data.VI_PHAM){
+      const remoteStudentId=clean(x?.studentId);
+      const remoteStudentName=clean(x?.studentName)||remoteNameById.get(remoteStudentId)||'';
+      const localStudentId=localByName.get(fold(remoteStudentName))||(remoteStudentId&&localById.has(remoteStudentId)?remoteStudentId:'');
+      if(!localStudentId) continue;
+      const rec={id:clean(x?.id)||uid(),studentId:localStudentId,studentName:remoteStudentName,date:clean(x?.date)||today(),type:clean(x?.type)||'Ghi nhận',level:clean(x?.level)||'Trung bình',action:clean(x?.action),note:clean(x?.note),status:clean(x?.status)};
+      if(existingIds.has(rec.id)){
+        const cur=D.violations.find(v=>clean(v?.id)===rec.id);
+        if(cur){const before=JSON.stringify(cur);Object.assign(cur,rec);if(JSON.stringify(cur)!==before)updated++;}
+        continue;
+      }
+      const key=[rec.date,fold(remoteStudentName||student(rec.studentId)?.name||''),fold(rec.type),fold(rec.level),rec.note].join('|');
+      if(existingKeys.has(key))continue;
+      D.violations.push(rec);
+      existingIds.add(rec.id); existingKeys.add(key); added++;
+    }
+    if(added||updated){
+      write(D);
+      if(route==='violations')render();
+      toast('Đã đồng bộ '+(added+updated)+' bản ghi vi phạm từ dữ liệu dùng chung');
+    }
+  }catch(e){console.warn('[remote violations]',e?.message||e)}
+}
+void __lhPullRemoteViolations();
 let route=(location.hash||'#home').slice(1).split('?')[0]||'home';let params={};
 const TITLES={home:'Trang chủ',students:'Học sinh',profiles:'Hồ sơ học sinh',profile:'Hồ sơ học sinh',attendance:'Điểm danh',violations:'Vi phạm',rewards:'Khen thưởng',learning:'Học tập',progress:'Tiến bộ',comments:'Nhận xét',links:'Link học sinh',millionaire:'Triệu Phú Học Đường',ai:'AI giáo viên',settings:'Cấu hình'};
 function student(id){return D.students.find(s=>s&&s.id===id)}
