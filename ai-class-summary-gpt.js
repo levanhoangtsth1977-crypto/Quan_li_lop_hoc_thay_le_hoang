@@ -238,6 +238,9 @@
 
     let html = '';
     html += '<style>' +
+      '#' + MOUNT_ID + ' .ai-brand{display:flex;align-items:center;gap:12px;margin-bottom:10px}' +
+      '#' + MOUNT_ID + ' .ai-brand img{width:64px;height:64px;object-fit:cover;border-radius:16px;border:1px solid #dbe2ec;background:#fff;flex:none}' +
+      '#' + MOUNT_ID + ' .ai-brand h2{margin:0 0 3px}' +
       '#' + MOUNT_ID + ' .ai-stat-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:12px}' +
       '#' + MOUNT_ID + ' .ai-stat{background:#f8fafc;border:1px solid #e4e9f0;border-radius:10px;padding:10px}' +
       '#' + MOUNT_ID + ' .ai-stat b{display:block;font-size:22px;margin-top:4px}' +
@@ -250,7 +253,7 @@
       '@media(max-width:600px){#' + MOUNT_ID + ' .ai-stat-grid{grid-template-columns:repeat(2,1fr)}}' +
       '</style>';
 
-    html += '<div><h2 style="margin:0 0 4px">📊 Tổng hợp dữ liệu toàn lớp 5A3</h2>';
+    html += '<div class="ai-brand"><img src="/assets/logo-5a3.svg" alt="Logo lớp 5A3"><div><h2>🤖 AI GIÁO VIÊN · 5A3</h2><div class="muted">Trường Tiểu học Nghĩa Hành · Năm học 2026–2027</div></div></div><div><h3 style="margin:0 0 4px">📊 Tổng hợp dữ liệu toàn lớp 5A3</h3>';
     html += '<div class="muted">Liên kết trực tiếp từ Học sinh · Hồ sơ · Điểm danh · Vi phạm · Khen thưởng · Học tập · Tiến bộ · Nhận xét</div></div>';
 
     html += '<div class="ai-actions">' +
