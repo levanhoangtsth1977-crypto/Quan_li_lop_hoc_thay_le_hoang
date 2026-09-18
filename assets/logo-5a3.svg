@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="logoTitle logoDesc">
+<title id="logoTitle">Logo lớp 5A3</title>
+<desc id="logoDesc">Biểu tượng lớp 5A3 Trường Tiểu học Nghĩa Hành</desc>
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1d4ed8"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs>
+<rect width="100" height="100" rx="22" fill="url(#g)"/>
+<text x="50" y="17" text-anchor="middle" font-family="Arial,sans-serif" font-size="7" font-weight="700" fill="#bfdbfe">TIỂU HỌC</text>
+<circle cx="50" cy="40" r="12" fill="#fff"/>
+<path d="M28 77c4-15 13-23 22-23s18 8 22 23" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+<path d="M21 82h58" stroke="#bfdbfe" stroke-width="5" stroke-linecap="round"/>
+<text x="50" y="96" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="900" fill="#fff">5A3</text>
+</svg>
