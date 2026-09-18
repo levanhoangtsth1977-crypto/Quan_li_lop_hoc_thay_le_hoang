@@ -1,118 +1,12 @@
-name: Repair core startup and routing
+name: Obsolete core startup repair guard
 
 on:
-  push:
-    branches: [master]
   workflow_dispatch:
 
-permissions:
-  contents: write
-
+# Archived manual workflow. Production code is now maintained directly in
+# the canonical application files; CI must not rewrite them after pushes.
 jobs:
-  repair:
-    if: github.actor != 'github-actions[bot]'
+  archived:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Repair startup render flow and script version
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          import re
-
-          script = Path('script.js')
-          html = Path('index.html')
-          s = script.read_text(encoding='utf-8')
-          h = html.read_text(encoding='utf-8')
-
-          marker = 'CORE_STARTUP_REPAIR_V1'
-          changed = False
-
-          if marker not in s:
-              pattern = re.compile(
-                  r'(?P<start>\n\s*/\*\s*\n\s*\* INITIAL RENDER\s*\n\s*\*/\s*\n)'
-                  r'.*?'
-                  r'(?P<end>\n\s*/\*\s*\n\s*\* CURRENT PAGE\s*\n\s*\*/\s*\n)',
-                  re.S,
-              )
-              replacement = '''\n    /*\n     * INITIAL RENDER — CORE_STARTUP_REPAIR_V1\n     * CORE_STARTUP_REPAIR_V1\n     * Chỉ render dashboard lúc khởi động.\n     * Các menu còn lại render khi được điều hướng tới,\n     * tránh khóa main thread bởi hàng loạt renderer ẩn.\n     */\n\n    safeRender(\n        "dashboard",\n        renderDashboard\n    );\n'''
-              s2, n = pattern.subn(replacement + '\n    /*\n     * CURRENT PAGE\n     */\n', s, count=1)
-              if n != 1:
-                  raise SystemExit('Không tìm thấy khối INITIAL RENDER trong script.js')
-              s = s2
-              changed = True
-
-          s = s.replace('SCRIPT.JS 4.1.1', 'SCRIPT.JS 4.1.2', 1)
-          s = s.replace('version: "4.1.1"', 'version: "4.1.2"', 1)
-
-          if 'early-core-router.js' not in h:
-              anchor = '    <script src="script.js?v=4.1.1"></script>'
-              if anchor not in h:
-                  anchor = '<script src="script.js?v=4.1.1"></script>'
-              if anchor not in h:
-                  raise SystemExit('Không tìm thấy script.js?v=4.1.1 trong index.html')
-              router = '    <script src="early-core-router.js?v=1.0"></script>\n'
-              h = h.replace(anchor, router + anchor, 1)
-              changed = True
-
-          if 'script.js?v=4.1.1' in h:
-              h = h.replace('script.js?v=4.1.1', 'script.js?v=4.1.2', 1)
-              changed = True
-
-          if marker not in s:
-              raise SystemExit('Marker CORE_STARTUP_REPAIR_V1 chưa được ghi vào script.js')
-
-          script.write_text(s, encoding='utf-8')
-          html.write_text(h, encoding='utf-8')
-          print('core repair applied:', changed)
-          PY
-
-      - name: Validate JavaScript syntax
-        shell: bash
-        run: |
-          set -euo pipefail
-          node --check script.js
-          node --check early-core-router.js
-          node --check core-unblock.js
-
-      - name: Validate canonical menu structure
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          from collections import Counter
-          import re
-          html = Path('index.html').read_text(encoding='utf-8')
-          required = ['dashboard','students','attendance','violations','rewards','learning','statistics','student-links','ai','lucky-wheel','settings']
-          routes = re.findall(r'data-page=["\']([^"\']+)', html)
-          bad = [x for x in required if routes.count(x) != 1]
-          if bad:
-              raise SystemExit(f'data-page missing/duplicate: {bad}')
-          sections = re.findall(r'data-page-section=["\']([^"\']+)', html)
-          bad2 = [x for x in required if sections.count(x) != 1]
-          if bad2:
-              raise SystemExit(f'data-page-section missing/duplicate: {bad2}')
-          if 'early-core-router.js?v=1.0' not in html:
-              raise SystemExit('early-core-router include missing')
-          if 'script.js?v=4.1.2' not in html:
-              raise SystemExit('script.js version not updated')
-          print('Core menu structure OK')
-          PY
-
-      - name: Commit repair
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add script.js index.html
-          if git diff --cached --quiet; then
-            echo 'No changes to commit.'
-            exit 0
-          fi
-          git commit -m 'Repair core startup rendering and routing flow'
-          git push
+      - run: echo "Archived: no automatic code mutation."
