@@ -159,6 +159,18 @@ return clean(v);
 function sharedDate(v){return fmtDate(v)}
 function sharedItems(arr,fn){
 if(!Array.isArray(arr)||!arr.length)return'<p class="empty">Chưa có dữ liệu.</p>';
+if(arr.some(x=>x&&x.type!==undefined)){
+const isViolation=arr.some(x=>x&&x.level!==undefined);
+const rows=arr.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).map(x=>{
+if(isViolation){
+const cls=x.level==='Nghiêm trọng'?'bad':x.level==='Trung bình'?'warn':'good';
+return '<tr><td>'+esc(sharedDate(x.date))+'</td><td>'+esc(x.type||'Ghi nhận')+'</td><td><span class="tag '+cls+'">'+esc(x.level||'Chưa xác định')+'</span></td><td>'+esc(x.note||'')+'</td></tr>';
+}
+return '<tr><td>'+esc(sharedDate(x.date))+'</td><td>'+esc(x.type||'Ghi nhận')+'</td><td>'+esc(x.note||'')+'</td></tr>';
+}).join('');
+const head=isViolation?'<thead><tr><th>Ngày</th><th>Nội dung cụ thể</th><th>Mức độ</th><th>Ghi chú</th></tr></thead>':'<thead><tr><th>Ngày</th><th>Nội dung cụ thể</th><th>Ghi chú</th></tr></thead>';
+return '<div class="table-wrap"><table class="table">'+head+'<tbody>'+rows+'</tbody></table></div>';
+}
 return '<div class="grid" style="gap:7px">'+arr.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).map(x=>'<div class="meta-box">'+fn(x)+'</div>').join('')+'</div>';
 }
 function sharedProfileBody(data){
