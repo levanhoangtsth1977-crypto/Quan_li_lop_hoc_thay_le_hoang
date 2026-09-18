@@ -147,7 +147,7 @@ const s=student(id);if(!s)return `<div class="empty">Không tìm thấy học si
 const a=D.attendance.filter(x=>x.studentId===id),v=D.violations.filter(x=>x.studentId===id),r=D.rewards.filter(x=>x.studentId===id),l=[...Object.values(D.learning||{}).flat().filter(x=>x.studentId===id)];
 return head(s.name,'Hồ sơ cá nhân và toàn bộ lịch sử theo ngày',`<a class="btn" href="#profiles">← Danh sách hồ sơ</a><button class="btn" data-action="add-violation" data-student="${id}">+ Vi phạm</button><button class="btn" data-action="add-reward" data-student="${id}">+ Khen</button><button class="btn primary" data-action="edit-student" data-student="${id}">Sửa hồ sơ</button>`)+`<div class="grid g2"><div class="card"><div class="profile-head"><div class="avatar">${esc(initials(s.name))}</div><div><h2 style="margin:0">${esc(s.name)}</h2><div class="muted">${esc(s.studentCode||s.id)} · ${s.status==='active'?'Đang học':'Không còn học'}</div></div></div><div class="meta-grid" style="margin-top:14px"><div class="meta-box"><small>Ngày sinh</small><b>${esc(fmtDate(s.birthDate||''))}</b></div><div class="meta-box"><small>Giới tính</small><b>${esc(s.gender||'Chưa nhập')}</b></div><div class="meta-box"><small>Phụ huynh</small><b>${esc(s.parentName||'Chưa nhập')}</b></div><div class="meta-box"><small>Điện thoại</small><b>${esc(s.phone||'Chưa nhập')}</b></div></div><p><b>Địa chỉ:</b> ${esc(s.address||'Chưa nhập')}</p><p><b>Ghi chú:</b> ${esc(s.note||'')}</p></div><div class="card"><h3>Tổng hợp</h3><div class="profile-summary" style="grid-template-columns:repeat(2,1fr);margin-top:10px"><div class="stat">Điểm danh<div class="num">${a.length}</div></div><div class="stat">Vi phạm<div class="num">${v.length}</div></div><div class="stat">Khen thưởng<div class="num">${r.length}</div></div><div class="stat">Học tập<div class="num">${l.length}</div></div></div><div class="notice">Mọi bản ghi bên dưới đều gắn với chính học sinh này. Ngày và nội dung được giữ riêng theo từng sự kiện.</div></div></div>${historyRows(s)}`}
 function sharedProfile(){
-return head('Hồ sơ học sinh','Trang tổng hợp của học sinh · dữ liệu được phép chia sẻ',`<a class="btn" href="#home">← Trang chủ</a>`)+`<div id="sharedProfileHost" class="card"><div class="empty">Đang tải trang tổng hợp học sinh…</div></div>`;
+return head('Hồ sơ học sinh','Trang tổng hợp của học sinh · dữ liệu được phép chia sẻ','')+`<div id="sharedProfileHost" class="card"><div class="empty">Đang tải trang tổng hợp học sinh…</div></div>`;
 }
 function sharedStatus(v){
 const x=clean(v).toLocaleLowerCase('vi');
@@ -185,7 +185,7 @@ const rr=await fetch('/api/student-data?t='+encodeURIComponent(token)+'&_='+Date
 const data=await rr.json().catch(()=>null);
 if(!rr.ok||!data?.ok)throw Error(data?.error||'Không tải được dữ liệu hồ sơ học sinh.');
 if(seq!==sharedProfileRequest||route!=='profile'||params.token!==token)return;
-$('mainContent').innerHTML=head(data.student?.name||'Hồ sơ học sinh','Trang tổng hợp của học sinh · dữ liệu được phép chia sẻ',`<a class="btn" href="#home">← Trang chủ</a>`)+`<div id="sharedProfileHost" class="card">${sharedProfileBody(data)}</div>`;
+$('mainContent').innerHTML=head(data.student?.name||'Hồ sơ học sinh','Trang tổng hợp của học sinh · dữ liệu được phép chia sẻ','')+`<div id="sharedProfileHost" class="card">${sharedProfileBody(data)}</div>`;
 $('pageTitle').textContent='Hồ sơ học sinh';
 }catch(e){
 if(seq!==sharedProfileRequest||route!=='profile'||params.token!==token)return;
