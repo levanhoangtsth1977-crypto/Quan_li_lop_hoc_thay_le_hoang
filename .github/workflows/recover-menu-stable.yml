@@ -1,4 +1,4 @@
-name: Verify core menu integrity
+name: Verify canonical class-management app
 
 on:
   push:
@@ -10,17 +10,20 @@ permissions:
 
 jobs:
   verify:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Validate menu, sections, internal links and module wiring
+      - name: Validate canonical menus, student links and modules
         shell: bash
         run: |
           set -euo pipefail
           test -f index.html
-          test -f menu-runtime-fix.js
+          test -f student-profile-v5.html
+          test -f student-links-canonical.js
+          test -f api/student-data.js
+          test -f api/google.js
 
           python - <<'PY'
           from pathlib import Path
@@ -29,105 +32,69 @@ jobs:
           from html.parser import HTMLParser
 
           html = Path('index.html').read_text(encoding='utf-8')
-          runtime = Path('menu-runtime-fix.js').read_text(encoding='utf-8')
           required = [
-              'dashboard','students','attendance','violations','rewards','learning',
-              'statistics','student-links','ai','lucky-wheel','settings'
+              'home','students','profiles','attendance','violations','rewards',
+              'learning','progress','comments','links','millionaire','ai','settings'
           ]
 
-          # One and only one canonical menu route per required page.
-          routes = re.findall(r'data-page=["\']([^"\']+)', html)
-          counts = Counter(routes)
-          missing = [x for x in required if counts[x] != 1]
-          extras = sorted(set(routes) - set(required))
-          if missing:
-              raise SystemExit(f'data-page missing/duplicate: {missing}')
-          if extras:
-              raise SystemExit(f'data-page invalid: {extras}')
+          nav = re.findall(r'data-nav=["\\']([^"\\']+)', html)
+          counts = Counter(nav)
+          bad = [x for x in required if counts[x] != 1]
+          if bad:
+              raise SystemExit(f'data-nav missing/duplicate: {bad}')
 
-          # One and only one section for every menu route.
-          sections = re.findall(r'data-page-section=["\']([^"\']+)', html)
-          section_ids = re.findall(r'id=["\']page-([^"\']+)["\']', html)
-          for page in required:
-              if sections.count(page) != 1:
-                  raise SystemExit(f'data-page-section missing/duplicate: {page}: {sections.count(page)}')
-              if section_ids.count(page) != 1:
-                  raise SystemExit(f'page section id missing/duplicate: {page}: {section_ids.count(page)}')
-
-          # Internal SPA links must point to a canonical page.
-          links = re.findall(r'data-page-link=["\']([^"\']+)', html)
-          bad_links = sorted(set(links) - set(required))
-          if bad_links:
-              raise SystemExit(f'data-page-link invalid: {bad_links}')
-
-          # Standalone utilities link must remain an actual file link.
-          hrefs = re.findall(r'href=["\']([^"\']+)', html)
-          if 'tien-ich.html' not in hrefs:
-              raise SystemExit('Standalone Tiện ích link missing')
-          if not Path('tien-ich.html').is_file():
-              raise SystemExit('tien-ich.html missing')
-
-          # Static script includes: no duplicate exact JS/CSS paths in index.html.
-          scripts = re.findall(r'<script[^>]+src=["\']([^"\']+)', html, flags=re.I)
-          for label, values in [
-              ('JS', scripts),
-              ('CSS', re.findall(r'<link[^>]+href=["\']([^"\']+)', html, flags=re.I))
-          ]:
-              normalized = [x.split('?')[0] for x in values]
-              dup = sorted(k for k,v in Counter(normalized).items() if k and v > 1)
-              if dup:
-                  raise SystemExit(f'Duplicate {label} includes in index.html: {dup}')
-
-          # Static modules below are intentionally owned by index.html.
-          for name in ('learning-smas-import.js','behavior-records-ai-summary.js'):
-              count = sum(1 for src in scripts if src.split('?')[0] == name)
-              if count != 1:
-                  raise SystemExit(f'Static module include count for {name}: {count}')
-
-          # Runtime-only modules must be loaded by one canonical loadOnce entry.
-          for name in ('behavior-quick-options.js','home-class-logo.js','site-link-integrity.js'):
-              count = runtime.count("loadOnce('" + name + "'")
-              if count != 1:
-                  raise SystemExit(f'Runtime loader count for {name}: {count}')
-
-          # The two static modules above must NOT also be runtime loaded.
-          for name in ('learning-smas-import.js','behavior-records-ai-summary.js'):
-              if "loadOnce('" + name + "'" in runtime:
-                  raise SystemExit(f'Duplicate runtime/static ownership for {name}')
-
-          # No obsolete menu entry or legacy class in index.html.
-          if re.search(r'data-page=["\']comments["\']', html):
-              raise SystemExit('Legacy comments menu found')
+          if '<script src="/student-links-canonical.js?v=20260918.1"></script>' not in html:
+              raise SystemExit('Canonical student-link loader missing')
+          if html.count('student-links-canonical.js') != 1:
+              raise SystemExit('Student-link loader duplicated')
+          if html.count('event-delete-menu-patch.js') != 1:
+              raise SystemExit('Delete-menu module count is not exactly 1')
+          if 'jsonp(' in html:
+              raise SystemExit('Obsolete jsonp() call remains in index.html')
+          if "fetch('/api/google?action=get_students&_='+Date.now()" not in html:
+              raise SystemExit('Canonical Google student roster fetch missing')
+          if 'student-profile-v5.html?t=' not in html:
+              raise SystemExit('Student profile link generator missing')
           if '5C' in html or '5c' in html:
               raise SystemExit('Legacy class 5C found in index.html')
 
-          print('Static menu/link/module integrity OK')
-          PY
+          # Ensure there is exactly one student-link action and one renderer.
+          if html.count('data-action="generate-links"') != 1:
+              raise SystemExit('generate-links action missing/duplicated')
+          if html.count('function fillLinks()') != 1:
+              raise SystemExit('fillLinks() missing/duplicated')
 
-      - name: Validate HTML nesting
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          from html.parser import HTMLParser
+          print('Canonical menu/link integrity OK')
+
           class P(HTMLParser):
+              VOID = {'meta','link','input','img','br','hr','source','area','base','embed','param','track','wbr'}
               def __init__(self):
                   super().__init__()
                   self.stack=[]
               def handle_starttag(self, tag, attrs):
-                  if tag not in {'meta','link','input','img','br','hr','source','area','base','embed','param','track','wbr'}:
+                  if tag not in self.VOID:
                       self.stack.append(tag)
               def handle_endtag(self, tag):
-                  if tag in {'meta','link','input','img','br','hr','source','area','base','embed','param','track','wbr'}:
+                  if tag in self.VOID:
                       return
                   if not self.stack or self.stack[-1] != tag:
                       raise SystemExit(f'HTML nesting mismatch at </{tag}>')
                   self.stack.pop()
-          p=P()
-          p.feed(Path('index.html').read_text(encoding='utf-8'))
+
+          p = P()
+          p.feed(html)
           p.close()
           if p.stack:
               raise SystemExit(f'Unclosed HTML tags: {p.stack[-10:]}')
-          print('HTML integrity OK')
+          print('HTML nesting OK')
           PY
+
+      - name: Validate JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check student-links-canonical.js
+          node --check api/student-data.js
+          node --check api/google.js
+          node --check event-delete-menu-patch.js
+          echo "JavaScript syntax OK"
