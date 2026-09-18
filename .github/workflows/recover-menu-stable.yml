@@ -37,7 +37,7 @@ jobs:
               'learning','progress','comments','links','millionaire','ai','settings'
           ]
 
-          nav = re.findall(r'data-nav=["\\']([^"\\']+)', html)
+          nav = re.findall(r'data-nav="([^"]+)"', html)
           counts = Counter(nav)
           bad = [x for x in required if counts[x] != 1]
           if bad:
