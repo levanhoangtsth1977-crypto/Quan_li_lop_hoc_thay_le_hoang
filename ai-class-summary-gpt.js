@@ -248,6 +248,10 @@
       '#' + MOUNT_ID + ' .ai-actions .btn{display:inline-flex;align-items:center}' +
       '#' + MOUNT_ID + ' .ai-mini-list{display:grid;gap:7px}' +
       '#' + MOUNT_ID + ' .ai-mini-row{padding:8px 10px;border:1px solid #edf1f5;border-radius:9px;background:#fafbfd}' +
+      '#' + MOUNT_ID + ' .ai-summary-table-wrap{overflow-x:auto}' +
+      '#' + MOUNT_ID + ' .ai-summary-table{min-width:980px}' +
+      '#' + MOUNT_ID + ' .ai-summary-table th,#' + MOUNT_ID + ' .ai-summary-table td{white-space:nowrap;vertical-align:middle}' +
+      '#' + MOUNT_ID + ' .ai-summary-table .ai-summary-name{min-width:220px;white-space:nowrap}' +
       '#' + MOUNT_ID + ' .ai-code{width:100%;min-height:260px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px}' +
       '@media(max-width:900px){#' + MOUNT_ID + ' .ai-stat-grid{grid-template-columns:repeat(3,1fr)}}' +
       '@media(max-width:600px){#' + MOUNT_ID + ' .ai-stat-grid{grid-template-columns:repeat(2,1fr)}}' +
@@ -284,12 +288,12 @@
       '</div></div>';
 
     html += '<div style="margin-top:14px"><h3 style="margin:0 0 8px">📋 Danh sách tổng hợp chung cả lớp</h3>' +
-      '<div class="table-wrap"><table class="table"><thead><tr>' +
+      '<div class="table-wrap ai-summary-table-wrap"><table class="table ai-summary-table"><thead><tr>' +
       '<th>STT</th><th>Học sinh</th><th>Có mặt</th><th>Có phép</th><th>Vắng KP</th><th>Vi phạm</th><th>Khen</th><th>Học tập</th><th>Tiến bộ</th><th>Nhận xét</th>' +
       '</tr></thead><tbody>' +
       (rows.length ? rows.map((r) => '<tr>' +
         '<td>' + r.stt + '</td>' +
-        '<td><b>' + escapeHtml(r.name) + '</b><div class="subtle">' + escapeHtml(r.code || r.id) + '</div></td>' +
+        '<td class="ai-summary-name"><b>' + escapeHtml(r.name) + '</b><div class="subtle">' + escapeHtml(r.code || r.id) + '</div></td>' +
         '<td>' + r.present + '</td><td>' + r.excused + '</td><td>' + r.absent + '</td>' +
         '<td>' + r.vio + '</td><td>' + r.rew + '</td><td>' + r.learning + '</td><td>' + r.progress + '</td><td>' + r.comments + '</td>' +
       '</tr>').join('') : '<tr><td colspan="10"><div class="empty">Chưa có dữ liệu học sinh.</div></td></tr>') +
