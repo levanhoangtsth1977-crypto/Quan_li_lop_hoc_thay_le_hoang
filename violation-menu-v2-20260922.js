@@ -92,7 +92,7 @@
     option.dataset.lhViolationCode = item.code;
     if (item.level) option.dataset.lhViolationLevel = item.level;
     option.dataset.lhViolationFixed = item.level ? '1' : '0';
-    select.add(option);
+    select.appendChild(option);
     return option;
   }
 
@@ -270,7 +270,18 @@
     if (select.dataset.lhViolationChangeBound === '1') return;
 
     select.addEventListener('change', () => {
+      const option = selectedOption(select);
       const item = ITEMS.find(x => x.text === select.value);
+
+      if (option?.dataset?.lhV2Custom === '1') {
+        const level = option.dataset.lhViolationLevel || 'Trung bình';
+        select.dataset.lhCustomValue = select.value;
+        select.dataset.lhCustomLevel = level;
+        setLevelFixed(byId('mLevel'), level);
+        setMeta({ code: 'V32', text: select.value }, level);
+        return;
+      }
+
       if (!item) return;
 
       if (item.code === 'V32') {
@@ -380,8 +391,7 @@
       select.value = value;
       select.dataset.lhCustomValue = value;
       select.dataset.lhCustomLevel = level;
-      select.dataset.lhLastFixedValue = value;
-
+      // Giữ lại lựa chọn cố định trước đó để nút Hủy quay về đúng mục.
       setLevelFixed(byId('mLevel'), level);
       setMeta({ code: 'V32', text: value }, level);
       closeOtherDialog();
