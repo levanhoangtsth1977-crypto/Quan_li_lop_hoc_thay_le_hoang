@@ -52,8 +52,74 @@ const NAMES=['Nguyễn Bảo An','Phạm Nguyễn Thiên Anh','Nguyễn Ngọc B
 const LEGACY_PROFILE=[
 ['Nguyễn Bảo An','Nam','02/01/2016'],['Phạm Nguyễn Thiên Anh','Nữ','22/01/2016'],['Nguyễn Ngọc Bích','Nữ','13/09/2016'],['Lương Bảo Châu','Nữ','31/01/2016'],['Trần Thị Ngọc Diệp','Nữ','02/11/2016'],['Võ Thị Huyền Diệu','Nữ','09/01/2016'],['Phạm Minh Đức','Nam','23/08/2016'],['Huỳnh Đặng Quốc Hoàng','Nam','19/11/2016'],['Nguyễn Gia Hưng','Nam','12/07/2016'],['Đoàn Văn Qúy','Nam','06/10/2016'],['Tạ Trí Khang','Nam','20/08/2016'],['Nguyễn Văn Đăng Khoa','Nam','28/03/2016'],['Phạm Đăng Khôi','Nam','29/09/2016'],['Ngô Sinh Khởi','Nam','10/01/2016'],['Phạm Anh Kiệt','Nam','17/07/2016'],['Trần Anh Kiệt','Nam','03/08/2016'],['Nguyễn Quỳnh Lam','Nữ','18/01/2016'],['Trịnh Gia Linh','Nữ','08/06/2016'],['Phạm Tấn Mạnh','Nam','30/05/2016'],['Bùi Nguyễn Hà My','Nữ','24/01/2016'],['Lương Đỗ Thảo My','Nữ','19/06/2016'],['Huỳnh Hữu Nam','Nam','13/11/2016'],['Bùi Huỳnh Khánh Ngọc','Nữ','15/04/2016'],['Nguyễn Bùi Bảo Ngọc','Nữ','07/07/2016'],['Nguyễn Thị Bảo Ngọc','Nữ','01/09/2016'],['Trịnh Phước Nguyên','Nam','11/11/2016'],['Ngô Thiện Nhân','Nam','10/12/2016'],['Phạm Lê An Nhiên','Nữ','21/12/2016'],['Lê Văn Phát','Nam','15/02/2016'],['Bùi Văn Phong','Nam','04/04/2016'],['Nguyễn Văn Phước','Nam','12/02/2016'],['Phạm Anh Quân','Nam','17/07/2016'],['Lê Hữu Phú Quý','Nam','09/10/2016'],['Huỳnh Lê Nhã Quyên','Nữ','29/10/2016'],['Lê Bá Thụ','Nam','14/12/2016'],['Huỳnh Bảo Trâm','Nữ','08/10/2016'],['Nguyễn Đăng Trường','Nam','23/02/2016'],['Võ Tấn Trường','Nam','14/12/2016'],['Huỳnh Gia Tuệ','Nữ','03/12/2016'],['Võ Thanh Vỹ','Nam','22/10/2016'],['Huỳnh Ngọc Bảo Yến','Nữ','30/11/2016'],['Đinh Nguyễn Anh Phong','Nam','18/01/2016']
 ];
-const VIOLATIONS=['Không tập trung trong giờ học','Nói chuyện riêng trong giờ học','Quên đồ dùng học tập','Không hoàn thành nhiệm vụ học tập','Làm việc riêng trong giờ học','Mất trật tự trong lớp','Không thực hiện nhiệm vụ được giao','Chưa chuẩn bị bài ở nhà','Không giữ gìn vệ sinh lớp học','Không hoàn thành trực vệ sinh','Không thực hiện đầy đủ nhiệm vụ trực nhật','Xả rác không đúng nơi quy định','Tự ý rời vị trí khi chưa được phép','Sử dụng điện thoại/thiết bị không đúng quy định','Trêu chọc bạn','Tranh giành đồ dùng với bạn','Đùa nghịch gây ảnh hưởng bạn khác','Chơi các trò chơi nguy hiểm, có nguy cơ gây mất an toàn cho bản thân và người khác','Chưa chấp hành hướng dẫn của giáo viên','Đi học muộn','Bỏ tiết học','Thiếu đồ dùng cá nhân cần thiết','Viết/vẽ không đúng nơi quy định','Đánh bạn','Đánh nhau với bạn','Xô đẩy bạn gây nguy hiểm','Dùng lời nói xúc phạm, chửi bạn','Đe dọa bạn','Phá hoại đồ dùng của bạn hoặc của trường','Tự ý lấy đồ của bạn khi chưa được phép','Gian lận trong học tập/kiểm tra','Hành vi khác cần ghi rõ'];
-const REWARDS=['Hoàn thành tốt nhiệm vụ học tập','Có tiến bộ rõ rệt','Chủ động giúp đỡ bạn','Tích cực phát biểu xây dựng bài','Thực hiện tốt nội quy lớp','Giữ gìn vệ sinh lớp học','Có ý thức bảo quản đồ dùng chung','Tinh thần hợp tác tốt','Tự giác hoàn thành nhiệm vụ','Có sáng kiến trong hoạt động','Tham gia tích cực hoạt động tập thể','Gương mẫu trong công việc được giao','Biết nhận lỗi và sửa lỗi','Có ý thức giữ gìn môi trường','Thực hiện tốt an toàn giao thông','Nhặt được của rơi trả người mất','Có hành động đẹp giúp đỡ người khác','Đạt kết quả nổi bật trong học tập','Tiến bộ trong rèn luyện','Đạt thành tích trong các hoạt động phong trào','Đạt thành tích trong hội thi/hoạt động của trường','Có thành tích nổi bật trong hoạt động tập thể','Hỗ trợ tốt các hoạt động của lớp','Thực hiện tốt nhiệm vụ được phân công','Thành tích/việc tốt khác'];
+const VIOLATIONS=[
+'Không mặc đúng đồng phục theo quy định của nhà trường.',
+'Đi học muộn.',
+'Không mang đầy đủ sách giáo khoa theo thời khóa biểu.',
+'Không mang đầy đủ vở học tập theo yêu cầu của môn học.',
+'Không mang đầy đủ đồ dùng học tập theo yêu cầu của môn học.',
+'Mang điện thoại đến trường khi chưa được phép.',
+'Mang đồ chơi đến trường khi chưa được phép.',
+'Nói chuyện riêng trong giờ học.',
+'Làm việc riêng trong giờ học.',
+'Không theo dõi hướng dẫn của giáo viên trong giờ học.',
+'Không ghi chép bài theo yêu cầu.',
+'Không làm bài tập về nhà được giao.',
+'Không thực hiện nhiệm vụ học tập được giao trên lớp.',
+'Không tham gia hoạt động học tập theo yêu cầu.',
+'Không hoàn thành phần việc được phân công trong hoạt động nhóm.',
+'Phát biểu khi chưa đến lượt.',
+'Tự ý rời khỏi chỗ ngồi khi chưa được phép.',
+'Tự ý sử dụng đồ dùng của bạn.',
+'Nhìn bài của bạn trong khi làm bài kiểm tra.',
+'Nhắc bài cho bạn trong khi làm bài kiểm tra.',
+'Sử dụng từ ngữ thiếu văn hóa khi giao tiếp.',
+'Trêu chọc bạn trong giờ học.',
+'Đe dọa bạn.',
+'Xô đẩy bạn.',
+'Lấy đồ dùng của bạn khi chưa được phép.',
+'Làm hư hỏng đồ dùng của lớp.',
+'Xả rác không đúng nơi quy định.',
+'Chạy nhảy tại khu vực không bảo đảm an toàn.',
+'Đánh bạn.',
+'Đánh nhau với bạn.',
+'Chơi trò chơi nguy hiểm.',
+'Khác – GV tự ghi'
+];
+const VIOLATION_LEVELS=Object.freeze({
+'Không mặc đúng đồng phục theo quy định của nhà trường.':'Nhẹ',
+'Đi học muộn.':'Nhẹ',
+'Không mang đầy đủ sách giáo khoa theo thời khóa biểu.':'Nhẹ',
+'Không mang đầy đủ vở học tập theo yêu cầu của môn học.':'Nhẹ',
+'Không mang đầy đủ đồ dùng học tập theo yêu cầu của môn học.':'Nhẹ',
+'Mang điện thoại đến trường khi chưa được phép.':'Nhẹ',
+'Mang đồ chơi đến trường khi chưa được phép.':'Nhẹ',
+'Nói chuyện riêng trong giờ học.':'Nhẹ',
+'Làm việc riêng trong giờ học.':'Nhẹ',
+'Không theo dõi hướng dẫn của giáo viên trong giờ học.':'Nhẹ',
+'Không ghi chép bài theo yêu cầu.':'Nhẹ',
+'Không làm bài tập về nhà được giao.':'Nhẹ',
+'Không thực hiện nhiệm vụ học tập được giao trên lớp.':'Nhẹ',
+'Không tham gia hoạt động học tập theo yêu cầu.':'Nhẹ',
+'Không hoàn thành phần việc được phân công trong hoạt động nhóm.':'Nhẹ',
+'Phát biểu khi chưa đến lượt.':'Nhẹ',
+'Tự ý rời khỏi chỗ ngồi khi chưa được phép.':'Nhẹ',
+'Tự ý sử dụng đồ dùng của bạn.':'Nhẹ',
+'Nhìn bài của bạn trong khi làm bài kiểm tra.':'Trung bình',
+'Nhắc bài cho bạn trong khi làm bài kiểm tra.':'Trung bình',
+'Sử dụng từ ngữ thiếu văn hóa khi giao tiếp.':'Trung bình',
+'Trêu chọc bạn trong giờ học.':'Trung bình',
+'Đe dọa bạn.':'Trung bình',
+'Xô đẩy bạn.':'Trung bình',
+'Lấy đồ dùng của bạn khi chưa được phép.':'Trung bình',
+'Làm hư hỏng đồ dùng của lớp.':'Trung bình',
+'Xả rác không đúng nơi quy định.':'Trung bình',
+'Chạy nhảy tại khu vực không bảo đảm an toàn.':'Trung bình',
+'Đánh bạn.':'Nghiêm trọng',
+'Đánh nhau với bạn.':'Nghiêm trọng',
+'Chơi trò chơi nguy hiểm.':'Nghiêm trọng'
+});
+const VIOLATION_CODES=Object.freeze(Object.fromEntries(VIOLATIONS.map((text,i)=>[text,'V'+String(i+1).padStart(2,'0')])));const REWARDS=['Hoàn thành tốt nhiệm vụ học tập','Có tiến bộ rõ rệt','Chủ động giúp đỡ bạn','Tích cực phát biểu xây dựng bài','Thực hiện tốt nội quy lớp','Giữ gìn vệ sinh lớp học','Có ý thức bảo quản đồ dùng chung','Tinh thần hợp tác tốt','Tự giác hoàn thành nhiệm vụ','Có sáng kiến trong hoạt động','Tham gia tích cực hoạt động tập thể','Gương mẫu trong công việc được giao','Biết nhận lỗi và sửa lỗi','Có ý thức giữ gìn môi trường','Thực hiện tốt an toàn giao thông','Nhặt được của rơi trả người mất','Có hành động đẹp giúp đỡ người khác','Đạt kết quả nổi bật trong học tập','Tiến bộ trong rèn luyện','Đạt thành tích trong các hoạt động phong trào','Đạt thành tích trong hội thi/hoạt động của trường','Có thành tích nổi bật trong hoạt động tập thể','Hỗ trợ tốt các hoạt động của lớp','Thực hiện tốt nhiệm vụ được phân công','Thành tích/việc tốt khác'];
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
 const clean=s=>String(s??'').trim().replace(/\s+/g,' '),norm=s=>clean(s).toLocaleLowerCase('vi');
 const fold=s=>clean(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLocaleLowerCase('vi');
@@ -271,7 +337,78 @@ function settings(){return head('Cấu hình','Thông tin lớp hiện hành',`<
 function page(){switch(route){case'home':return home();case'students':return students();case'profiles':return profiles();case'profile':return profile(params.student,params.token);case'attendance':return attendance();case'violations':return records('violations','Vi phạm','Theo dõi giáo dục','add-violation');case'rewards':return records('rewards','Khen thưởng','Ghi nhận tích cực','add-reward');case'learning':return learning();case'progress':return simple('progress','Tiến bộ','Nội dung','add-progress');case'comments':return simple('comments','Nhận xét','Nội dung','add-comment');case'links':return links();case'millionaire':return millionaire();case'ai':return ai();case'settings':return settings();default:route='home';return home()}}
 function render(){const publicProfile=route==='profile'&&!!params.token;document.body.classList.toggle('lh-public-profile',publicProfile);if(!publicProfile)document.querySelectorAll('[data-nav]').forEach(a=>a.classList.toggle('active',a.dataset.nav===route||(route==='profile'&&a.dataset.nav==='profiles')));$('pageTitle').textContent=publicProfile?'Hồ sơ học sinh':(TITLES[route]||'Trang chủ');$('violationCount').textContent=D.violations.length;$('rewardCount').textContent=D.rewards.length;$('mainContent').innerHTML=page();if(route==='students')fillStudents();if(route==='profiles')fillProfiles();if(route==='attendance')fillAttendance();if(route==='links')fillLinks();if(publicProfile)void loadSharedProfile(params.token)}
 function studentForm(id=''){const s=id?student(id):null;openModal(id?'Sửa hồ sơ học sinh':'Thêm học sinh',`<div class="form"><label>Họ tên</label><input id="mName" value="${esc(s?.name||'')}" autofocus><label>Mã học sinh</label><input id="mCode" value="${esc(s?.studentCode||'')}"><div class="grid g2"><div><label>Ngày sinh</label><input id="mBirth" placeholder="dd/mm/yyyy" value="${esc(s?.birthDate||'')}"></div><div><label>Giới tính</label><select id="mGender"><option value="">Chưa nhập</option><option value="Nam" ${s?.gender==='Nam'?'selected':''}>Nam</option><option value="Nữ" ${s?.gender==='Nữ'?'selected':''}>Nữ</option></select></div></div><div class="grid g2"><div><label>Họ tên phụ huynh</label><input id="mParent" value="${esc(s?.parentName||'')}"></div><div><label>Số điện thoại</label><input id="mPhone" value="${esc(s?.phone||'')}"></div></div><label>Địa chỉ</label><input id="mAddress" value="${esc(s?.address||'')}"><label>Trạng thái</label><select id="mStatus"><option value="active" ${!s||s.status==='active'?'selected':''}>Đang học</option><option value="inactive" ${s?.status==='inactive'?'selected':''}>Không còn học</option></select><label>Ghi chú</label><textarea id="mStudentNote">${esc(s?.note||'')}</textarea><div class="actions"><button class="btn" data-action="close">Hủy</button><button class="btn primary" data-action="save-student" data-id="${id}">Lưu hồ sơ</button></div></div>`)}
-function eventForm(kind,studentId=''){const arr=kind==='violation'?VIOLATIONS:REWARDS;const isV=kind==='violation';openModal(isV?'Ghi nhận vi phạm':'Khen thưởng',`<div class="form"><label>Học sinh</label><select id="mStudent">${D.students.map(s=>`<option value="${s.id}" ${s.id===studentId?'selected':''}>${esc(s.name)}</option>`).join('')}</select><label>Ngày ${isV?'vi phạm':'ghi nhận'}</label><input id="mDate" type="date" value="${today()}"><label>${isV?'Nội dung vi phạm':'Nội dung khen thưởng'}</label><select id="mType">${arr.map(x=>`<option>${esc(x)}</option>`).join('')}</select>${isV?'<label>Mức độ vi phạm</label><select id="mLevel"><option>Nhẹ</option><option selected>Trung bình</option><option>Nghiêm trọng</option></select>':''}<label>Nội dung/ghi chú chi tiết</label><textarea id="mNote" placeholder="Ghi rõ diễn biến, kết quả xử lý hoặc thành tích cụ thể nếu cần"></textarea><div class="actions"><button class="btn" data-action="close">Hủy</button><button class="btn primary" data-action="save-event" data-kind="${kind}">Lưu bản ghi</button></div></div>`)}
+function eventForm(kind,studentId=''){
+const arr=kind==='violation'?VIOLATIONS:REWARDS;
+const isV=kind==='violation';
+const options=isV
+  ? arr.map((x,i)=>'<option value="'+esc(x)+'" data-code="V'+String(i+1).padStart(2,'0')+'" data-level="'+esc(VIOLATION_LEVELS[x]||'')+'">'+esc('V'+String(i+1).padStart(2,'0')+' · '+x)+'</option>').join('')
+  : arr.map(x=>'<option>'+esc(x)+'</option>').join('');
+openModal(isV?'Ghi nhận vi phạm':'Khen thưởng',
+'<div class="form">'+
+'<label>Học sinh</label><select id="mStudent">'+D.students.map(s=>'<option value="'+s.id+'" '+(s.id===studentId?'selected':'')+'>'+esc(s.name)+'</option>').join('')+'</select>'+
+'<label>Ngày '+(isV?'vi phạm':'ghi nhận')+'</label><input id="mDate" type="date" value="'+today()+'">'+
+'<label>'+(isV?'Nội dung vi phạm':'Nội dung khen thưởng')+'</label><select id="mType">'+options+'</select>'+
+(isV?'<label>Mức độ vi phạm</label><select id="mLevel"><option value="Nhẹ">Nhẹ</option><option value="Trung bình">Trung bình</option><option value="Nghiêm trọng">Nghiêm trọng</option></select>':'')+
+'<label>Nội dung/ghi chú chi tiết</label><textarea id="mNote" placeholder="Ghi rõ diễn biến, kết quả xử lý hoặc thành tích cụ thể nếu cần"></textarea>'+
+'<div class="actions"><button class="btn" data-action="close">Hủy</button><button class="btn primary" data-action="save-event" data-kind="'+kind+'">Lưu bản ghi</button></div></div>');
+if(isV) setupViolationForm();
+}
+function closeViolationOtherDialog(){$('violationOtherDialog')?.remove()}
+function setupViolationForm(){
+const type=$('mType'),level=$('mLevel');
+if(!type||!level||type.dataset.violationFixedHandler==='1')return;
+if(!$('violationMenuStyle')){
+const st=document.createElement('style');st.id='violationMenuStyle';
+st.textContent='.violation-fixed-level{background:#f8fafc!important;color:#334155!important;opacity:1!important;cursor:not-allowed!important}#violationOtherDialog{position:fixed;inset:0;z-index:1100;background:#0f172a99;display:flex;align-items:center;justify-content:center;padding:16px}#violationOtherDialog .vod{width:min(560px,100%);background:#fff;border-radius:14px;padding:18px;box-shadow:0 18px 50px #0003}#violationOtherDialog h2{margin:0 0 8px;font-size:20px}#violationOtherDialog p{margin:0 0 12px;color:#475569;font-size:13px}#violationOtherDialog textarea{width:100%;min-height:110px;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:9px;font:inherit;resize:vertical}#violationOtherDialog .vod-level{display:flex;flex-wrap:wrap;gap:10px 20px;margin:12px 0 16px}#violationOtherDialog .vod-level label{display:flex;gap:6px;align-items:center;font-weight:600}#violationOtherDialog .vod-actions{display:flex;justify-content:flex-end;gap:8px}#violationOtherDialog button{border:1px solid #d7dee8;background:#fff;border-radius:9px;padding:8px 12px;font:inherit;cursor:pointer}#violationOtherDialog .primary{background:#1d4ed8;color:#fff;border-color:#1d4ed8}';
+document.head.appendChild(st)}
+function setLevelFixed(value){level.value=value;level.disabled=true;level.classList.add('violation-fixed-level');level.title='Mức độ tự động theo nội dung vi phạm.'}
+function syncViolationLevel(){
+const option=type.options[type.selectedIndex];if(!option)return;
+const code=option.dataset.code||VIOLATION_CODES[type.value]||'';
+if(code==='V32'){
+if(type.dataset.violationCustom==='1'&&type.dataset.violationCustomLevel){setLevelFixed(type.dataset.violationCustomLevel)}
+else{level.disabled=true;level.classList.add('violation-fixed-level');level.value='';level.title='V32 yêu cầu nhập nội dung và chọn mức độ trong hộp Khác.'}
+return}
+const fixed=option.dataset.level||VIOLATION_LEVELS[type.value]||'';
+if(fixed){delete type.dataset.violationCustom;delete type.dataset.violationCustomLevel;type.dataset.violationPrevious=type.value;setLevelFixed(fixed)}
+}
+function showOtherDialog(){
+closeViolationOtherDialog();
+const previous=type.dataset.violationPrevious||type.options[0]?.value||'';
+const bg=document.createElement('div');bg.id='violationOtherDialog';
+const box=document.createElement('div');box.className='vod';
+box.innerHTML='<h2>NỘI DUNG VI PHẠM KHÁC</h2><p>Nhập nội dung vi phạm của học sinh:</p><textarea id="violationOtherText" placeholder="Nhập nội dung vi phạm..."></textarea><div class="vod-level"><label><input type="radio" name="violationOtherLevel" value="Nhẹ"> Nhẹ</label><label><input type="radio" name="violationOtherLevel" value="Trung bình"> Trung bình</label><label><input type="radio" name="violationOtherLevel" value="Nghiêm trọng"> Nghiêm trọng</label></div><div class="vod-actions"><button type="button" id="violationOtherCancel">Hủy</button><button type="button" id="violationOtherSave" class="primary">Lưu</button></div>';
+bg.appendChild(box);document.body.appendChild(bg);
+$('violationOtherCancel').addEventListener('click',()=>{type.value=previous;delete type.dataset.violationCustom;delete type.dataset.violationCustomLevel;syncViolationLevel();closeViolationOtherDialog()});
+$('violationOtherSave').addEventListener('click',()=>{
+const text=$('violationOtherText').value.trim();
+const picked=document.querySelector('input[name="violationOtherLevel"]:checked');
+if(!text||!picked){toast('Vui lòng nhập nội dung vi phạm và chọn mức độ.');return}
+[...type.options].filter(o=>o.dataset.customViolation==='1').forEach(o=>o.remove());
+const option=new Option('V32 · Khác – GV tự ghi: '+text,text);
+option.dataset.customViolation='1';option.dataset.code='V32';option.dataset.level=picked.value;
+type.appendChild(option);type.value=text;
+type.dataset.violationCustom='1';type.dataset.violationCustomLevel=picked.value;type.dataset.violationPrevious=text;
+setLevelFixed(picked.value);closeViolationOtherDialog();
+});
+bg.addEventListener('click',e=>{if(e.target===bg)$('violationOtherCancel').click()});
+setTimeout(()=>$('violationOtherText')?.focus(),0);
+}
+type.addEventListener('focus',()=>{const o=type.options[type.selectedIndex];if(o&&o.dataset.code!=='V32')type.dataset.violationPrevious=type.value});
+type.addEventListener('change',()=>{
+const o=type.options[type.selectedIndex];if(!o)return;
+if(o.dataset.code==='V32'&&!o.dataset.customViolation){showOtherDialog();return}
+syncViolationLevel();
+});
+level.addEventListener('change',()=>syncViolationLevel());
+type.dataset.violationFixedHandler='1';
+syncViolationLevel();
+}
+document.addEventListener('click',e=>{
+const save=e.target.closest?.('[data-action="save-event"][data-kind="violation"]');if(!save)return;
+const type=$('mType'),o=type?.options?.[type.selectedIndex];
+if(o?.dataset.code==='V32'&&!type.dataset.violationCustom){e.preventDefault();e.stopPropagation();setupViolationForm();showOtherDialog()}
+},true);
 function simpleForm(title,type,label){openModal(title,`<div class="form"><label>Học sinh</label><select id="mStudent">${D.students.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select><label>Ngày</label><input id="mSimpleDate" type="date" value="${today()}"><label>${esc(label)}</label><textarea id="mText"></textarea><div class="actions"><button class="btn" data-action="close">Hủy</button><button class="btn primary" data-action="save-simple" data-type="${type}">Lưu</button></div></div>`)}
 function importBox(kind){openModal(kind==='students'?'Nhập học sinh':'Nhập kết quả SMAS',`<div class="form"><div class="notice">${kind==='students'?'CSV/TSV: Họ tên [tab] Ngày sinh [tab] Giới tính.':'CSV/TSV: Họ tên hoặc Student ID [tab] Môn [tab] Kết quả.'}</div><select id="mStage" ${kind==='students'?'style="display:none"':''}><option>GK1</option><option>CK1</option><option>GK2</option><option>CK2</option></select><input id="mFile" type="file" accept=".csv,.tsv,.txt"><div class="actions"><button class="btn" data-action="close">Hủy</button><button class="btn primary" data-action="do-import" data-kind="${kind}">Nhập</button></div></div>`)}
 function textFile(f,cb){const r=new FileReader();r.onload=()=>cb(String(r.result||''));r.onerror=()=>toast('Không đọc được file');r.readAsText(f,'utf-8')}
