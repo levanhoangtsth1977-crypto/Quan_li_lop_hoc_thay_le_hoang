@@ -293,6 +293,8 @@
     delete typeSelect.dataset.lhV3CustomValue;
     delete typeSelect.dataset.lhV3CustomLevel;
 
+    removeCustomOption(typeSelect);
+    typeSelect.dataset.lhV3LastFixedValue = item.text;
     setFixedLevel(item.level, false);
     showMeta(item);
   }
