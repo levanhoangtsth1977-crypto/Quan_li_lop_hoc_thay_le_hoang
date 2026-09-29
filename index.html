@@ -372,15 +372,17 @@ const input=$('mDate'),button=$('mDateOpen');
 if(!input||!button||button.dataset.datePickerReady==='1')return;
 const openPicker=()=>{
 try{
-if(typeof input.showPicker==='function'){input.showPicker();return}
+if(typeof input.showPicker==='function'){input.showPicker();return true}
 }catch(_){}
-try{input.focus();input.click()}catch(_){}
+try{input.focus();input.click();return true}catch(_){return false}
 };
-button.addEventListener('click',e=>{
-e.preventDefault();
-e.stopPropagation();
+button.addEventListener('pointerdown',()=>{
+try{if(typeof input.showPicker==='function')input.showPicker()}catch(_){}
+},{passive:true});
+button.addEventListener('click',()=>{
 openPicker();
 });
+input.addEventListener('click',()=>{});
 button.dataset.datePickerReady='1';
 }
 function eventForm(kind,studentId=''){
