@@ -367,6 +367,22 @@ function settings(){return head('Cấu hình','Thông tin lớp hiện hành',`<
 function page(){switch(route){case'home':return home();case'students':return students();case'profiles':return profiles();case'profile':return profile(params.student,params.token);case'attendance':return attendance();case'violations':return records('violations','Vi phạm','Theo dõi giáo dục','add-violation');case'rewards':return records('rewards','Khen thưởng','Ghi nhận tích cực','add-reward');case'learning':return learning();case'progress':return simple('progress','Tiến bộ','Nội dung','add-progress');case'comments':return autoComments();case'links':return links();case'millionaire':return millionaire();case'ai':return ai();case'settings':return settings();default:route='home';return home()}}
 function render(){const publicProfile=route==='profile'&&!!params.token;document.body.classList.toggle('lh-public-profile',publicProfile);if(!publicProfile)document.querySelectorAll('[data-nav]').forEach(a=>a.classList.toggle('active',a.dataset.nav===route||(route==='profile'&&a.dataset.nav==='profiles')));$('pageTitle').textContent=publicProfile?'Hồ sơ học sinh':(TITLES[route]||'Trang chủ');$('violationCount').textContent=D.violations.length;$('rewardCount').textContent=D.rewards.length;$('mainContent').innerHTML=page();if(route==='students')fillStudents();if(route==='profiles')fillProfiles();if(route==='attendance')fillAttendance();if(route==='links')fillLinks();if(publicProfile)void loadSharedProfile(params.token)}
 function studentForm(id=''){const s=id?student(id):null;openModal(id?'Sửa hồ sơ học sinh':'Thêm học sinh',`<div class="form"><label>Họ tên</label><input id="mName" value="${esc(s?.name||'')}" autofocus><label>Mã học sinh</label><input id="mCode" value="${esc(s?.studentCode||'')}"><div class="grid g2"><div><label>Ngày sinh</label><input id="mBirth" placeholder="dd/mm/yyyy" value="${esc(s?.birthDate||'')}"></div><div><label>Giới tính</label><select id="mGender"><option value="">Chưa nhập</option><option value="Nam" ${s?.gender==='Nam'?'selected':''}>Nam</option><option value="Nữ" ${s?.gender==='Nữ'?'selected':''}>Nữ</option></select></div></div><div class="grid g2"><div><label>Họ tên phụ huynh</label><input id="mParent" value="${esc(s?.parentName||'')}"></div><div><label>Số điện thoại</label><input id="mPhone" value="${esc(s?.phone||'')}"></div></div><label>Địa chỉ</label><input id="mAddress" value="${esc(s?.address||'')}"><label>Trạng thái</label><select id="mStatus"><option value="active" ${!s||s.status==='active'?'selected':''}>Đang học</option><option value="inactive" ${s?.status==='inactive'?'selected':''}>Không còn học</option></select><label>Ghi chú</label><textarea id="mStudentNote">${esc(s?.note||'')}</textarea><div class="actions"><button class="btn" data-action="close">Hủy</button><button class="btn primary" data-action="save-student" data-id="${id}">Lưu hồ sơ</button></div></div>`)}
+function wireEventDatePicker(){
+const input=$('mDate'),button=$('mDateOpen');
+if(!input||!button||button.dataset.datePickerReady==='1')return;
+const openPicker=()=>{
+try{
+if(typeof input.showPicker==='function'){input.showPicker();return}
+}catch(_){}
+try{input.focus();input.click()}catch(_){}
+};
+button.addEventListener('click',e=>{
+e.preventDefault();
+e.stopPropagation();
+openPicker();
+});
+button.dataset.datePickerReady='1';
+}
 function eventForm(kind,studentId=''){
 const arr=kind==='violation'?VIOLATIONS:REWARDS;
 const isV=kind==='violation';
@@ -376,11 +392,12 @@ const options=isV
 openModal(isV?'Ghi nhận vi phạm':'Khen thưởng',
 '<div class="form">'+
 '<label>Học sinh</label><select id="mStudent">'+D.students.map(s=>'<option value="'+s.id+'" '+(s.id===studentId?'selected':'')+'>'+esc(s.name)+'</option>').join('')+'</select>'+
-'<label>Ngày '+(isV?'vi phạm':'ghi nhận')+'</label><input id="mDate" type="date" value="'+today()+'">'+
+'<label>Ngày '+(isV?'vi phạm':'ghi nhận')+'</label><div style="display:flex;gap:8px;align-items:center"><input id="mDate" type="date" value="'+today()+'" autocomplete="off" aria-label="'+(isV?'Ngày vi phạm':'Ngày ghi nhận')+'" style="flex:1;min-width:0"><button id="mDateOpen" type="button" class="mini" aria-label="Mở lịch chọn ngày" title="Mở lịch chọn ngày">📅 Chọn ngày</button></div>'+
 '<label>'+(isV?'Nội dung vi phạm':'Nội dung khen thưởng')+'</label><select id="mType">'+options+'</select>'+
 (isV?'<label>Mức độ vi phạm</label><select id="mLevel"><option value="Nhẹ">Nhẹ</option><option value="Trung bình">Trung bình</option><option value="Nghiêm trọng">Nghiêm trọng</option></select>':'')+
 '<label>Nội dung/ghi chú chi tiết</label><textarea id="mNote" placeholder="Ghi rõ diễn biến, kết quả xử lý hoặc thành tích cụ thể nếu cần"></textarea>'+
 '<div class="actions"><button class="btn" data-action="close">Hủy</button><button class="btn primary" data-action="save-event" data-kind="'+kind+'">Lưu bản ghi</button></div></div>');
+wireEventDatePicker();
 if(isV) setupViolationForm();
 }
 function closeViolationOtherDialog(){$('violationOtherDialog')?.remove()}
