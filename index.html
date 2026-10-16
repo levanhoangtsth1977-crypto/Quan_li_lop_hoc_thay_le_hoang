@@ -227,6 +227,17 @@ async function __lhSyncOne(sheet,rec){
 async function __lhSyncMany(sheet,recs){
   const rows=Array.isArray(recs)?recs.filter(x=>x&&x.studentId):[];
   const out=[];
+  // Điểm danh ghi nhiều bản ghi cùng lúc; ghi tuần tự để tránh các lệnh
+  // ghi Google Apps Script chạy đồng thời gây xung đột/thiếu bản ghi.
+  if(sheet==='DIEM_DANH'){
+    const errors=[];
+    for(const row of rows){
+      try{out.push(await __lhSyncOne(sheet,row))}
+      catch(e){errors.push((student(row.studentId)?.name||row.studentName||row.studentId)+': '+(e?.message||String(e)))}
+    }
+    if(errors.length)throw Error('Đồng bộ điểm danh chưa đủ ('+out.length+'/'+rows.length+'). '+errors.slice(0,4).join(' | ')+(errors.length>4?' | và '+(errors.length-4)+' lỗi khác':''));
+    return out;
+  }
   for(let i=0;i<rows.length;i+=6){
     const chunk=rows.slice(i,i+6);
     const got=await Promise.all(chunk.map(x=>__lhSyncOne(sheet,x)));
