@@ -81,6 +81,7 @@ const VIOLATIONS=[
 'Sử dụng từ ngữ thiếu văn hóa khi giao tiếp.',
 'Trêu chọc bạn trong giờ học.',
 'Trêu chọc bạn trong giờ ra chơi.',
+'Đùa giỡn trong giờ chào cờ.',
 'Đe dọa bạn.',
 'Xô đẩy bạn.',
 'Lấy đồ dùng của bạn khi chưa được phép.',
@@ -121,6 +122,7 @@ const VIOLATION_LEVELS=Object.freeze({
 'Sử dụng từ ngữ thiếu văn hóa khi giao tiếp.':'Trung bình',
 'Trêu chọc bạn trong giờ học.':'Trung bình',
 'Trêu chọc bạn trong giờ ra chơi.':'Trung bình',
+'Đùa giỡn trong giờ chào cờ.':'Trung bình',
 'Đe dọa bạn.':'Trung bình',
 'Xô đẩy bạn.':'Trung bình',
 'Lấy đồ dùng của bạn khi chưa được phép.':'Trung bình',
@@ -467,9 +469,9 @@ function setLevelFixed(value){level.value=value;level.disabled=true;level.classL
 function syncViolationLevel(){
 const option=type.options[type.selectedIndex];if(!option)return;
 const code=option.dataset.code||VIOLATION_CODES[type.value]||'';
-if(code==='V32'){
+if(!option.dataset.customViolation && (option.value==='Khác – GV tự ghi' || code===VIOLATION_CODES['Khác – GV tự ghi'])){
 if(type.dataset.violationCustom==='1'&&type.dataset.violationCustomLevel){setLevelFixed(type.dataset.violationCustomLevel)}
-else{level.disabled=true;level.classList.add('violation-fixed-level');level.value='';level.title='V32 yêu cầu nhập nội dung và chọn mức độ trong hộp Khác.'}
+else{level.disabled=true;level.classList.add('violation-fixed-level');level.value='';level.title='Nội dung Khác yêu cầu nhập mô tả và chọn mức độ.'}
 return}
 const fixed=option.dataset.level||VIOLATION_LEVELS[type.value]||'';
 if(fixed){delete type.dataset.violationCustom;delete type.dataset.violationCustomLevel;type.dataset.violationPrevious=type.value;setLevelFixed(fixed)}
@@ -487,8 +489,8 @@ const text=$('violationOtherText').value.trim();
 const picked=document.querySelector('input[name="violationOtherLevel"]:checked');
 if(!text||!picked){toast('Vui lòng nhập nội dung vi phạm và chọn mức độ.');return}
 [...type.options].filter(o=>o.dataset.customViolation==='1').forEach(o=>o.remove());
-const option=new Option('V32 · Khác – GV tự ghi: '+text,text);
-option.dataset.customViolation='1';option.dataset.code='V32';option.dataset.level=picked.value;
+const option=new Option('Khác – GV tự ghi: '+text,text);
+option.dataset.customViolation='1';option.dataset.code=VIOLATION_CODES['Khác – GV tự ghi']||'';option.dataset.level=picked.value;
 type.appendChild(option);type.value=text;
 type.dataset.violationCustom='1';type.dataset.violationCustomLevel=picked.value;type.dataset.violationPrevious=text;
 setLevelFixed(picked.value);closeViolationOtherDialog();
@@ -496,10 +498,10 @@ setLevelFixed(picked.value);closeViolationOtherDialog();
 bg.addEventListener('click',e=>{if(e.target===bg)$('violationOtherCancel').click()});
 setTimeout(()=>$('violationOtherText')?.focus(),0);
 }
-type.addEventListener('focus',()=>{const o=type.options[type.selectedIndex];if(o&&o.dataset.code!=='V32')type.dataset.violationPrevious=type.value});
+type.addEventListener('focus',()=>{const o=type.options[type.selectedIndex];if(o&&!o.dataset.customViolation&&o.value!=='Khác – GV tự ghi')type.dataset.violationPrevious=type.value});
 type.addEventListener('change',()=>{
 const o=type.options[type.selectedIndex];if(!o)return;
-if(o.dataset.code==='V32'&&!o.dataset.customViolation){showOtherDialog();return}
+if((o.value==='Khác – GV tự ghi'||o.dataset.code===VIOLATION_CODES['Khác – GV tự ghi'])&&!o.dataset.customViolation){showOtherDialog();return}
 syncViolationLevel();
 });
 level.addEventListener('change',()=>syncViolationLevel());
@@ -509,7 +511,7 @@ syncViolationLevel();
 document.addEventListener('click',e=>{
 const save=e.target.closest?.('[data-action="save-event"][data-kind="violation"]');if(!save)return;
 const type=$('mType'),o=type?.options?.[type.selectedIndex];
-if(o?.dataset.code==='V32'&&!type.dataset.violationCustom){e.preventDefault();e.stopPropagation();setupViolationForm();showOtherDialog()}
+if(o&&!o.dataset.customViolation&&(o.value==='Khác – GV tự ghi'||o.dataset.code===VIOLATION_CODES['Khác – GV tự ghi'])&&!type.dataset.violationCustom){e.preventDefault();e.stopPropagation();setupViolationForm();showOtherDialog()}
 },true);
 function simpleForm(title,type,label){openModal(title,`<div class="form"><label>Học sinh</label><select id="mStudent">${D.students.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select><label>Ngày</label><input id="mSimpleDate" type="date" value="${today()}"><label>${esc(label)}</label><textarea id="mText"></textarea><div class="actions"><button class="btn" data-action="close">Hủy</button><button class="btn primary" data-action="save-simple" data-type="${type}">Lưu</button></div></div>`)}
 function importBox(kind){openModal(kind==='students'?'Nhập học sinh':'Nhập kết quả SMAS',`<div class="form"><div class="notice">${kind==='students'?'CSV/TSV: Họ tên [tab] Ngày sinh [tab] Giới tính.':'CSV/TSV: Họ tên hoặc Student ID [tab] Môn [tab] Kết quả.'}</div><select id="mStage" ${kind==='students'?'style="display:none"':''}><option>GK1</option><option>CK1</option><option>GK2</option><option>CK2</option></select><input id="mFile" type="file" accept=".csv,.tsv,.txt"><div class="actions"><button class="btn" data-action="close">Hủy</button><button class="btn primary" data-action="do-import" data-kind="${kind}">Nhập</button></div></div>`)}
