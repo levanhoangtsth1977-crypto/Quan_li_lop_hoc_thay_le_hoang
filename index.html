@@ -257,6 +257,26 @@ async function __lhSyncMany(sheet,recs){
   }
   return out;
 }
+async function __lhSyncLearningBatch(recs){
+ const rows=Array.isArray(recs)?recs.filter(x=>x&&x.studentId):[];
+ if(!rows.length)return{ok:true,saved:true,stored:true,count:0};
+ const rems=await __lhRemoteStudents();
+ const mapped=rows.map(rec=>{
+  const local=student(rec.studentId);
+  if(!local)throw Error('Không tìm thấy học sinh cục bộ để đồng bộ: '+rec.studentId);
+  const remote=rems.find(x=>fold(x?.name)===fold(local.name));
+  if(!remote?.id)throw Error('Không ghép được học sinh với Google Sheets: '+local.name);
+  return{...rec,studentId:String(remote.id),studentName:String(remote.name||local.name)};
+ });
+ const response=await fetch('/api/google',{
+  method:'POST',cache:'no-store',credentials:'same-origin',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({payload:JSON.stringify({action:'save_events',sheet:'HOC_TAP',records:mapped})})
+ });
+ const data=await response.json().catch(()=>null);
+ if(!response.ok||!data?.ok||data.saved!==true||data.stored!==true)throw Error(data?.error||'Google Sheets chưa xác nhận lưu bảng Học tập.');
+ return data;
+}
 async function __lhSyncNotice(sheet,recs,okText){
   try{await __lhSyncMany(sheet,recs);toast(okText||'Đã đồng bộ Google Sheets')}catch(e){toast('Đã lưu trên máy giáo viên nhưng chưa đồng bộ Google Sheets: '+(e?.message||e))}
 }
@@ -374,8 +394,9 @@ return '<div class="grid" style="gap:7px">'+arr.slice().sort((a,b)=>String(b.dat
 function sharedProfileBody(data){
 const st=data?.student||{},att=Array.isArray(data?.DIEM_DANH)?data.DIEM_DANH:[],vio=Array.isArray(data?.VI_PHAM)?data.VI_PHAM:[],rew=Array.isArray(data?.KHEN_THUONG)?data.KHEN_THUONG:[],learn=Array.isArray(data?.HOC_TAP)?data.HOC_TAP:[],prog=Array.isArray(data?.TIEN_BO)?data.TIEN_BO:[],comments=Array.isArray(data?.NHAN_XET)?data.NHAN_XET:[];
 const present=att.filter(x=>sharedStatus(x.status)==='Có mặt').length,excused=att.filter(x=>sharedStatus(x.status)==='Có phép').length,absent=att.filter(x=>sharedStatus(x.status)==='Không phép').length;
-const groups={};for(const x of learn){const s=clean(x.subject)||'Khác';(groups[s]??=[]).push(x)}
-const subjects=Object.entries(groups).map(([s,a])=>{const x=a.slice().sort((u,v)=>String(v.date||'').localeCompare(String(u.date||'')))[0];return `<div class="meta-box"><small>${esc(s)}</small><b>${esc(clean(x.result)||clean(x.level)||clean(x.note)||'Đã có ghi nhận')}</b></div>`}).join('')||'<p class="empty">Chưa có dữ liệu.</p>';
+const stageOrder=['GK1','CK1','GK2','CK2','Chưa phân kỳ'],stageLabels={GK1:'Giữa học kỳ I',CK1:'Cuối học kỳ I',GK2:'Giữa học kỳ II',CK2:'Cuối học kỳ II','Chưa phân kỳ':'Chưa xác định học kỳ'};
+const stages=[...new Set(learn.map(x=>clean(x.stage)||'Chưa phân kỳ'))].sort((a,b)=>{const ai=stageOrder.indexOf(a),bi=stageOrder.indexOf(b);return(ai<0?99:ai)-(bi<0?99:bi)||a.localeCompare(b,'vi')});
+const subjects=stages.map(stage=>{const rows=learn.filter(x=>(clean(x.stage)||'Chưa phân kỳ')===stage).sort((a,b)=>String(a.category||'').localeCompare(String(b.category||''))||String(a.item||a.subject||'').localeCompare(String(b.item||b.subject||''),'vi'));return `<div class="meta-box"><small>${esc(stageLabels[stage]||stage)}</small><div style="display:grid;gap:6px;margin-top:7px">${rows.map(x=>{const category=x.category==='PHAM_CHAT'?'Phẩm chất':x.category==='NANG_LUC'?'Năng lực':'Môn học';const item=clean(x.item)||clean(x.subject)||'Nội dung';const result=clean(x.result)||clean(x.level)||'Chưa có kết quả';return `<div><b>${esc(category)} · ${esc(item)}:</b> ${esc(result)}</div>`}).join('')}</div></div>`}).join('')||'<p class="empty">Chưa có dữ liệu học tập được đồng bộ.</p>';
 const technical=/^(save_event|get_students|student-data|sync_event|sync|stored|success|ok)$/i;const reminders=[...new Set(vio.filter(x=>!['resolved','đã xử lý'].includes(clean(x.status).toLocaleLowerCase('vi'))).map(x=>{const note=clean(x.note),action=clean(x.action);return note&&!technical.test(note)?note:(action&&!technical.test(action)?action:'')}).filter(Boolean))];
 return `<div class="profile-head"><div class="avatar">${esc(initials(st.name||'Học sinh'))}</div><div><h2 style="margin:0">${esc(st.name||'Học sinh')}</h2><div class="muted">${esc(st.gender||'')}${st.birthDate?' · '+esc(fmtDate(st.birthDate)):''}</div></div></div>
 <div class="notice" style="margin-top:12px">Trang này chỉ hiển thị dữ liệu được phép chia sẻ; không hiển thị số điện thoại, địa chỉ hoặc dữ liệu gia đình.</div>
@@ -576,19 +597,19 @@ function prepareSmasPdfImport(payload,session){
   const values=item.row.values;
   for(let i=0;i<SMAS_SUBJECTS.length;i++){
    const result=String(values[i]??'').trim().toUpperCase();if(!['T','H','C'].includes(result))continue;
-   const name=SMAS_SUBJECTS[i];records.push({id:uid(),studentId:item.student.id,studentName:item.student.name,stage:session.stage,category:'MON_HOC',item:name,subject:name,result,date:today(),source:fileName,sourceType:'SMAS_PDF',sourceFile:fileName,importedAt:now});subjectCount++;
+   const name=SMAS_SUBJECTS[i];records.push({id:'SMAS_'+session.stage+'_'+item.student.id+'_MON_'+i,studentId:item.student.id,studentName:item.student.name,stage:session.stage,category:'MON_HOC',item:name,subject:name,result,date:today(),source:fileName,sourceType:'SMAS_PDF',sourceFile:fileName,importedAt:now});subjectCount++;
   }
   for(let i=0;i<SMAS_QUALITIES.length;i++){
    const result=normalizeSmasAbility(values[12+i]);if(!result)continue;
-   const name=SMAS_QUALITIES[i];records.push({id:uid(),studentId:item.student.id,studentName:item.student.name,stage:session.stage,category:'PHAM_CHAT',item:name,subject:'Phẩm chất',result,date:today(),source:fileName,sourceType:'SMAS_PDF',sourceFile:fileName,importedAt:now});qualityCount++;
+   const name=SMAS_QUALITIES[i];records.push({id:'SMAS_'+session.stage+'_'+item.student.id+'_PC_'+i,studentId:item.student.id,studentName:item.student.name,stage:session.stage,category:'PHAM_CHAT',item:name,subject:'Phẩm chất',result,date:today(),source:fileName,sourceType:'SMAS_PDF',sourceFile:fileName,importedAt:now});qualityCount++;
   }
   for(let i=0;i<SMAS_GENERAL.length;i++){
    const result=normalizeSmasAbility(values[17+i]);if(!result)continue;
-   const name=SMAS_GENERAL[i];records.push({id:uid(),studentId:item.student.id,studentName:item.student.name,stage:session.stage,category:'NANG_LUC',item:name,subject:'Năng lực chung',result,date:today(),source:fileName,sourceType:'SMAS_PDF',sourceFile:fileName,importedAt:now});abilityCount++;
+   const name=SMAS_GENERAL[i];records.push({id:'SMAS_'+session.stage+'_'+item.student.id+'_NLC_'+i,studentId:item.student.id,studentName:item.student.name,stage:session.stage,category:'NANG_LUC',item:name,subject:'Năng lực chung',result,date:today(),source:fileName,sourceType:'SMAS_PDF',sourceFile:fileName,importedAt:now});abilityCount++;
   }
   for(let i=0;i<SMAS_SPECIAL.length;i++){
    const result=normalizeSmasAbility(values[20+i]);if(!result)continue;
-   const name=SMAS_SPECIAL[i];records.push({id:uid(),studentId:item.student.id,studentName:item.student.name,stage:session.stage,category:'NANG_LUC',item:name,subject:'Năng lực đặc thù',result,date:today(),source:fileName,sourceType:'SMAS_PDF',sourceFile:fileName,importedAt:now});abilityCount++;
+   const name=SMAS_SPECIAL[i];records.push({id:'SMAS_'+session.stage+'_'+item.student.id+'_NLD_'+i,studentId:item.student.id,studentName:item.student.name,stage:session.stage,category:'NANG_LUC',item:name,subject:'Năng lực đặc thù',result,date:today(),source:fileName,sourceType:'SMAS_PDF',sourceFile:fileName,importedAt:now});abilityCount++;
   }
  }
  if(!records.length)throw Error('Đã nhận diện học sinh nhưng không tìm thấy mã đánh giá T/H/C hoặc T/Đ/CĐ hợp lệ.');
@@ -605,12 +626,19 @@ function handleSmasPdfMessage(event){
  try{prepareSmasPdfImport(message.payload||{},session)}catch(e){showSmasPdfProblem('PDF SMAS chưa đạt kiểm tra',String(e?.message||e))}
 }
 window.addEventListener('message',handleSmasPdfMessage);
-function confirmSmasPdfImport(){
+async function confirmSmasPdfImport(){
  const pending=pendingSmasPdfImport;if(!pending)return;
  const current=Array.isArray(D.learning[pending.stage])?D.learning[pending.stage]:[];
  D.learning[pending.stage]=current.filter(r=>r?.sourceType!=='SMAS_PDF').concat(pending.records);
  write(D);pendingSmasPdfImport=null;closeModal();navigate('learning',{stage:pending.stage});
- toast(`Đã nhập ${pending.studentCount} học sinh · ${pending.records.length} kết quả từ PDF SMAS vào ${pending.stage}.`);
+ toast(`Đã nhập ${pending.studentCount} học sinh · ${pending.records.length} kết quả vào ${pending.stage}; đang đồng bộ bảng cá nhân...`);
+ try{
+  const saved=await __lhSyncLearningBatch(pending.records);
+  toast(`Đã đồng bộ ${saved.count} kết quả học tập lên Google Sheets. Link riêng học sinh sẽ hiển thị dữ liệu ${pending.stage}.`);
+ }catch(error){
+  console.error('[SMAS learning sync]',error);
+  toast('Đã lưu trên máy giáo viên nhưng chưa đồng bộ được bảng cá nhân: '+(error?.message||error));
+ }
 }
 function importData(kind){
  const f=$('mFile')?.files?.[0];if(!f)return toast('Chọn file trước');const stage=$('mStage')?.value||'GK1';
