@@ -1,5 +1,5 @@
 /* QUẢN LÝ LỚP HỌC THẦY LÊ HOÀNG — GOOGLE APPS SCRIPT MASTER 7.2 */
-const CONFIG={SPREADSHEET_ID:'1v9H6dReZiC_fCg6T9ISdfWOy1FN1HJQXXrKsABiCLI4',SCHOOL_YEAR:'2026–2027',CLASS_NAME:'5A3',EXPECTED_STUDENTS:42,VERSION:'MASTER-7.2-DELETE-STATS',HEADERS:{HOC_SINH:['id','name','gender','birthDate','status','parentName','phone','address','note','shareEnabled','createdAt','updatedAt'],DIEM_DANH:['id','studentName','studentId','date','status','note','createdAt','updatedAt'],VI_PHAM:['id','studentName','studentId','date','type','level','status','action','note','createdAt','updatedAt'],KHEN_THUONG:['id','studentName','studentId','date','type','formType','note','createdAt','updatedAt'],HOC_TAP:['id','studentName','studentId','date','subject','result','level','note','stage','category','item','sourceType','sourceFile','createdAt','updatedAt'],TIEN_BO:['id','studentName','studentId','date','category','level','score','note','createdAt','updatedAt'],NHAN_XET:['id','studentName','studentId','date','subject','content','level','createdAt','updatedAt'],LINK_HOC_SINH:['studentId','studentCode','studentName','studentUrl','enabled','createdAt','updatedAt'],CAU_HINH:['Key','Value','UpdatedAt'],NHAT_KY:['timestamp','action','sheet','recordId','message']}};
+const CONFIG={SPREADSHEET_ID:'1v9H6dReZiC_fCg6T9ISdfWOy1FN1HJQXXrKsABiCLI4',SCHOOL_YEAR:'2026–2027',CLASS_NAME:'5A3',EXPECTED_STUDENTS:42,VERSION:'MASTER-7.3-SMAS-BATCH',HEADERS:{HOC_SINH:['id','name','gender','birthDate','status','parentName','phone','address','note','shareEnabled','createdAt','updatedAt'],DIEM_DANH:['id','studentName','studentId','date','status','note','createdAt','updatedAt'],VI_PHAM:['id','studentName','studentId','date','type','level','status','action','note','createdAt','updatedAt'],KHEN_THUONG:['id','studentName','studentId','date','type','formType','note','createdAt','updatedAt'],HOC_TAP:['id','studentName','studentId','date','subject','result','level','note','stage','category','item','sourceType','sourceFile','createdAt','updatedAt'],TIEN_BO:['id','studentName','studentId','date','category','level','score','note','createdAt','updatedAt'],NHAN_XET:['id','studentName','studentId','date','subject','content','level','createdAt','updatedAt'],LINK_HOC_SINH:['studentId','studentCode','studentName','studentUrl','enabled','createdAt','updatedAt'],CAU_HINH:['Key','Value','UpdatedAt'],NHAT_KY:['timestamp','action','sheet','recordId','message']}};
 const OLD={DIEM_DANH:['id','studentId','date','status','note','createdAt','updatedAt'],VI_PHAM:['id','studentId','date','type','level','status','action','note','createdAt','updatedAt'],KHEN_THUONG:['id','studentId','date','type','formType','note','createdAt','updatedAt'],HOC_TAP:['id','studentId','date','subject','result','level','note','createdAt','updatedAt'],TIEN_BO:['id','studentId','date','category','level','score','note','createdAt','updatedAt'],NHAN_XET:['id','studentId','date','subject','content','level','createdAt','updatedAt']};
 const PREVIOUS={HOC_TAP:['id','studentName','studentId','date','subject','result','level','note','createdAt','updatedAt']};
 function getSpreadsheet_(){return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID)}
@@ -8,13 +8,12 @@ function json_(o,e){const cb=text_(e?.parameter?.callback),b=JSON.stringify(o);r
 function students_(){const sh=getSpreadsheet_().getSheetByName('HOC_SINH');if(!sh)throw Error('Không tìm thấy HOC_SINH');const h=CONFIG.HEADERS.HOC_SINH,cur=h.map((_,i)=>text_(sh.getRange(1,i+1).getValue()));if(!h.every((x,i)=>cur[i]===x))throw Error('Header HOC_SINH không đúng schema');const n=sh.getLastRow();if(n<2)return[];return sh.getRange(2,1,n-1,h.length).getValues().map(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]);o.id=text_(o.id);o.name=text_(o.name);o.status=text_(o.status)||'active';return o}).filter(x=>x.id&&x.name)}
 function migrateEventSheet_(name){
  const sh=getSpreadsheet_().getSheetByName(name);if(!sh)return;
- const neu=CONFIG.HEADERS[name],width=Math.max(1,sh.getLastColumn());
- const cur=sh.getRange(1,1,1,width).getValues()[0].map(text_);
+ const neu=CONFIG.HEADERS[name],cur=neu.map((_,i)=>text_(sh.getRange(1,i+1).getValue()));
  if(neu.every((x,i)=>cur[i]===x))return;
  if(cur.every(x=>!x)){sh.getRange(1,1,1,neu.length).setValues([neu]);return}
- const candidates=[OLD[name],PREVIOUS[name]].filter(Boolean);
- const old=candidates.find(cols=>cols.every((x,i)=>cur[i]===x)&&cur.slice(cols.length).every(x=>!x));
- if(!old)throw Error('Header '+name+' không đúng schema cũ/mới');
+ let old=OLD[name];
+ if(name==='HOC_TAP'&&PREVIOUS.HOC_TAP.every((x,i)=>cur[i]===x))old=PREVIOUS.HOC_TAP;
+ if(!old||!old.every((x,i)=>cur[i]===x))throw Error('Header '+name+' không đúng schema cũ/mới');
  const last=sh.getLastRow(),rows=last<2?[]:sh.getRange(2,1,last-1,old.length).getValues(),names={};
  students_().forEach(s=>names[text_(s.id)]=s.name);
  sh.clearContents();sh.getRange(1,1,1,neu.length).setValues([neu]);if(!rows.length)return;
