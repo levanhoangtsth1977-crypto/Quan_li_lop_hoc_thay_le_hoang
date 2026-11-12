@@ -13,7 +13,7 @@ const clean = value => String(value ?? '').trim().replace(/\s+/g, ' ');
 const tokenForStudent = id => createHash('sha256').update(PREFIX + clean(id), 'utf8').digest('hex');
 const pick = (obj, keys) => { const out = {}; for (const key of keys) if (obj?.[key] !== undefined && obj?.[key] !== null && obj[key] !== '') out[key] = obj[key]; return out; };
 const byStudent = (list, sid, name, keys) => (Array.isArray(list) ? list : [])
-  .filter(x => clean(x?.studentId) === sid || clean(x?.studentName) === name)
+  .filter(x => clean(x?.studentId) ? clean(x.studentId) === sid : clean(x?.studentName) === name)
   .map(x => pick(x, keys));
 
 function parsePayload(text) {
@@ -98,7 +98,7 @@ module.exports = async function handler(req, res) {
       DIEM_DANH: byStudent(data.DIEM_DANH, sid, name, ['date', 'status', 'note']),
       VI_PHAM: byStudent(data.VI_PHAM, sid, name, ['date', 'type', 'level', 'action', 'note', 'status']),
       KHEN_THUONG: byStudent(data.KHEN_THUONG, sid, name, ['date', 'type', 'formType', 'note']),
-      HOC_TAP: byStudent(data.HOC_TAP, sid, name, ['date', 'subject', 'result', 'level', 'note']),
+      HOC_TAP: byStudent(data.HOC_TAP, sid, name, ['date', 'subject', 'result', 'level', 'note', 'stage', 'category', 'item', 'sourceType', 'sourceFile']),
       TIEN_BO: byStudent(data.TIEN_BO, sid, name, ['date', 'category', 'level', 'score', 'result', 'note']),
       NHAN_XET: (Array.isArray(data.NHAN_XET) ? data.NHAN_XET : [])
         .filter(x => (clean(x?.studentId) === sid || clean(x?.studentName) === name) && x?.visibleToStudent !== false)
