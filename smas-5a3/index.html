@@ -289,7 +289,7 @@ async function parsePDF(file){
  const gm={};GENERAL.forEach((g,i)=>gm[g]=17+i);
  // 12 môn + 5 phẩm chất + 3 NL chung = 20; 7 NL đặc thù nằm trực tiếp ở pseudo[20..26].
  const specialMap=Object.fromEntries(SPECIAL.map((s,i)=>[s,20+i]));
- APP={rows:pseudo,headers:[],maps:{subjects:sm,qualities:qm,general:gm,special:specialMap},fileName:file.name,source:'pdf',meta:{},pdfDebug:`PDF ${doc.numPages} trang · ${isMidterm?'mẫu giữa kỳ, 2 cột điểm':'mẫu cuối kỳ, 7 cột điểm'} · dựng ${pseudo.length} HS · khóa 27 cột mã đánh giá theo tọa độ dòng mốc ${anchor.stt}`};
+ APP={rows:pseudo,headers:[],maps:{subjects:sm,qualities:qm,general:gm,special:specialMap},fileName:file.name,source:'pdf',meta:{},pdfDebug:`PDF ${doc.numPages} trang · ${isMidterm?'mẫu giữa kỳ, 2 cột điểm':'mẫu cuối kỳ, 7 cột điểm'} · dựng ${pseudo.length} HS · khóa 27 cột mã đánh giá theo tọa độ.`};
  show();
  document.getElementById('status').className='status warn';
  document.getElementById('status').textContent=`Đã dựng ${pseudo.length} học sinh · mẫu ${isMidterm?'giữa kỳ (2 cột điểm)':'cuối kỳ (7 cột điểm)'} · khóa 27 cột đánh giá theo tọa độ.`;
