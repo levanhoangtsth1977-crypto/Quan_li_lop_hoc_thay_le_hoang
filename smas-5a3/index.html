@@ -204,24 +204,41 @@ async function parsePDF(file){
  const codeToken=v=>norm(v);
  const codeItems=row=>row.items.filter(it=>allCodeSet.has(codeToken(it.str)));
 
- // Định vị theo lưới cột thực tế của mẫu SMAS 5A3.
- // Không suy ra vị trí bằng cách đếm mã T/H/C/T/Đ/CĐ trên một dòng:
- // ô trống trong một tiêu chí sẽ làm mọi cột phía sau bị dịch sang trái.
- // Các tâm cột dưới đây được đo từ đường kẻ dọc của chính mẫu PDF 5A3.
+ // Nhận dạng đúng biến thể mẫu theo số tiêu đề "Điểm KTĐK" trên trang 1.
+ // Giữa kỳ I: 2 cột điểm (Toán, Tiếng Việt).
+ // Cuối kỳ I: 7 cột điểm (Toán, Tiếng Việt, Đạo đức, LS-ĐL, Tiếng Anh, Tin học, Khoa học).
+ // Cả hai mẫu đều có 27 cột mã đánh giá: 12 môn + 5 phẩm chất + 3 NL chung + 7 NL đặc thù.
+ // Tọa độ được đo theo đường kẻ dọc của hai PDF SMAS 5A3 ông chủ cung cấp.
  const pageWidth=Number(doc.getPage(1).view[2])-Number(doc.getPage(1).view[0]);
  const scale=pageWidth/841.68;
- const rawCenters=[
+ if(!Number.isFinite(pageWidth)||pageWidth<700||pageWidth>1000){
+  throw new Error('Khổ PDF không khớp mẫu bảng SMAS 5A3; dừng đọc để tránh gán nhầm cột.');
+ }
+ const scoreHeaderCount=pages[0].items.filter(it=>norm(it.str).includes('ktđk')).length;
+ const isMidterm=scoreHeaderCount===2;
+ const isFinal=scoreHeaderCount===7;
+ if(!isMidterm&&!isFinal){
+  throw new Error('Không xác định được mẫu SMAS: trang 1 phải có đúng 2 tiêu đề Điểm KTĐK (giữa kỳ) hoặc 7 tiêu đề (cuối kỳ). Hệ thống dừng để tránh đọc lệch cột.');
+ }
+ const rawCenters=isMidterm?[
   193.585,236.355,279.125,300.510,321.895,343.280,
   364.660,386.045,407.430,428.815,450.200,471.585,
   491.715,510.580,529.445,548.315,567.185,
   586.055,604.925,623.795,
   642.660,661.525,680.395,699.265,718.135,737.005,755.875
+ ]:[
+  173.735,211.350,248.965,286.580,324.195,361.815,
+  399.425,437.045,455.855,474.665,493.470,512.275,
+  529.980,546.575,563.170,579.765,596.360,
+  612.955,629.550,646.145,
+  662.740,679.340,695.635,712.530,729.125,745.720,762.315
  ];
- if(!Number.isFinite(pageWidth)||pageWidth<700||pageWidth>1000){
-  throw new Error('Khổ PDF không khớp mẫu bảng SMAS 5A3; dừng đọc để tránh gán nhầm cột.');
- }
+ const rawScoreCenters=isMidterm?[214.970,257.740]:[
+  192.545,230.155,267.775,305.385,343.005,380.620,418.235
+ ];
+ const scoreSubjectCount=isMidterm?2:7;
  const codeCenters=rawCenters.map(x=>x*scale);
- const expectedCount=27;
+ const scoreCenters=rawScoreCenters.map(x=>x*scale);
  function nearestCode(row,targetX,kind){
   let best=null,bestDist=Infinity;
   for(const it of row.items){
@@ -244,11 +261,10 @@ async function parsePDF(file){
   const n=Number(raw);
   return Number.isFinite(n)&&n>=0&&n<=10?raw.replace('.',','):'';
  }
- function scoreBetween(row,leftX,rightX){
-  const lo=Math.min(Number(leftX),Number(rightX)),hi=Math.max(Number(leftX),Number(rightX));
-  const mid=(lo+hi)/2;
-  const candidates=(row.items||[]).map(it=>({cx:Number(it.x)+(Number(it.w||0)/2),value:scoreToken(it.str)})).filter(x=>x.value&&x.cx>lo&&x.cx<hi);
-  candidates.sort((a,b)=>Math.abs(a.cx-mid)-Math.abs(b.cx-mid));
+ function scoreAt(row,targetX){
+  const candidates=(row.items||[]).map(it=>({cx:Number(it.x)+(Number(it.w||0)/2),value:scoreToken(it.str)}))
+   .filter(x=>x.value&&Math.abs(x.cx-targetX)<=9.2*scale);
+  candidates.sort((a,b)=>Math.abs(a.cx-targetX)-Math.abs(b.cx-targetX));
   return candidates[0]?.value||'';
  }
 
@@ -257,7 +273,8 @@ async function parsePDF(file){
   const values=[];
   for(let i=0;i<12;i++)values.push(nearestCode(r,codeCenters[i],'subject'));
   for(let i=12;i<27;i++)values.push(nearestCode(r,codeCenters[i],'ability'));
-  const scores={'Toán':scoreBetween(r,codeCenters[0],codeCenters[1]),'Tiếng Việt':scoreBetween(r,codeCenters[1],codeCenters[2])};
+  const scores={};
+  for(let i=0;i<scoreSubjectCount;i++)scores[SUBJECTS[i]]=scoreAt(r,scoreCenters[i]);
   pseudo.push({stt:r.stt,name:r.name,values,scores});
  }
 
@@ -266,10 +283,10 @@ async function parsePDF(file){
  const gm={};GENERAL.forEach((g,i)=>gm[g]=17+i);
  // 12 môn + 5 phẩm chất + 3 NL chung = 20; 7 NL đặc thù nằm trực tiếp ở pseudo[20..26].
  const specialMap=Object.fromEntries(SPECIAL.map((s,i)=>[s,20+i]));
- APP={rows:pseudo,headers:[],maps:{subjects:sm,qualities:qm,general:gm,special:specialMap},fileName:file.name,source:'pdf',meta:{},pdfDebug:`PDF ${doc.numPages} trang · dựng ${pseudo.length} HS · khóa 27 cột mã đánh giá theo tọa độ dòng mốc ${anchor.stt}`};
+ APP={rows:pseudo,headers:[],maps:{subjects:sm,qualities:qm,general:gm,special:specialMap},fileName:file.name,source:'pdf',meta:{},pdfDebug:`PDF ${doc.numPages} trang · ${isMidterm?'mẫu giữa kỳ, 2 cột điểm':'mẫu cuối kỳ, 7 cột điểm'} · dựng ${pseudo.length} HS · khóa 27 cột mã đánh giá theo tọa độ dòng mốc ${anchor.stt}`};
  show();
  document.getElementById('status').className='status warn';
- document.getElementById('status').textContent=`Đã dựng ${pseudo.length} học sinh từ PDF. Đã khóa 27 cột đánh giá theo tọa độ: 12 môn + 15 phẩm chất/năng lực.`;
+ document.getElementById('status').textContent=`Đã dựng ${pseudo.length} học sinh · mẫu ${isMidterm?'giữa kỳ (2 cột điểm)':'cuối kỳ (7 cột điểm)'} · khóa 27 cột đánh giá theo tọa độ.`;
 }
 async function parseFile(file){try{document.getElementById('status').className='status';document.getElementById('status').textContent='⏳ Đang đọc và kiểm tra dữ liệu…';const ext=file.name.toLowerCase().split('.').pop();if(ext==='pdf')await parsePDF(file);else await parseSpreadsheet(file)}catch(e){document.getElementById('status').className='status err';document.getElementById('status').textContent='❌ '+(e?.message||String(e));console.error(e);try{if(window.parent&&window.parent!==window)window.parent.postMessage({type:'LH_SMAS_ANALYSIS_ERROR',payload:{fileName:file?.name||'',message:String(e?.message||e||'Không đọc được PDF SMAS.')}},location.origin)}catch(_){}}}
 window.addEventListener('message',event=>{if(event.origin!==location.origin||event.source!==window.parent)return;const message=event.data||{};if(message.type!=='LH_SMAS_IMPORT_FILE'||!message.file||typeof message.file.arrayBuffer!=='function')return;parseFile(message.file)});
