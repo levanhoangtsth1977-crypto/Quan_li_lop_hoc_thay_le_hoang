@@ -565,6 +565,7 @@ const SMAS_QUALITIES=['Yêu nước','Nhân ái','Chăm chỉ','Trung thực','T
 const SMAS_GENERAL=['Tự chủ và tự học','Giao tiếp và hợp tác','Giải quyết vấn đề và sáng tạo'];
 const SMAS_SPECIAL=['Ngôn ngữ','Tính toán','Khoa học','Công nghệ','Tin học','Thẩm mĩ','Thể chất'];
 function normalizeSmasAbility(value){const v=fold(value);if(v==='t')return'T';if(v==='d')return'Đ';if(v==='cd')return'CĐ';return''}
+function normalizeSmasScore(value){const raw=clean(value).replace(/\s+/g,'').replace(',','.');if(!raw)return'';const n=Number(raw);return Number.isFinite(n)&&n>=0&&n<=10?raw.replace('.',','):''}
 function showSmasPdfProblem(title,message){finishSmasPdfSession();pendingSmasPdfImport=null;openModal(title,`<div class="form"><div class="notice">${esc(message)}</div><p>Chưa có dữ liệu nào được nhập vào Học tập.</p><div class="actions"><button class="btn primary" data-action="close">Đóng</button></div></div>`)}
 function prepareSmasPdfImport(payload,session){
  const rows=Array.isArray(payload?.rows)?payload.rows:[];
@@ -591,13 +592,15 @@ function prepareSmasPdfImport(payload,session){
   ].filter(Boolean).join(' ');
   throw Error(details+' Hệ thống yêu cầu khớp đủ danh sách trước khi nhập để tránh gán nhầm kết quả.');
  }
- const records=[];let subjectCount=0,qualityCount=0,abilityCount=0;
+ const records=[];let subjectCount=0,scoreCount=0,qualityCount=0,abilityCount=0;
  const now=new Date().toISOString(),fileName=String(payload.fileName||session.file.name||'SMAS.pdf');
  for(const item of matched){
   const values=item.row.values;
   for(let i=0;i<SMAS_SUBJECTS.length;i++){
-   const result=String(values[i]??'').trim().toUpperCase();if(!['T','H','C'].includes(result))continue;
-   const name=SMAS_SUBJECTS[i];records.push({id:'SMAS_'+session.stage+'_'+item.student.id+'_MON_'+i,studentId:item.student.id,studentName:item.student.name,stage:session.stage,category:'MON_HOC',item:name,subject:name,result,date:today(),source:fileName,sourceType:'SMAS_PDF',sourceFile:fileName,importedAt:now});subjectCount++;
+   const result=String(values[i]??'').trim().toUpperCase();
+   const score=i===0?normalizeSmasScore(item.row.scores?.['Toán']):i===1?normalizeSmasScore(item.row.scores?.['Tiếng Việt']):'';
+   if(!['T','H','C'].includes(result)&&!score)continue;
+   const name=SMAS_SUBJECTS[i];records.push({id:'SMAS_'+session.stage+'_'+item.student.id+'_MON_'+i,studentId:item.student.id,studentName:item.student.name,stage:session.stage,category:'MON_HOC',item:name,subject:name,result:['T','H','C'].includes(result)?result:'',score,level:'',date:today(),source:fileName,sourceType:'SMAS_PDF',sourceFile:fileName,importedAt:now});subjectCount++;if(score)scoreCount++;
   }
   for(let i=0;i<SMAS_QUALITIES.length;i++){
    const result=normalizeSmasAbility(values[12+i]);if(!result)continue;
@@ -613,10 +616,10 @@ function prepareSmasPdfImport(payload,session){
   }
  }
  if(!records.length)throw Error('Đã nhận diện học sinh nhưng không tìm thấy mã đánh giá T/H/C hoặc T/Đ/CĐ hợp lệ.');
- pendingSmasPdfImport={stage:session.stage,fileName,records,studentCount:matched.length,subjectCount,qualityCount,abilityCount};
+ pendingSmasPdfImport={stage:session.stage,fileName,records,studentCount:matched.length,subjectCount,scoreCount,qualityCount,abilityCount};
  finishSmasPdfSession();
- const preview=matched.slice(0,8).map(x=>{const count=records.filter(r=>r.studentId===x.student.id).length;return `<tr><td>${esc(x.student.name)}</td><td>${count}</td></tr>`}).join('');
- openModal('Kiểm tra dữ liệu PDF SMAS',`<div class="form"><div class="notice">Đọc thành công <b>${matched.length} học sinh</b> và đối chiếu chính xác với danh sách lớp. Giai đoạn nhập: <b>${session.stage}</b>. Chưa ghi dữ liệu; ông chủ kiểm tra rồi xác nhận.</div><div class="grid g3"><div class="stat"><div>Học sinh</div><div class="num">${matched.length}</div></div><div class="stat"><div>Kết quả môn học</div><div class="num">${subjectCount}</div></div><div class="stat"><div>Phẩm chất + năng lực</div><div class="num">${qualityCount+abilityCount}</div></div></div><div class="notice">Tổng cộng <b>${records.length}</b> kết quả có mã đánh giá hợp lệ. Ô trống trong PDF được giữ trống, không tự điền.</div><div class="table-wrap"><table class="table"><thead><tr><th>Học sinh (8 em đầu)</th><th>Số tiêu chí có kết quả</th></tr></thead><tbody>${preview}</tbody></table></div><div class="actions"><button class="btn" data-action="cancel-pdf-learning">Hủy</button><button class="btn primary" data-action="confirm-pdf-learning">Xác nhận nhập PDF</button></div></div>`);
+ const preview=matched.slice(0,8).map(x=>{const count=records.filter(r=>r.studentId===x.student.id).length,s=x.row.scores||{};return `<tr><td>${esc(x.student.name)}</td><td>${esc(s['Toán']||'—')}</td><td>${esc(s['Tiếng Việt']||'—')}</td><td>${count}</td></tr>`}).join('');
+ openModal('Kiểm tra dữ liệu PDF SMAS',`<div class="form"><div class="notice">Đọc thành công <b>${matched.length} học sinh</b> và đối chiếu chính xác với danh sách lớp. Giai đoạn nhập: <b>${session.stage}</b>. Chưa ghi dữ liệu; ông chủ kiểm tra rồi xác nhận.</div><div class="grid g4"><div class="stat"><div>Học sinh</div><div class="num">${matched.length}</div></div><div class="stat"><div>Kết quả môn học</div><div class="num">${subjectCount}</div></div><div class="stat"><div>Điểm KTĐK</div><div class="num">${scoreCount}</div></div><div class="stat"><div>Phẩm chất + năng lực</div><div class="num">${qualityCount+abilityCount}</div></div></div><div class="notice">Tổng cộng <b>${records.length}</b> bản ghi. Đã tách riêng điểm KTĐK và mã đánh giá; ô trống trong PDF được giữ trống.</div><div class="table-wrap"><table class="table"><thead><tr><th>Học sinh (8 em đầu)</th><th>Điểm Toán</th><th>Điểm Tiếng Việt</th><th>Số tiêu chí</th></tr></thead><tbody>${preview}</tbody></table></div><div class="actions"><button class="btn" data-action="cancel-pdf-learning">Hủy</button><button class="btn primary" data-action="confirm-pdf-learning">Xác nhận nhập PDF</button></div></div>`);
 }
 function handleSmasPdfMessage(event){
  const session=smasPdfSession;if(!session||event.origin!==location.origin||event.source!==session.frame.contentWindow)return;
@@ -631,7 +634,7 @@ async function confirmSmasPdfImport(){
  const current=Array.isArray(D.learning[pending.stage])?D.learning[pending.stage]:[];
  D.learning[pending.stage]=current.filter(r=>r?.sourceType!=='SMAS_PDF').concat(pending.records);
  write(D);pendingSmasPdfImport=null;closeModal();navigate('learning',{stage:pending.stage});
- toast(`Đã nhập ${pending.studentCount} học sinh · ${pending.records.length} kết quả vào ${pending.stage}; đang đồng bộ bảng cá nhân...`);
+ toast(`Đã nhập ${pending.studentCount} học sinh · ${pending.records.length} kết quả, trong đó ${pending.scoreCount} điểm KTĐK vào ${pending.stage}; đang đồng bộ bảng cá nhân...`);
  try{
   const saved=await __lhSyncLearningBatch(pending.records);
   toast(`Đã đồng bộ ${saved.count} kết quả học tập lên Google Sheets. Link riêng học sinh sẽ hiển thị dữ liệu ${pending.stage}.`);
