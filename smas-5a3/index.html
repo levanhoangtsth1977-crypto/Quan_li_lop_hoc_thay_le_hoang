@@ -214,7 +214,7 @@ async function parsePDF(file){
  if(!Number.isFinite(pageWidth)||pageWidth<700||pageWidth>1000){
   throw new Error('Khổ PDF không khớp mẫu bảng SMAS 5A3; dừng đọc để tránh gán nhầm cột.');
  }
- const scoreHeaderCount=pages[0].items.filter(it=>norm(it.str).includes('ktđk')).length;
+ const scoreHeaderCount=pages[0].items.filter(it=>norm(it.str).includes('ktdk')).length;
  const isMidterm=scoreHeaderCount===2;
  const isFinal=scoreHeaderCount===7;
  if(!isMidterm&&!isFinal){
