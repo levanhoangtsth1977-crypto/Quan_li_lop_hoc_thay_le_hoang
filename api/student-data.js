@@ -16,6 +16,20 @@ const byStudent = (list, sid, name, keys) => (Array.isArray(list) ? list : [])
   .filter(x => clean(x?.studentId) ? clean(x.studentId) === sid : clean(x?.studentName) === name)
   .map(x => pick(x, keys));
 
+const dedupeLearning = rows => {
+  const latest = new Map();
+  for (const row of rows) {
+    const stage = clean(row.stage) || 'NO_STAGE';
+    const category = clean(row.category) || 'MON_HOC';
+    const item = clean(row.item || row.subject);
+    const key = [stage, category, item].join('|').toLocaleLowerCase('vi');
+    const stamp = Date.parse(row.updatedAt || row.importedAt || row.createdAt || row.date || '') || 0;
+    const previous = latest.get(key);
+    if (!previous || stamp >= previous.stamp) latest.set(key, { row, stamp });
+  }
+  return [...latest.values()].map(x => x.row);
+};
+
 function parsePayload(text) {
   const value = String(text ?? '').trim().replace(/^\uFEFF/, '');
   try { return JSON.parse(value); } catch (_) {}
@@ -98,7 +112,7 @@ module.exports = async function handler(req, res) {
       DIEM_DANH: byStudent(data.DIEM_DANH, sid, name, ['date', 'status', 'note']),
       VI_PHAM: byStudent(data.VI_PHAM, sid, name, ['date', 'type', 'level', 'action', 'note', 'status']),
       KHEN_THUONG: byStudent(data.KHEN_THUONG, sid, name, ['date', 'type', 'formType', 'note']),
-      HOC_TAP: byStudent(data.HOC_TAP, sid, name, ['date', 'subject', 'result', 'score', 'level', 'note', 'stage', 'category', 'item', 'sourceType', 'sourceFile']),
+      HOC_TAP: dedupeLearning(byStudent(data.HOC_TAP, sid, name, ['date', 'subject', 'result', 'score', 'level', 'note', 'stage', 'category', 'item', 'sourceType', 'sourceFile', 'updatedAt', 'createdAt', 'importedAt'])),
       TIEN_BO: byStudent(data.TIEN_BO, sid, name, ['date', 'category', 'level', 'score', 'result', 'note']),
       NHAN_XET: (Array.isArray(data.NHAN_XET) ? data.NHAN_XET : [])
         .filter(x => (clean(x?.studentId) === sid || clean(x?.studentName) === name) && x?.visibleToStudent !== false)
