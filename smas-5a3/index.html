@@ -206,7 +206,7 @@ async function parsePDF(file){
 
  // Nhận dạng đúng biến thể mẫu theo số tiêu đề "Điểm KTĐK" trên trang 1.
  // Giữa kỳ I: 2 cột điểm (Toán, Tiếng Việt).
- // Cuối kỳ I: 7 cột điểm (Toán, Tiếng Việt, Đạo đức, LS-ĐL, Tiếng Anh, Tin học, Khoa học).
+ // Cuối kỳ I: 7 cột điểm (Toán, Tiếng Việt, LS-ĐL, Tiếng Anh, Tin học, Khoa học, Công nghệ).
  // Cả hai mẫu đều có 27 cột mã đánh giá: 12 môn + 5 phẩm chất + 3 NL chung + 7 NL đặc thù.
  // Tọa độ được đo theo đường kẻ dọc của hai PDF SMAS 5A3 ông chủ cung cấp.
  const pageWidth=Number(doc.getPage(1).view[2])-Number(doc.getPage(1).view[0]);
@@ -227,8 +227,8 @@ async function parsePDF(file){
   586.055,604.925,623.795,
   642.660,661.525,680.395,699.265,718.135,737.005,755.875
  ]:[
-  173.735,211.350,248.965,286.580,324.195,361.815,
-  399.425,437.045,455.855,474.665,493.470,512.275,
+  173.735,211.350,248.965,267.773,305.389,343.005,
+  380.621,418.237,455.855,474.665,493.470,512.275,
   529.980,546.575,563.170,579.765,596.360,
   612.955,629.550,646.145,
   662.740,679.340,695.935,712.530,729.125,745.720,762.315
