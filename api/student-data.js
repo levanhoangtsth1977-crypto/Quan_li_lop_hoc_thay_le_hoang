@@ -98,7 +98,7 @@ module.exports = async function handler(req, res) {
       DIEM_DANH: byStudent(data.DIEM_DANH, sid, name, ['date', 'status', 'note']),
       VI_PHAM: byStudent(data.VI_PHAM, sid, name, ['date', 'type', 'level', 'action', 'note', 'status']),
       KHEN_THUONG: byStudent(data.KHEN_THUONG, sid, name, ['date', 'type', 'formType', 'note']),
-      HOC_TAP: byStudent(data.HOC_TAP, sid, name, ['date', 'subject', 'result', 'level', 'note', 'stage', 'category', 'item', 'sourceType', 'sourceFile']),
+      HOC_TAP: byStudent(data.HOC_TAP, sid, name, ['date', 'subject', 'result', 'score', 'level', 'note', 'stage', 'category', 'item', 'sourceType', 'sourceFile']),
       TIEN_BO: byStudent(data.TIEN_BO, sid, name, ['date', 'category', 'level', 'score', 'result', 'note']),
       NHAN_XET: (Array.isArray(data.NHAN_XET) ? data.NHAN_XET : [])
         .filter(x => (clean(x?.studentId) === sid || clean(x?.studentName) === name) && x?.visibleToStudent !== false)
