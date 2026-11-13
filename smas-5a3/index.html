@@ -146,8 +146,10 @@ h+='</tbody></table></div>';return h}
 function renderStudents(){
  const scoreRows=APP.rows.map(r=>'<tr><td>'+esc(r.stt)+'</td><td><strong>'+esc(r.name)+'</strong></td><td>'+esc(r.scores?.['Toán']||'—')+'</td><td>'+esc(r.scores?.['Tiếng Việt']||'—')+'</td></tr>').join('');
  let h='<h2 class="section-title">🎯 Kiểm tra điểm KTĐK Toán và Tiếng Việt</h2><div class="section-note">Điểm số được đọc từ hai cột Điểm KTĐK nằm xen giữa các cột mã đánh giá. Ô trống được giữ trống.</div><div class="table-wrap"><table><thead><tr><th>STT</th><th>Họ và tên</th><th>Điểm Toán</th><th>Điểm Tiếng Việt</th></tr></thead><tbody>'+scoreRows+'</tbody></table></div>';
- h+='<h2 class="section-title">👥 Kiểm tra từng học sinh — Năng lực đặc thù</h2><div class="section-note">Bảng này chỉ hiển thị 7 năng lực đặc thù đọc trực tiếp từ SMAS, đúng miền mã T / Đ / CĐ.</div><div class="table-wrap special-student-table"><table><thead><tr><th>STT</th><th>Họ và tên</th>'+SPECIAL.map(s=>'<th>'+esc(s)+'</th>').join('')+'</tr></thead><tbody>';
- for(const r of APP.rows){const sp=specialValues(r);h+='<tr><td>'+esc(r.stt)+'</td><td><strong>'+esc(r.name)+'</strong></td>'+SPECIAL.map(s=>'<td>'+codeCell(sp[s],'ability')+'</td>').join('')+'</tr>'}
+ h+='<h2 class="section-title">👥 Đối chiếu 15 cột phẩm chất và năng lực theo từng học sinh</h2><div class="section-note">Thứ tự cố định theo bảng SMAS gốc: 5 phẩm chất → 3 năng lực chung → 7 năng lực đặc thù. Ô trống được giữ trống, không dồn cột.</div>';
+ const abilityNames=[...QUALITIES,...GENERAL,...SPECIAL];
+ h+='<div class="table-wrap special-student-table"><table><thead><tr><th>STT</th><th>Họ và tên</th>'+abilityNames.map(n=>'<th>'+esc(n)+'</th>').join('')+'</tr></thead><tbody>';
+ for(const r of APP.rows){h+='<tr><td>'+esc(r.stt)+'</td><td><strong>'+esc(r.name)+'</strong></td>'+abilityNames.map((n,i)=>'<td>'+codeCell(r.values[12+i]||'','ability')+'</td>').join('')+'</tr>'}
  h+='</tbody></table></div>';return h
 }
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
@@ -202,64 +204,24 @@ async function parsePDF(file){
  const codeToken=v=>norm(v);
  const codeItems=row=>row.items.filter(it=>allCodeSet.has(codeToken(it.str)));
 
- // Chọn dòng có nhiều mã đánh giá nhất và đủ dài để làm "mốc cột".
- let anchor=null,anchorCodes=[];
- for(const r of rows){
-  const cs=codeItems(r);
-  if(cs.length>anchorCodes.length){anchor=r;anchorCodes=cs;}
+ // Định vị theo lưới cột thực tế của mẫu SMAS 5A3.
+ // Không suy ra vị trí bằng cách đếm mã T/H/C/T/Đ/CĐ trên một dòng:
+ // ô trống trong một tiêu chí sẽ làm mọi cột phía sau bị dịch sang trái.
+ // Các tâm cột dưới đây được đo từ đường kẻ dọc của chính mẫu PDF 5A3.
+ const pageWidth=Number(doc.getPage(1).view[2])-Number(doc.getPage(1).view[0]);
+ const scale=pageWidth/841.68;
+ const rawCenters=[
+  193.585,236.355,279.125,300.510,321.895,343.280,
+  364.660,386.045,407.430,428.815,450.200,471.585,
+  491.715,510.580,529.445,548.315,567.185,
+  586.055,604.925,623.795,
+  642.660,661.525,680.395,699.265,718.135,737.005,755.875
+ ];
+ if(!Number.isFinite(pageWidth)||pageWidth<700||pageWidth>1000){
+  throw new Error('Khổ PDF không khớp mẫu bảng SMAS 5A3; dừng đọc để tránh gán nhầm cột.');
  }
- if(!anchor || anchorCodes.length<20){
-  throw new Error('PDF có dữ liệu học sinh nhưng không tìm được dòng mốc chứa đủ các mã T/H/C và T/Đ/CĐ để xác định tọa độ cột.');
- }
- anchorCodes=anchorCodes.slice().sort((a,b)=>a.x-b.x);
+ const codeCenters=rawCenters.map(x=>x*scale);
  const expectedCount=27;
- let codeCenters=[];
- if(anchorCodes.length>=expectedCount){
-  codeCenters=anchorCodes.slice(0,expectedCount).map(it=>Number(it.x)+(Number(it.w||0)/2));
- }else{
-  // Fallback: dùng các vị trí tiêu đề đã nhận diện được, sau đó bổ sung bằng vị trí mã trên anchor.
-  const header=headerTextPositions(pages);
-  function findHeaderPhrasePos(phrases){
-   const want=(phrases||[]).map(cleanHeader).filter(Boolean);let best=null;
-   for(const p of pages){
-    for(const l of p.lines){
-     const ln=cleanHeader(lineText(l)); if(!ln)continue;
-     for(const ph of want){
-      if(!ln.includes(ph))continue;
-      const its=l.items;
-      for(let i=0;i<its.length;i++){
-       let acc='';
-       for(let k=i;k<Math.min(its.length,i+12);k++){
-        acc=cleanHeader(its.slice(i,k+1).map(z=>z.str).join(' '));
-        if(acc===ph || acc.includes(ph)){
-         const x1=Math.min(...its.slice(i,k+1).map(z=>z.x));
-         const x2=Math.max(...its.slice(i,k+1).map(z=>z.x+z.w));
-         const cand={page:p.page,x:(x1+x2)/2,y:l.y};
-         if(!best || (p.page===1&&best.page!==1)||(p.page===1&&best.page===1&&cand.y>best.y))best=cand;
-         break;
-        }
-        if(acc.length>ph.length+16)break;
-       }
-      }
-     }
-    }
-   }
-   return best;
-  }
-  const fallbackNames=[...SUBJECTS,...QUALITIES,...GENERAL,...SPECIAL];
-  const pos=[];
-  for(const n of fallbackNames){const p=findHeaderPhrasePos([...(SUBJECT_ALIASES[n]||[n]),n]);if(p)pos.push(p.x)}
-  codeCenters=[...pos];
-  while(codeCenters.length<expectedCount && anchorCodes[codeCenters.length]){
-   codeCenters.push(Number(anchorCodes[codeCenters.length].x)+(Number(anchorCodes[codeCenters.length].w||0)/2));
-  }
- }
- codeCenters=codeCenters.slice(0,expectedCount);
- // Loại trường hợp hai tọa độ trùng do PDF dùng chung một text item.
- if(new Set(codeCenters.map(x=>Math.round(x*10)/10)).size<20){
-  throw new Error('Không xác định được 27 cột đánh giá riêng biệt trong PDF.');
- }
-
  function nearestCode(row,targetX,kind){
   let best=null,bestDist=Infinity;
   for(const it of row.items){
@@ -270,10 +232,10 @@ async function parsePDF(file){
    const d=Math.abs(cx-targetX);
    if(d<bestDist){bestDist=d;best=v;}
   }
-  // Dùng ngưỡng theo khoảng cách cột kế bên để tránh kéo nhầm mã của cột lân cận.
+  // Ngưỡng nhỏ hơn nửa khoảng cách hai cột để không lấy nhầm mã bên cạnh.
   let gap=999;
   for(const x of codeCenters){const d=Math.abs(x-targetX);if(d>0.5&&d<gap)gap=d;}
-  const tol=Math.max(10,Math.min(28,gap*0.46));
+  const tol=Math.min(9*scale,gap*0.42);
   return best && bestDist<=tol ? best.toUpperCase() : '';
  }
  function scoreToken(value){
