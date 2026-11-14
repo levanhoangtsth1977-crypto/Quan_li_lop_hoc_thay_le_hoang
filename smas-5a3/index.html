@@ -173,7 +173,7 @@ async function parsePDF(file){
   const pg=await doc.getPage(pno);
   const tc=await pg.getTextContent({normalizeWhitespace:false,disableCombineTextItems:false});
   const items=tc.items.filter(x=>text(x.str)).map(x=>({str:text(x.str),x:Number(x.transform[4]||0),y:Number(x.transform[5]||0),w:Number(x.width||0),h:Number(x.height||0)}));
-  pages.push({page:pno,items,lines:clusterLines(items)});
+  pages.push({page:pno,items,lines:clusterLines(items),view:Array.isArray(pg.view)?pg.view:null});
  }
  const sl=groupRowsByCoordinates(pages);
  if(!sl.length)throw new Error('PDF đã đọc được text nhưng chưa dựng được dòng STT + họ tên theo tọa độ. Hãy dùng đúng PDF xuất trực tiếp từ SMAS.');
@@ -209,7 +209,9 @@ async function parsePDF(file){
  // Cuối kỳ I: 7 cột điểm (Toán, Tiếng Việt, LS-ĐL, Tiếng Anh, Tin học, Khoa học, Công nghệ).
  // Cả hai mẫu đều có 27 cột mã đánh giá: 12 môn + 5 phẩm chất + 3 NL chung + 7 NL đặc thù.
  // Tọa độ được đo theo đường kẻ dọc của hai PDF SMAS 5A3 ông chủ cung cấp.
- const pageWidth=Number(doc.getPage(1).view[2])-Number(doc.getPage(1).view[0]);
+ const firstPageView=pages[0]?.view;
+ if(!Array.isArray(firstPageView)||firstPageView.length<4)throw new Error('Không đọc được kích thước trang PDF SMAS. Hãy thử xuất lại PDF trực tiếp từ SMAS.');
+ const pageWidth=Number(firstPageView[2])-Number(firstPageView[0]);
  const scale=pageWidth/841.68;
  if(!Number.isFinite(pageWidth)||pageWidth<700||pageWidth>1000){
   throw new Error('Khổ PDF không khớp mẫu bảng SMAS 5A3; dừng đọc để tránh gán nhầm cột.');
